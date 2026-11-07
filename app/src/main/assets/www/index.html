@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#2E95F0">
+  <title>Lumi Transportation</title>
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ============ TAB: PERJALANAN ============ -->
+    <section class="tab is-active" id="tab-plan" aria-label="Perjalanan">
+      <header class="plan-head">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+            <defs><linearGradient id="bmg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7FCBF7"/><stop offset="1" stop-color="#3A7BE4"/></linearGradient></defs>
+            <circle cx="20" cy="20" r="19" fill="url(#bmg)" stroke="rgba(255,255,255,.55)" stroke-width="1.5"/>
+            <path d="M14 11v11a6 6 0 0 0 6 6h7" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+            <circle cx="14" cy="11" r="3.4" fill="#1565D8" stroke="#fff" stroke-width="2.4"/>
+            <circle cx="27.5" cy="28" r="3.6" fill="#fff"/>
+            <path d="M29.5 8.5l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z" fill="#fff"/>
+          </svg>
+          <div>
+            <div class="brand-name">Lumi Transportation</div>
+            <div class="brand-sub">Semua moda Jabodetabek, satu rute</div>
+          </div>
+          <button class="gear" id="btnSettings" type="button" aria-label="Pengaturan">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <form class="trip" id="tripForm" autocomplete="off">
+          <div class="trip-stem" aria-hidden="true"><i class="dot-from"></i><i class="stem"></i><i class="dot-to"></i></div>
+          <div class="trip-fields">
+            <label class="field">
+              <span class="field-label">Dari</span>
+              <input id="inFrom" type="text" placeholder="Cari asal di Google Maps" enterkeyhint="search">
+              <button type="button" class="field-clear" data-clear="from" aria-label="Hapus asal">×</button>
+            </label>
+            <label class="field">
+              <span class="field-label">Ke</span>
+              <input id="inTo" type="text" placeholder="Cari tujuan di Google Maps" enterkeyhint="search">
+              <button type="button" class="field-clear" data-clear="to" aria-label="Hapus tujuan">×</button>
+            </label>
+          </div>
+          <button type="button" class="swap" id="btnSwap" aria-label="Tukar asal dan tujuan">
+            <svg viewBox="0 0 24 24"><path d="M7 4v14m0 0-3-3m3 3 3-3M17 20V6m0 0-3 3m3-3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </form>
+        <div class="trip-actions">
+          <button class="chip-loc" id="btnLocate" type="button" aria-label="Pakai lokasi saya">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            <span>Lokasi saya</span>
+          </button>
+          <button class="chip-loc" id="btnTime" type="button">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span id="timeLabel">Berangkat sekarang</span>
+          </button>
+          <button class="btn-go" id="btnGo" type="button">Cari rute</button>
+        </div>
+      </header>
+
+      <div class="suggest" id="suggest" hidden></div>
+
+      <main class="plan-body" id="planBody">
+        <div id="planIntro">
+          <div id="gtfsBanner"></div>
+
+          <button class="live-entry" id="btnLiveNear" type="button">
+            <span class="live-entry-ico"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 11h16M8 20l1.5-3M16 20l-1.5-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="14" r="1.2" fill="currentColor"/><circle cx="15.5" cy="14" r="1.2" fill="currentColor"/></svg></span>
+            <span class="live-entry-txt"><b>Bus di sekitarmu <i class="live-pill">LANGSUNG</i></b><span>Lihat posisi bus Transjakarta &amp; Mikrotrans saat ini di peta.</span></span>
+            <svg class="live-entry-go" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+
+          <h2 class="sect-title">Tujuan populer <span style="font-weight:500;color:var(--muted);font-size:12.5px">· dibuka di Google Maps</span></h2>
+          <div class="pop" id="popular"></div>
+          <div id="recentWrap" hidden>
+            <h2 class="sect-title">Pencarian terakhir</h2>
+            <div class="recent" id="recent"></div>
+          </div>
+          <div class="modes-strip" aria-label="Moda yang tercakup">
+            <h2 class="sect-title">Yang Lumi hitungkan untukmu</h2>
+            <div class="mode-grid" id="modeGrid"></div>
+          </div>
+        </div>
+        <div id="results" hidden></div>
+      </main>
+    </section>
+
+    <!-- ============ TAB: RUTE ============ -->
+    <section class="tab" id="tab-lines" aria-label="Info rute">
+      <header class="page-head">
+        <h1>Info rute</h1>
+        <p>Pilih rute untuk melihat halte dan stasiun yang dilewati.</p>
+        <div class="search-line">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="inLine" type="search" placeholder="Cari rute: 9, 13C, Bogor, MRT, Blok M…" autocomplete="off">
+        </div>
+        <div class="filters" id="filters"></div>
+      </header>
+      <main class="lines" id="lineList"></main>
+    </section>
+
+    <!-- ============ TAB: INFO ============ -->
+    <section class="tab" id="tab-info" aria-label="Tarif dan info">
+      <header class="page-head">
+        <h1>Tarif &amp; info</h1>
+        <p>Perkiraan tarif yang dipakai Lumi untuk menghitung biaya perjalanan.</p>
+      </header>
+      <main class="info" id="infoBody"></main>
+    </section>
+
+    <!-- ============ NAV ============ -->
+    <nav class="nav" id="nav">
+      <button class="nav-btn is-active" data-tab="plan">
+        <svg viewBox="0 0 24 24"><path d="M6 4v10a4 4 0 0 0 4 4h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="6" cy="4" r="2.4" fill="currentColor"/><circle cx="18" cy="18" r="3" fill="currentColor"/></svg>
+        <span>Perjalanan</span>
+      </button>
+      <button class="nav-btn" data-tab="lines">
+        <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="14" rx="3.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M4 11h16M8 21l1.5-4M16 21l-1.5-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="8.5" cy="14" r="1" fill="currentColor"/><circle cx="15.5" cy="14" r="1" fill="currentColor"/></svg>
+        <span>Rute</span>
+      </button>
+      <button class="nav-btn" data-tab="info">
+        <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M3 10h18M7 14.5h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <span>Tarif</span>
+      </button>
+    </nav>
+
+    <!-- ============ SHEETS (overlay) ============ -->
+    <div class="sheet" id="sheetTrip" hidden>
+      <div class="sheet-bar">
+        <button class="back" data-close aria-label="Kembali"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="sheet-title" id="tripTitle">Detail perjalanan</div>
+        <button class="icon-btn" id="btnShare" aria-label="Bagikan"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5" fill="currentColor"/><circle cx="18" cy="6" r="2.5" fill="currentColor"/><circle cx="18" cy="18" r="2.5" fill="currentColor"/><path d="m8 11 8-4M8 13l8 4" stroke="currentColor" stroke-width="2"/></svg></button>
+      </div>
+      <div class="map" id="tripMap"></div>
+      <div class="sheet-body" id="tripBody"></div>
+    </div>
+
+
+    <div class="sheet" id="sheetLine" hidden>
+      <div class="line-hero" id="lineHero"></div>
+      <div class="map map-short" id="lineMap"></div>
+      <div class="sheet-body" id="lineBody"></div>
+    </div>
+
+    <!-- Jam berangkat / tiba -->
+    <div class="modal" id="sheetTime" hidden>
+      <div class="modal-card">
+        <div class="modal-head"><h3>Kapan berangkat?</h3><button class="icon-btn dark" data-close-modal aria-label="Tutup">×</button></div>
+        <div class="seg-toggle" id="timeMode">
+          <button data-m="now" class="is-on">Sekarang</button><button data-m="dep">Berangkat jam</button><button data-m="arr">Tiba sebelum</button>
+        </div>
+        <div class="time-row" id="timeRow">
+          <input type="time" id="inTime" value="08:00">
+          <div class="presets" id="presets">
+            <button data-t="06:00">06.00</button><button data-t="08:00">08.00</button><button data-t="12:00">12.00</button>
+            <button data-t="17:30">17.30</button><button data-t="22:30">22.30</button><button data-t="00:00">00.00</button>
+          </div>
+        </div>
+        <p class="modal-note" id="timeNote">Lumi hanya menyarankan moda yang beroperasi pada jam tersebut. Tengah malam, yang tersedia hanya Transjakarta koridor 1–14 (AMARI), Mikrotrans JAK36/47/52/75, dan ojol.</p>
+        <button class="btn-go wide" id="btnTimeOk">Pakai waktu ini</button>
+      </div>
+    </div>
+
+    <!-- Lokasi yang dibagikan dari Google Maps -->
+    <div class="modal" id="sheetShare" hidden>
+      <div class="modal-card">
+        <div class="modal-head"><h3>Lokasi diterima</h3><button class="icon-btn dark" data-close-modal aria-label="Tutup">×</button></div>
+        <div class="share-place"><span class="sg-ico saved" id="shareIco"></span><div><b id="shareName">…</b><span id="shareSub">Membaca tautan…</span></div></div>
+        <label class="pick-save"><input type="checkbox" id="shareSave" checked> Simpan ke tempat tersimpan</label>
+        <div class="set-actions"><button class="btn-sec" id="shareFrom" disabled>Jadikan asal</button><button class="btn-go" id="shareTo" style="flex:1" disabled>Jadikan tujuan</button></div>
+      </div>
+    </div>
+
+    <!-- Pengaturan -->
+    <div class="sheet" id="sheetSettings" hidden>
+      <div class="sheet-bar">
+        <button class="back" data-close aria-label="Kembali"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="sheet-title">Pengaturan</div>
+      </div>
+      <div class="settings" id="settingsBody"></div>
+    </div>
+
+    <!-- Pilih titik di peta -->
+    <div class="sheet" id="sheetPick" hidden>
+      <div class="sheet-bar">
+        <button class="back" data-close aria-label="Kembali"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="sheet-title" id="pickTitle">Pilih titik di peta</div>
+      </div>
+      <div class="pick-map-wrap">
+        <div class="map map-full" id="pickMap"></div>
+        <div class="pick-pin" aria-hidden="true"><i></i></div>
+        <button class="pick-me" id="pickMe" aria-label="Ke lokasi saya"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+      </div>
+      <div class="pick-panel">
+        <div class="pick-addr" id="pickAddr">Geser peta sampai pin tepat di lokasimu</div>
+        <label class="pick-save"><input type="checkbox" id="pickSaveChk"> Simpan sebagai tempat</label>
+        <input class="pick-name" id="pickName" type="text" placeholder="Nama tempat, mis. Laundry Alsusco" hidden>
+        <button class="btn-go wide" id="pickOk">Pakai titik ini</button>
+      </div>
+    </div>
+
+    <!-- Posisi bus langsung (feed armada Transjakarta) -->
+    <div class="sheet" id="sheetLive" hidden>
+      <div class="sheet-bar"><button class="back" data-close aria-label="Kembali"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="sheet-title">Bus di sekitarmu</div><span class="live-status" id="liveNearStatus"></span></div>
+      <div class="map" id="liveMap"></div>
+      <div class="sheet-body" id="liveBody"></div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="vendor/leaflet.js"></script>
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="vendor/leaflet-maplibre-gl.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/stopfix.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/live.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

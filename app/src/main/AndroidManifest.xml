@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="id.lumi.transport"
+    android:versionCode="39"
+    android:versionName="2.3">
+
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Mode pendampingan (GPS terus berjalan saat layar mati) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Pembaruan rute harian tetap terjadwal setelah HP dinyalakan ulang -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- "Berjalan di latar belakang": minta dikecualikan dari penghemat baterai -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Agar bisa membuka aplikasi ojol yang terpasang (Android 11+) -->
+    <queries>
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.gojek.app" />
+        <package android:name="com.grabtaxi.passenger" />
+        <package android:name="com.taxsee.taxsee" />
+        <package android:name="sinet.startup.inDriver" />
+        <package android:name="com.kci.access" />
+        <package android:name="id.co.transjakarta.tije" />
+        <package android:name="com.transjakmobile" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/LumiTheme"
+        android:allowBackup="true"
+        android:usesCleartextTraffic="false"
+        android:supportsRtl="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Terima lokasi yang dibagikan dari Google Maps / aplikasi lain -->
+            <intent-filter android:label="Rute dengan Lumi">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".NavService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+        <service
+            android:name=".RouteWatchJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <provider
+            android:name=".ShareProvider"
+            android:authorities="id.lumi.transport.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+        <service
+            android:name=".RouteUpdateJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+    </application>
+</manifest>

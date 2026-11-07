@@ -1,0 +1,39 @@
+lugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "id.lumi.transport"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "id.lumi.transport"
+        minSdk 24
+        targetSdk 34
+        versionCode 40
+        versionName "2.4"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Ganti dengan signingConfig milikmu sebelum rilis ke Play Store.
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    androidResources {
+        noCompress "woff2"
+    }
+}
+
+// Bangun ulang data rute sebelum build (butuh python3).
+tasks.register("buildRouteData", Exec) {
+    workingDir rootProject.projectDir
+    commandLine "python3", "tools/build_data.py"
+}
+preBuild.dependsOn buildRouteData
+

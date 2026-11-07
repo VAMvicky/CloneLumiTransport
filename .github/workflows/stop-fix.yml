@@ -1,0 +1,25 @@
+name: stop-fix
+# Selaraskan titik halte/stasiun dengan OpenStreetMap tiap minggu (aplikasi mengambil data/stop_fix.json).
+on:
+  schedule:
+    - cron: "17 20 * * 0"     # Senin 03.17 WIB
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["tools/osm_stops.py", ".github/workflows/stop-fix.yml"]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: GTFS resmi ringkas (cabang gtfs-data)
+        run: git fetch -q origin gtfs-data && git show origin/gtfs-data:tj_gtfs.json > tj_gtfs.json || true
+      - run: python3 tools/osm_stops.py . 2> data/stop_fix_error.txt || true
+      - run: test -s data/stop_fix_error.txt || rm -f data/stop_fix_error.txt
+      - run: |
+          git config user.name "lumi-route-watch[bot]"
+          git config user.email "lumi-route-watch@users.noreply.github.com"
+          git add -A data
+          git diff --cached --quiet || (git commit -qm "data: titik halte/stasiun dari OpenStreetMap" && git pull -q --rebase origin main && git push origin HEAD:main)

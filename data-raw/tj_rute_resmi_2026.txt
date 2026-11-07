@@ -1,0 +1,240 @@
+# Daftar rute resmi Transjakarta — disalin dari https://transjakarta.co.id/rute (diakses 10 Okt 2026)
+# Format: KATEGORI|KODE|ASAL - TUJUAN
+BRT|1|Blok M - Kota
+BRT|2|Pulo Gadung - Monumen Nasional
+BRT|2A|Pulo Gadung - Rawa Buaya
+BRT|3|Kalideres - Monumen Nasional via Veteran
+BRT|3F|Kalideres - Senayan Bank Jakarta
+BRT|3H|Damai - Kota
+BRT|4|Pulo Gadung - Galunggung
+BRT|4D|Pulo Gadung - Kuningan
+BRT|5|Kampung Melayu - Ancol
+BRT|5C|Cililitan - Juanda
+BRT|6|Ragunan - Galunggung
+BRT|6A|Ragunan - Balai Kota via Kuningan
+BRT|6B|Ragunan - Balai Kota via Semanggi
+BRT|6V|Ragunan - Senayan Bank Jakarta
+BRT|7|Kampung Melayu - Kampung Rambutan
+BRT|7F|Kampung Rambutan - Juanda via Cempaka Putih
+BRT|8|Lebak Bulus - Pasar Baru
+BRT|9|Pinang Ranti - Pluit
+BRT|9A|Cililitan - Grogol
+BRT|9C|Pinang Ranti - Bundaran Senayan
+BRT|9N|Pinang Ranti - Simpang Cawang
+BRT|10|Tanjung Priok - PGC
+BRT|10H|Tanjung Priok - Bundaran Senayan
+BRT|11|Pulo Gebang - Kampung Melayu
+BRT|12|Pluit - Tanjung Priok
+BRT|13|Ciledug - Tegal Mampang
+BRT|13B|Puri Beta - Pancoran
+BRT|13E|Puri Beta - Flyover Kuningan
+BRT|14|Jakarta International Stadium - Senen
+BRT|L13E|Puri Beta - Flyover Kuningan (Express)
+PENGUMPAN|1A|Pantai Maju - Balai Kota
+PENGUMPAN|1B|Stasiun Palmerah - Transport Hub Dukuh Atas
+PENGUMPAN|1C|Pesanggrahan - Blok M
+PENGUMPAN|1E|Pondok Labu - Blok M
+PENGUMPAN|1F|Stasiun Palmerah - Bundaran Senayan
+PENGUMPAN|1H|Tanah Abang - Stasiun Gondangdia
+PENGUMPAN|1M|Meruya - Blok M
+PENGUMPAN|1P|Senen - Blok M
+PENGUMPAN|1Q|Rempoa - Blok M
+PENGUMPAN|1R|Senen - Tanah Abang
+PENGUMPAN|1W|Blok M - Ancol
+PENGUMPAN|2B|Harapan Indah - Pulo Gadung
+PENGUMPAN|2P|Stasiun Gondangdia - Pasar Senen
+PENGUMPAN|2Q|Gondangdia - Balai Kota
+PENGUMPAN|3D|Taman Kota - Penjaringan via Tubagus Angke
+PENGUMPAN|3E|Sentraland Cengkareng - Puri Kembangan
+PENGUMPAN|4B|Stasiun Manggarai - Universitas Indonesia
+PENGUMPAN|4C|JIEP - Bundaran Senayan
+PENGUMPAN|4F|Pinang Ranti - Pulo Gadung
+PENGUMPAN|4K|Pulo Gadung - Kejaksaan Agung
+PENGUMPAN|5B|Stasiun Tebet - Bidara Cina
+PENGUMPAN|5F|Kampung Melayu - Tanah Abang
+PENGUMPAN|5M|Kampung Melayu - Tanah Abang
+PENGUMPAN|5N|Ragunan - Kampung Melayu
+PENGUMPAN|6C|Stasiun Tebet - Kuningan
+PENGUMPAN|6D|Stasiun Tebet - Bundaran Senayan
+PENGUMPAN|6H|Senen - Lebak Bulus
+PENGUMPAN|6K|Kuningan - Karet
+PENGUMPAN|6M|Stasiun Manggarai - Blok M
+PENGUMPAN|6N|Ragunan - Blok M via Kemang
+PENGUMPAN|6Q|Dukuh Atas - Casablanca via Epicentrum
+PENGUMPAN|6T|Pasar Minggu - Velbak via Kebon Jeruk
+PENGUMPAN|6U|Blok M - Pasar Minggu
+PENGUMPAN|6W|Duren Tiga - Blok M via Bangka Raya
+PENGUMPAN|7A|Kampung Rambutan - Lebak Bulus
+PENGUMPAN|7B|Kampung Rambutan - Blok M
+PENGUMPAN|7C|Cibubur - Cawang Cililitan
+PENGUMPAN|7D|TMII - Pancoran
+PENGUMPAN|7E|Kampung Rambutan - Ragunan
+PENGUMPAN|7P|Pondok Kelapa - Cawang Cililitan
+PENGUMPAN|7Q|Blok M - Cawang Cililitan
+PENGUMPAN|7R|Cibubur - Pluit
+PENGUMPAN|7T|Cibubur - Tanjung Priok
+PENGUMPAN|7U|Cibubur - Ancol
+PENGUMPAN|7V|Cibubur - Kampung Rambutan
+PENGUMPAN|7W|Cawang - Stasiun Kereta Cepat Halim
+PENGUMPAN|8C|Kebayoran Lama - Tanah Abang
+PENGUMPAN|8D|Meruya Selatan - Blok M
+PENGUMPAN|8E|Bintaro - Blok M
+PENGUMPAN|8K|Batusari - Grogol
+PENGUMPAN|8M|Tanah Abang - Tanjung Duren
+PENGUMPAN|8N|Kebayoran - Petamburan via Asia Afrika
+PENGUMPAN|9D|Pasar Minggu - Tanah Abang
+PENGUMPAN|9E|Kebayoran - Jelambar
+PENGUMPAN|9H|Pasar Minggu - Cipedak
+PENGUMPAN|11D|Pulo Gebang - Pulo Gadung via PIK
+PENGUMPAN|11Q|Kampung Melayu - Pulo Gebang via BKT
+PENGUMPAN|11W|Stasiun Klender - Pulo Gadung
+PENGUMPAN|12A|Kota - Kaliadem
+PENGUMPAN|12B|Pluit - Senen
+PENGUMPAN|12P|Stasiun LRT Pegangsaan - JIS
+PENGUMPAN|14A|Monumen Nasional - Jakarta International Stadium
+PENGUMPAN|14B|Tanjung Priok - Senen via JIS
+PENGUMPAN|51ST|Shuttle HBKB Ancol
+ROYAL|1K|Cibubur - Blok M
+ROYAL|1T|Cibubur - Balai Kota
+ROYAL|6P|Cibubur - Kuningan
+ROYAL|B13|Summarecon Bekasi - Blok M
+ROYAL|B14|Summarecon Bekasi - Kuningan
+ROYAL|D31|Cinere - Kuningan
+ROYAL|D32|Cinere - Bundaran Senayan
+ROYAL|S12|Terminal BSD - Fatmawati
+ROYAL|S14|Summarecon Serpong - Lebak Bulus
+ROYAL|S31|Bintaro - Fatmawati
+WISATA|BW1|Sejarah Jakarta
+WISATA|BW2|Monas Explorer
+WISATA|BW4|Pencakar Langit
+MIKRO|JAK01|Tanjung Priok - Plumpang
+MIKRO|JAK02|Kampung Melayu - Duren Sawit
+MIKRO|JAK03|Lebak Bulus - Andara
+MIKRO|JAK04|Grogol - Tubagus Angke
+MIKRO|JAK05|Semper - Rorotan
+MIKRO|JAK06|Kampung Rambutan - Pondok Gede
+MIKRO|JAK07|Tanah Abang - Grogol via Tawakal
+MIKRO|JAK08|Tanah Abang - Benhil via Roxy
+MIKRO|JAK09|Tanah Abang - Karet via Roxy
+MIKRO|JAK10|Tanah Abang - Kota
+MIKRO|JAK100|Terminal Pulo Gebang - Rusun Pinus Elok
+MIKRO|JAK102|Blok M - Lebak Bulus
+MIKRO|JAK105|Stasiun Tebet - Rusun Cipinang Muara
+MIKRO|JAK106|Terminal Klender - Terminal Kampung Melayu
+MIKRO|JAK107|Jembatan Garden - Puri Beta
+MIKRO|JAK108|Kramat Jati - Bambu Apus
+MIKRO|JAK10A|Gondangdia - Cikini via Salemba Raya
+MIKRO|JAK10B|Gondangdia - Cikini via Kramat Raya
+MIKRO|JAK11|Tanah Abang - Kebayoran Lama
+MIKRO|JAK110A|Rusun Marunda - Pulo Gebang
+MIKRO|JAK110B|Rusun Komarudin - Putaran Balik Bebek TNI
+MIKRO|JAK112|Terminal Tanah Merah - Pulo Gadung
+MIKRO|JAK113|Tanah Merdeka - Kampung Sawah
+MIKRO|JAK115|Terminal Tanjung Priok - Pegangsaan II IGI
+MIKRO|JAK117|Tanjung Priok - Tanah Merdeka
+MIKRO|JAK118|Taman Waduk Papanggo - Kota Tua
+MIKRO|JAK12|Tanah Abang - Kebayoran Lama via Pos Pengumben
+MIKRO|JAK120|Jakarta International Stadium - Terminal Muara Angke
+MIKRO|JAK13|Tanah Abang - Jembatan Lima
+MIKRO|JAK14|Tanah Abang - Meruya
+MIKRO|JAK15|Tanjung Priok - Rusun Marunda
+MIKRO|JAK16|Cililitan - Condet
+MIKRO|JAK17|Senen - Pulogadung
+MIKRO|JAK18|Stasiun Duren Kalibata - Kuningan
+MIKRO|JAK19|Pinang Ranti - Kampung Rambutan
+MIKRO|JAK20|Cawang UKI - Lubang Buaya
+MIKRO|JAK21|Cililitan - Dwikora
+MIKRO|JAK22|Dwikora - Penas Kalimalang
+MIKRO|JAK23|Senen - Pisangan Baru
+MIKRO|JAK24|Senen - Pulo Gadung via Kelapa Gading
+MIKRO|JAK25|Pasar Rebo - Kalisari
+MIKRO|JAK26|Rawamangun - Duren Sawit
+MIKRO|JAK27|Pulo Gebang - Rorotan
+MIKRO|JAK28|Pasar Rebo - Stasiun LRT Harjamukti via Bulak Sereh
+MIKRO|JAK29|Tanjung Priok - Sukapura
+MIKRO|JAK30|Grogol - Meruya via Roxy
+MIKRO|JAK31|Blok M - Andara
+MIKRO|JAK32|Lebak Bulus - Joglo
+MIKRO|JAK33|Pulo Gadung - Kota
+MIKRO|JAK34|Terminal Klender - Terminal Rawamangun
+MIKRO|JAK35|Rawamangun - Pangkalan Jati
+MIKRO|JAK36|Cilangkap - Cililitan (PGC)
+MIKRO|JAK37|Cililitan (PGC) - Condet via Kayu Manis
+MIKRO|JAK38|Bulak Ringin - Kampung Rambutan
+MIKRO|JAK39|Kalimalang - Duren Sawit
+MIKRO|JAK40|Harapan Baru - Pulo Gebang via Rawa Kuning
+MIKRO|JAK41|Kampung Melayu - Pulo Gadung
+MIKRO|JAK42|Kampung Melayu - Pondok Kelapa
+MIKRO|JAK43B|Tongtek - Tebet Eco Park - Cililitan
+MIKRO|JAK43C|Sarana Jaya - Tebet Eco Park - Stasiun Cawang
+MIKRO|JAK44|Andara - Stasiun Universitas Pancasila
+MIKRO|JAK45|Lebak Bulus - Ragunan
+MIKRO|JAK46|Jagakarsa - Pasar Minggu
+MIKRO|JAK47|Pasar Minggu - Ciganjur via Kebun Binatang Ragunan
+MIKRO|JAK48A|Stasiun Tebet - Karet
+MIKRO|JAK49|Lebak Bulus - Cipulir
+MIKRO|JAK50|Kalideres - Puri Kembangan
+MIKRO|JAK51|Taman Kota - Budi Luhur
+MIKRO|JAK52|Kalideres - Muara Angke
+MIKRO|JAK53|Grogol - Pos Pengumben
+MIKRO|JAK54|Grogol - Benhil
+MIKRO|JAK56|Pesing - Srengseng
+MIKRO|JAK58|Cilincing - Rusun Padat Karya
+MIKRO|JAK59|Rawamangun - Rawa Sengon
+MIKRO|JAK60|Kelapa Gading - Rusun Kemayoran
+MIKRO|JAK61|Cempaka Putih - Pulo Gadung via Kelapa Gading
+MIKRO|JAK64|Aseli - Terminal Pasar Minggu
+MIKRO|JAK71|Kampung Rambutan - Pinang Ranti
+MIKRO|JAK72|Kampung Rambutan - Pasar Rebo via Poncol
+MIKRO|JAK73|Jambore Cibubur - Pasar Rebo
+MIKRO|JAK74|Rawamangun - Cipinang Muara
+MIKRO|JAK75|Cililitan - Kampung Pulo
+MIKRO|JAK76|Jalan Industri Raya - ASMI
+MIKRO|JAK77|Tanjung Priok - Jembatan Hitam
+MIKRO|JAK78A|Benda - Cengkareng
+MIKRO|JAK78B|Jembatan Tiga - Teluk Gong
+MIKRO|JAK79|Cengkareng - Tubagus Angke
+MIKRO|JAK80|Rawa Buaya - Rawa Kompeni
+MIKRO|JAK84|Terminal Kampung Melayu - Kapin Raya
+MIKRO|JAK85|Bintara - Cipinang Indah
+MIKRO|JAK86|Terminal Rawamangun - Terminal Manggarai
+MIKRO|JAK87|Terminal Tanjung Priok - Terminal Rawamangun
+MIKRO|JAK88|Terminal Tanjung Priok - Ancol Barat
+MIKRO|JAK89|Terminal Tanjung Priok - Taman Kota Intan
+MIKRO|JAK90|Terminal Tanjung Priok - Rusun Kemayoran
+MIKRO|JAK93|Jeruk Purut - Kebayoran Lama
+MIKRO|JAK95|Terminal Lebak Bulus - Terminal Pasar Minggu
+MIKRO|JAK98|Terminal Kampung Rambutan - Munjul
+MIKRO|JAK99|Terminal Pulo Gadung - Lampiri
+RUSUN|2F|Pulo Gadung - Rusun Cakung Barat
+RUSUN|2H|Rusun Jati Rawasari - Senen
+RUSUN|3A|Rusun Pesakih - Kalideres
+RUSUN|3B|Rusun Flamboyan - Cengkareng
+RUSUN|3C|Rusun Kapuk Muara - Rusun Tambora
+RUSUN|4E|Rusun Jatinegara Kaum - Pulogadung
+RUSUN|10B|Rusun Cipinang Besar Selatan - Penas Kalimalang
+RUSUN|11B|Rusun Ujung Menteng - Penggilingan
+RUSUN|11C|Rusun Pulo Gebang - Penggilingan
+RUSUN|11M|Rusun Rawa Bebek - Bukit Duri
+RUSUN|11P|Rusun Pondok Bambu - Walikota Jakarta Timur
+RUSUN|11R|Rusun Cakung KM2 - Penggilingan
+RUSUN|12C|Rusun Waduk Pluit - Rusun Penjaringan
+RUSUN|12F|Rusun Marunda - Rusun Waduk Pluit
+JABODETABEK|B11|Summarecon Bekasi - Cawang
+JABODETABEK|B21|Bekasi Timur - Cawang
+JABODETABEK|B25|Bekasi - Dukuh Atas
+JABODETABEK|B41|Vida Bekasi - Cawang Sentral
+JABODETABEK|B51|Cikarang - Cawang
+JABODETABEK|D11|Depok - Cawang Sentral via Cibubur
+JABODETABEK|D21|Universitas Indonesia - Lebak Bulus
+JABODETABEK|D41|Sawangan - Lebak Bulus via Tol Desari
+JABODETABEK|P11|Blok M - Bogor
+JABODETABEK|S11|BSD (Serpong) - Jelambar
+JABODETABEK|S21|CSW - Ciputat
+JABODETABEK|S22|Ciputat - Kampung Rambutan
+JABODETABEK|S61|Alam Sutera - Blok M
+JABODETABEK|SH1|Kalideres - Perkantoran Soekarno Hatta
+JABODETABEK|SH2|Blok M - Bandara Soekarno-Hatta
+JABODETABEK|T11|Poris Plawad - Petamburan
+JABODETABEK|T12|Poris Plawad - Juanda
+JABODETABEK|T31|PIK 2 - Blok M

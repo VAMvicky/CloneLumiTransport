@@ -1,0 +1,109 @@
+name: Build Lumi Transportation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "app/**"
+      - "tools/**"
+      - "data-raw/**"
+      - "build.sh"
+      - "release-notes/**"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Siapkan alat build Android (tanpa Gradle)
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          PLAT="$ANDROID_HOME/platforms/android-34"
+          if [ ! -f "$PLAT/android.jar" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" >/dev/null
+          fi
+          mkdir -p tools/sdk
+          curl -sSL -o tools/sdk/ecj.jar https://repo1.maven.org/maven2/org/eclipse/jdt/ecj/3.33.0/ecj-3.33.0.jar
+          {
+            echo "ANDROID_JAR=$PLAT/android.jar"
+            echo "AAPT2=$BT/aapt2"
+            echo "D8_JAR=$BT/lib/d8.jar"
+            echo "APKSIGNER_JAR=$BT/lib/apksigner.jar"
+            echo "ECJ_JAR=$PWD/tools/sdk/ecj.jar"
+          } >> "$GITHUB_ENV"
+          echo "build-tools: $BT"
+
+      - name: Ambil kunci tanda tangan dari Secrets
+        id: key
+        env:
+          KS_B64: ${{ secrets.LUMI_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.LUMI_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.LUMI_KEY_ALIAS }}
+        run: |
+          if [ -z "$KS_B64" ] || [ -z "$KS_PASS" ]; then
+            echo "::warning::Secrets LUMI_KEYSTORE_BASE64 / LUMI_KEYSTORE_PASSWORD belum diisi. APK ditandatangani kunci sementara dan TIDAK dirilis."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "KEYSTORE=$RUNNER_TEMP/temp.keystore" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/lumi.keystore"
+          echo "KEYSTORE=$RUNNER_TEMP/lumi.keystore" >> "$GITHUB_ENV"
+          echo "KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
+          echo "KS_ALIAS=${KS_ALIAS:-lumi}" >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        run: |
+          set -o pipefail
+          chmod +x build.sh
+          ./build.sh 2>&1 | tee build.log
+
+      - name: Uji mesin rute
+        run: node tools/test_engine.js > /dev/null
+
+      - name: Baca versi
+        id: ver
+        run: echo "tag=$(tr -d ' \r\n' < release-notes/CURRENT)" >> "$GITHUB_OUTPUT"
+
+      - name: Ganti nama APK
+        run: |
+          mkdir -p out
+          cp build/LumiTransportation.apk "out/LumiTransportation-${{ steps.ver.outputs.tag }}.apk"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LumiTransportation-apk
+          path: out/*.apk
+
+      # Satu rilis per versi (release-notes/CURRENT). Push berikutnya memperbarui APK di rilis itu.
+      - name: Pindahkan tag versi ke commit ini
+        if: github.ref == 'refs/heads/main' && steps.key.outputs.signed == 'true'
+        run: |
+          git tag -f "${{ steps.ver.outputs.tag }}" "${{ github.sha }}"
+          git push -f origin "refs/tags/${{ steps.ver.outputs.tag }}"
+
+      - name: Terbitkan rilis
+        if: github.ref == 'refs/heads/main' && steps.key.outputs.signed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: "✦ Lumi Transportation ${{ steps.ver.outputs.tag }}"
+          body_path: release-notes/${{ steps.ver.outputs.tag }}.md
+          files: out/*.apk
+          overwrite_files: true
+          make_latest: "true"

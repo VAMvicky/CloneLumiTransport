@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LumiTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:statusBarColor">#2E95F0</item>
+        <item name="android:colorPrimary">#2E95F0</item>
+        <item name="android:colorAccent">#38BDF8</item>
+    </style>
+</resources>

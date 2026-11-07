@@ -1,0 +1,18 @@
+build/
+app/build/
+.gradle/
+local.properties
+.idea/
+*.iml
+.DS_Store
+__pycache__/
+tools/sdk/
+
+# Kunci tanda tangan APK (disimpan di GitHub Secrets)
+keystore/
+*.jks
+*.keystore
+
+# kunci penandatangan APK: jangan pernah di-commit
+*.keystore
+*.jks
