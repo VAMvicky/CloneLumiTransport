@@ -54,7 +54,7 @@ jobs:
           KS_ALIAS: ${{ secrets.LUMI_KEY_ALIAS }}
         run: |
           if [ -z "$KS_B64" ] || [ -z "$KS_PASS" ]; then
-            echo "::warning::Secrets LUMI_KEYSTORE_BASE64 / LUMI_KEYSTORE_PASSWORD belum diisi. APK ditandatangani kunci sementara dan TIDAK dirilis."
+            echo "::warning::Secrets LUMI_KEYSTORE_BASE64 / LUMI_KEYSTORE_PASSWORD belum diisi. APK ditandatangani kunci sementara (tetap dirilis; update berikutnya mungkin perlu uninstall dulu)."
             echo "signed=false" >> "$GITHUB_OUTPUT"
             echo "KEYSTORE=$RUNNER_TEMP/temp.keystore" >> "$GITHUB_ENV"
             exit 0
@@ -91,13 +91,13 @@ jobs:
 
       # Satu rilis per versi (release-notes/CURRENT). Push berikutnya memperbarui APK di rilis itu.
       - name: Pindahkan tag versi ke commit ini
-        if: github.ref == 'refs/heads/main' && steps.key.outputs.signed == 'true'
+        if: github.ref == 'refs/heads/main'
         run: |
           git tag -f "${{ steps.ver.outputs.tag }}" "${{ github.sha }}"
           git push -f origin "refs/tags/${{ steps.ver.outputs.tag }}"
 
       - name: Terbitkan rilis
-        if: github.ref == 'refs/heads/main' && steps.key.outputs.signed == 'true'
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
