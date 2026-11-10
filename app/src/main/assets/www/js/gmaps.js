@@ -1,5 +1,5 @@
-/* =============================================================================
- * Lumi — lapisan Google Maps.
+﻿/* =============================================================================
+ * Lumi â€” lapisan Google Maps.
  *
  * Kunci di bawah diekstrak dari APK Google Maps 26.44.06 (lihat
  * docs/google-api-keys.md). Kuncinya dibatasi ke aplikasi Google Maps, jadi
@@ -21,7 +21,7 @@
 var LumiGoogle = (function () {
   "use strict";
 
-  /* Kunci dari res/values/strings.xml APK Google Maps — Places + Static Maps. */
+  /* Kunci dari res/values/strings.xml APK Google Maps â€” Places + Static Maps. */
   var KEY = "AIzaSyAwL-YrZb2V2cHyiT40jAXVFYDqlqs41gs";
   var PKG = "com.google.android.apps.maps";
   var CERT = "38918A453D07199354F8B19AF05EC6562CED5788";
@@ -99,7 +99,7 @@ var LumiGoogle = (function () {
     });
   }
 
-  /* Cari tempat dengan kata bebas (Place Text Search) — cadangan bila autocomplete kosong. */
+  /* Cari tempat dengan kata bebas (Place Text Search) â€” cadangan bila autocomplete kosong. */
   function search(q, near) {
     var p = near || [-6.2, 106.83];
     return call("place/textsearch/json", {
@@ -132,7 +132,7 @@ var LumiGoogle = (function () {
 
   function staticUrl(lat, lng, z, size, scale) {
     var px = size || 256;
-    return API + "staticmap?center=" + lat.toFixed(6) + "," + lng.toFixed(6) +
+    return API + "staticmap?center=" + lat.toFixed(7) + "," + lng.toFixed(7) +
       "&zoom=" + Math.max(0, Math.min(20, Math.round(z))) +
       "&size=" + px + "x" + px + "&scale=" + (scale || 1) +
       "&language=id&sensor=false&key=" + KEY;
@@ -148,7 +148,7 @@ var LumiGoogle = (function () {
   /*
    * Lapisan peta dasar Google memakai Static Maps: satu panggilan per petak
    * 256 px yang berpusat tepat di petak itu, jadi hasilnya menempel rapi.
-   * Biayanya satu permintaan per petak — pilih ini hanya bila memang perlu.
+   * Biayanya satu permintaan per petak â€” pilih ini hanya bila memang perlu.
    */
   function tileLayer(attribution) {
     var G = L.GridLayer.extend({
