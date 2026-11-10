@@ -1,0 +1,13 @@
+# Baseline profile untuk startup Lumi Transport.
+# Format ART: H = hot, S = startup, P = post-startup.
+# Fokus: kelas yang dijalankan saat aplikasi dibuka dan WebView pertama dimuat.
+
+HSPLid/lumi/transport/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLid/lumi/transport/MainActivity;->onPageFinished(Landroid/webkit/WebView;Ljava/lang/String;)V
+HSPLid/lumi/transport/MainActivity;->js(Ljava/lang/String;)V
+HSPLid/lumi/transport/MainActivity;->onResume()V
+HSPLid/lumi/transport/MainActivity;->onStart()V
+HSPLid/lumi/transport/MainActivity;-><init>()V
+
+HSPLid/lumi/transport/ShareProvider;-><init>()V
+HSPLid/lumi/transport/NavService;-><init>()V

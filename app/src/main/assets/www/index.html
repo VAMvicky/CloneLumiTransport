@@ -4,10 +4,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <meta name="theme-color" content="#2E95F0">
-  <title>Lumi Transportation</title>
+  <title>Lumi Transport</title>
   <link rel="stylesheet" href="vendor/leaflet.css">
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="css/app.css">
+  <script>
+    /* Sambutan belum selesai: sembunyikan beranda sejak awal agar tidak tampil sekilas sebelum sambutan dipasang. */
+    try { if (localStorage.getItem("lumi:onboarded") !== "2") document.documentElement.classList.add("ob-pending"); } catch (e) { }
+    /* Catatan galat: 100 galat terakhir (tanpa data pribadi), ikut terlampir di Pengaturan → Laporkan masalah. */
+    (function () {
+      var K = "lumi:errlog", log = [];
+      try { log = JSON.parse(localStorage.getItem(K) || "[]"); } catch (e) { }
+      var saveT = 0;
+      function save() { saveT = 0; try { localStorage.setItem(K, JSON.stringify(log)); } catch (e) { } }
+      window.lumiLog = function (e, where) {
+        if (!e) return;
+        var msg = String(e && e.message || e).slice(0, 200);
+        var at = where || (String(e && e.stack || "").split("\n").filter(function (l) { return /\.js/.test(l); })[0] || "").replace(/^.*\/(js|vendor)\//, "$1/").replace(/[()\s]/g, "").slice(0, 80);
+        var last = log[log.length - 1];
+        if (last && last.m === msg && last.a === at) { last.n = (last.n || 1) + 1; last.t = Date.now(); }
+        else { log.push({ t: Date.now(), m: msg, a: at }); if (log.length > 100) log.splice(0, log.length - 100); }
+        if (!saveT) saveT = setTimeout(save, 1500);
+      };
+      window.lumiErrors = function () { return log.slice(); };
+      window.lumiClearErrors = function () { log = []; save(); };
+      window.addEventListener("error", function (ev) { window.lumiLog(ev.error || ev.message, ev.filename ? ev.filename.replace(/^.*\//, "") + ":" + ev.lineno : ""); });
+      window.addEventListener("unhandledrejection", function (ev) { window.lumiLog(ev.reason || "promise ditolak", "promise"); });
+    })();
+  </script>
 </head>
 <body>
   <div id="app">
@@ -15,16 +39,9 @@
     <section class="tab is-active" id="tab-plan" aria-label="Perjalanan">
       <header class="plan-head">
         <div class="brand">
-          <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
-            <defs><linearGradient id="bmg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7FCBF7"/><stop offset="1" stop-color="#3A7BE4"/></linearGradient></defs>
-            <circle cx="20" cy="20" r="19" fill="url(#bmg)" stroke="rgba(255,255,255,.55)" stroke-width="1.5"/>
-            <path d="M14 11v11a6 6 0 0 0 6 6h7" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
-            <circle cx="14" cy="11" r="3.4" fill="#1565D8" stroke="#fff" stroke-width="2.4"/>
-            <circle cx="27.5" cy="28" r="3.6" fill="#fff"/>
-            <path d="M29.5 8.5l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z" fill="#fff"/>
-          </svg>
+          <img class="brand-mark" src="img/icon.png" alt="Lumi Transport">
           <div>
-            <div class="brand-name">Lumi Transportation</div>
+            <div class="brand-name">Lumi Transport</div>
             <div class="brand-sub">Semua moda Jabodetabek, satu rute</div>
           </div>
           <button class="gear" id="btnSettings" type="button" aria-label="Pengaturan">
@@ -37,12 +54,12 @@
           <div class="trip-fields">
             <label class="field">
               <span class="field-label">Dari</span>
-              <input id="inFrom" type="text" placeholder="Cari asal di Google Maps" enterkeyhint="search">
+              <input id="inFrom" type="text" placeholder="Cari asal: alamat, halte, atau tempat" enterkeyhint="search">
               <button type="button" class="field-clear" data-clear="from" aria-label="Hapus asal">×</button>
             </label>
             <label class="field">
               <span class="field-label">Ke</span>
-              <input id="inTo" type="text" placeholder="Cari tujuan di Google Maps" enterkeyhint="search">
+              <input id="inTo" type="text" placeholder="Cari tujuan: alamat, halte, atau tempat" enterkeyhint="search">
               <button type="button" class="field-clear" data-clear="to" aria-label="Hapus tujuan">×</button>
             </label>
           </div>
@@ -75,7 +92,7 @@
             <svg class="live-entry-go" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
 
-          <h2 class="sect-title">Tujuan populer <span style="font-weight:500;color:var(--muted);font-size:12.5px">· dibuka di Google Maps</span></h2>
+          <h2 class="sect-title" id="favTitle">Rute favorit</h2>
           <div class="pop" id="popular"></div>
           <div id="recentWrap" hidden>
             <h2 class="sect-title">Pencarian terakhir</h2>
@@ -113,6 +130,28 @@
       <main class="info" id="infoBody"></main>
     </section>
 
+    <!-- ============ TAB: HALTE & STASIUN ============ -->
+    <section class="tab" id="tab-stops" aria-label="Halte dan stasiun">
+      <header class="page-head">
+        <h1>Halte &amp; stasiun</h1>
+        <p>Cari halte Transjakarta atau stasiun KRL, MRT, LRT, dan KA Bandara.</p>
+        <div class="search-line">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="inStop" type="search" placeholder="Cari halte atau stasiun" autocomplete="off">
+        </div>
+      </header>
+      <main class="lines" id="stopList"></main>
+    </section>
+
+    <!-- ============ TAB: RIWAYAT ============ -->
+    <section class="tab" id="tab-history" aria-label="Riwayat perjalanan">
+      <header class="page-head">
+        <h1>Riwayat</h1>
+        <p>Perjalanan yang pernah kamu mulai, beserta ongkosnya.</p>
+      </header>
+      <main class="info" id="historyBody"></main>
+    </section>
+
     <!-- ============ NAV ============ -->
     <nav class="nav" id="nav">
       <button class="nav-btn is-active" data-tab="plan">
@@ -123,9 +162,17 @@
         <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="14" rx="3.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M4 11h16M8 21l1.5-4M16 21l-1.5-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="8.5" cy="14" r="1" fill="currentColor"/><circle cx="15.5" cy="14" r="1" fill="currentColor"/></svg>
         <span>Rute</span>
       </button>
+      <button class="nav-btn" data-tab="stops">
+        <svg viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.4" fill="currentColor"/></svg>
+        <span>Halte</span>
+      </button>
       <button class="nav-btn" data-tab="info">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M3 10h18M7 14.5h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         <span>Tarif</span>
+      </button>
+      <button class="nav-btn" data-tab="history">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Riwayat</span>
       </button>
     </nav>
 
@@ -176,6 +223,19 @@
       </div>
     </div>
 
+    <!-- Aksi halte/stasiun (tab Halte) -->
+    <div class="modal" id="sheetStop" hidden>
+      <div class="modal-card">
+        <div class="modal-head"><div class="stop-act-h"><small id="stopActKind">Halte</small><h3 id="stopActName">…</h3></div><button class="icon-btn dark" data-close-modal aria-label="Tutup">×</button></div>
+        <div class="stop-act-lines" id="stopActLines"></div>
+        <div class="stop-acts">
+          <button class="btn-sec" id="stopActFrom" type="button">Berangkat dari sini</button>
+          <button class="btn-go" id="stopActTo" type="button">Pergi ke sini</button>
+        </div>
+        <button class="btn-sec stop-act-live" id="stopActLive" type="button"><i class="live-dot"></i>Lihat posisi bus</button>
+      </div>
+    </div>
+
     <!-- Pengaturan -->
     <div class="sheet" id="sheetSettings" hidden>
       <div class="sheet-bar">
@@ -219,9 +279,11 @@
   <script src="vendor/maplibre-gl.js"></script>
   <script src="vendor/leaflet-maplibre-gl.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/gtfs.js"></script>
   <script src="js/stopfix.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/live.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

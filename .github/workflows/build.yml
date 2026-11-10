@@ -1,109 +1,314 @@
-name: Build Lumi Transportation
+name: CI Lumi Transport
 
+# Aturan rilis:
+#  - push ke branch dan pull request HANYA menghasilkan artifact (APK + laporan ukuran).
+#  - APK dibangun SATU jalur saja: Gradle (R8). build.sh tidak dipakai lagi.
+#  - Semua action dikunci ke SHA commit (komentar = versinya), supaya tag yang dipindah tidak ikut masuk.
+#  - rilis dibuat HANYA dari tag baru `v<versi>` yang tidak pernah dipindahkan.
 on:
   push:
-    branches: [ main ]
-    paths:
-      - "app/**"
-      - "tools/**"
-      - "data-raw/**"
-      - "build.sh"
-      - "release-notes/**"
-      - ".github/workflows/build.yml"
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  test:
+    name: Uji (versi, mesin rute, antarmuka & terjemahan)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Test skema versi (gagal = build merah)
+        run: bash tools/test_version.sh
 
+      - name: Bangun data rute (dengan GTFS resmi terbaru)
+        run: |
+          set -euo pipefail
+          git fetch -q --depth=1 origin gtfs-data && git show FETCH_HEAD:tj_gtfs.json > data-raw/tj_gtfs.json
+          python3 tools/build_data.py
+
+      - name: Cek sintaks JavaScript
+        run: for f in app/src/main/assets/www/js/*.js; do node --check "$f"; done
+
+      - name: Uji mesin rute (gagal = build merah)
+        run: node tools/test_engine.js
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Pasang Playwright (memakai Chrome bawaan runner)
+        run: pip install --quiet playwright==1.63.0
+
+      - name: Uji semua layar + terjemahan Inggris (gagal = ada galat JS / teks belum diterjemahkan)
+        run: |
+          set -euo pipefail
+          python3 tools/ui_check.py en native --shots ui-shots
+          python3 tools/ui_check.py id native --shots ui-shots
+
+      - name: Upload tangkapan layar uji
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ui-shots
+          path: ui-shots
+          if-no-files-found: ignore
+
+  gradle:
+    # Satu-satunya jalur build APK (R2). APK inilah yang diuji di emulator dan dirilis.
+    name: Build APK (Gradle, R8 + lint)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Siapkan alat build Android (tanpa Gradle)
+      - name: Siapkan platform Android 35
         run: |
-          set -e
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          PLAT="$ANDROID_HOME/platforms/android-34"
-          if [ ! -f "$PLAT/android.jar" ]; then
-            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" >/dev/null
+          set -euo pipefail
+          # `yes | sdkmanager` bisa berhenti dengan SIGPIPE saat sdkmanager selesai;
+          # dengan pipefail itu menggagalkan langkah, jadi kegagalan diabaikan.
+          if [ ! -d "$ANDROID_HOME/platforms/android-35" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" >/dev/null 2>&1 || true
           fi
-          mkdir -p tools/sdk
-          curl -sSL -o tools/sdk/ecj.jar https://repo1.maven.org/maven2/org/eclipse/jdt/ecj/3.33.0/ecj-3.33.0.jar
-          {
-            echo "ANDROID_JAR=$PLAT/android.jar"
-            echo "AAPT2=$BT/aapt2"
-            echo "D8_JAR=$BT/lib/d8.jar"
-            echo "APKSIGNER_JAR=$BT/lib/apksigner.jar"
-            echo "ECJ_JAR=$PWD/tools/sdk/ecj.jar"
-          } >> "$GITHUB_ENV"
-          echo "build-tools: $BT"
+
+      - name: Setup Gradle (cache)
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+      - name: Baca versi
+        id: ver
+        run: |
+          set -euo pipefail
+          read -r V CODE < <(bash tools/version.sh)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "versi $V (versionCode $CODE)"
 
       - name: Ambil kunci tanda tangan dari Secrets
-        id: key
         env:
           KS_B64: ${{ secrets.LUMI_KEYSTORE_BASE64 }}
           KS_PASS: ${{ secrets.LUMI_KEYSTORE_PASSWORD }}
           KS_ALIAS: ${{ secrets.LUMI_KEY_ALIAS }}
         run: |
-          if [ -z "$KS_B64" ] || [ -z "$KS_PASS" ]; then
-            echo "::warning::Secrets LUMI_KEYSTORE_BASE64 / LUMI_KEYSTORE_PASSWORD belum diisi. APK ditandatangani kunci sementara (tetap dirilis; update berikutnya mungkin perlu uninstall dulu)."
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "KEYSTORE=$RUNNER_TEMP/temp.keystore" >> "$GITHUB_ENV"
+          set -euo pipefail
+          if [ -z "${KS_B64:-}" ] || [ -z "${KS_PASS:-}" ]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "::error::Rilis butuh kunci resmi. Isi Secrets LUMI_KEYSTORE_BASE64 dan LUMI_KEYSTORE_PASSWORD."; exit 1
+            fi
+            echo "::warning::Secrets LUMI_* belum diisi; APK Gradle ditandatangani kunci debug."
             exit 0
           fi
           echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/lumi.keystore"
-          echo "KEYSTORE=$RUNNER_TEMP/lumi.keystore" >> "$GITHUB_ENV"
-          echo "KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
-          echo "KS_ALIAS=${KS_ALIAS:-lumi}" >> "$GITHUB_ENV"
-          echo "signed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "KEYSTORE=$RUNNER_TEMP/lumi.keystore"
+            echo "KS_PASS=$KS_PASS"
+            echo "KS_ALIAS=${KS_ALIAS:-lumi}"
+          } >> "$GITHUB_ENV"
 
-      - name: Build APK
+      - name: Ambil ringkasan GTFS resmi terbaru (ikut di APK)
         run: |
-          set -o pipefail
-          chmod +x build.sh
-          ./build.sh 2>&1 | tee build.log
+          set -euo pipefail
+          git fetch -q --depth=1 origin gtfs-data
+          git show FETCH_HEAD:tj_gtfs.json > data-raw/tj_gtfs.json
+          ls -la data-raw/tj_gtfs.json
 
-      - name: Uji mesin rute
-        run: node tools/test_engine.js > /dev/null
-
-      - name: Baca versi
-        id: ver
-        run: echo "tag=$(tr -d ' \r\n' < release-notes/CURRENT)" >> "$GITHUB_OUTPUT"
-
-      - name: Ganti nama APK
+      - name: Build release (R8 + shrinkResources)
         run: |
+          set -euo pipefail
+          chmod +x gradlew
+          # Distribusi Gradle kadang gagal diunduh (mis. 504 dari GitHub). Kalau begitu,
+          # pakai Gradle yang sudah terpasang di runner; kalau tidak ada, ulangi unduhan.
+          GRADLE="./gradlew"
+          if ! ./gradlew --version >/dev/null 2>&1; then
+            if command -v gradle >/dev/null 2>&1; then
+              echo "::warning::Distribusi Gradle tidak bisa diunduh; memakai Gradle bawaan runner."
+              gradle --version
+              GRADLE="gradle"
+            fi
+          fi
+          for attempt in 1 2 3 4; do
+            echo "::group::Percobaan $attempt ($GRADLE)"
+            if $GRADLE --no-daemon --stacktrace assembleRelease; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::Gradle gagal pada percobaan $attempt"
+            sleep 30
+          done
+          echo "::error::Gradle gagal setelah 4 percobaan"
+          exit 1
+
+      - name: Ukuran APK Gradle
+        id: gsize
+        run: |
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          BYTES=$(stat -c%s "$APK")
+          echo "bytes=$BYTES" >> "$GITHUB_OUTPUT"
+          echo "APK Gradle: $APK — $BYTES byte ($(( BYTES / 1024 )) KB)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Bandingkan ukuran dengan rilis terakhir
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PREV=$(gh api "repos/${{ github.repository }}/releases/latest" --jq '.assets[0].size' 2>/dev/null || echo "")
+          NOW=${{ steps.gsize.outputs.bytes }}
+          if [ -n "$PREV" ] && [ "$PREV" != "null" ]; then
+            DELTA=$(( NOW - PREV ))
+            PCT=$(( DELTA * 1000 / PREV ))
+            printf 'Ukuran APK: %d byte → %d byte (%+d byte, %+d.%d%%)\n' "$PREV" "$NOW" "$DELTA" $(( PCT / 10 )) $(( PCT % 10 )) | tee size-report.txt
+          else
+            printf 'Ukuran APK: %d byte (belum ada rilis pembanding)\n' "$NOW" | tee size-report.txt
+          fi
+          cat size-report.txt >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file size-report.txt || true
+
+      - name: Verifikasi identitas APK Gradle
+        run: |
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          BADGING=$("$BT/aapt2" dump badging "$APK")
+          echo "$BADGING" | head -3
+          echo "$BADGING" | grep -q "package: name='id.lumi.transport'" || { echo "::error::applicationId salah"; exit 1; }
+          echo "$BADGING" | grep -q "versionCode='${{ steps.ver.outputs.code }}'" || { echo "::error::versionCode Gradle tidak sesuai CURRENT"; exit 1; }
+          echo "$BADGING" | grep -q "versionName='${{ steps.ver.outputs.version }}'" || { echo "::error::versionName tidak sesuai CURRENT"; exit 1; }
+          echo "$BADGING" | grep -q "targetSdkVersion:'35'" || { echo "::error::targetSdk bukan 35"; exit 1; }
+          echo "$BADGING" | grep -qi "application-label:'Lumi Transport'" || { echo "::error::nama aplikasi salah"; exit 1; }
+
+      - name: Ganti nama APK Gradle
+        run: |
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           mkdir -p out
-          cp build/LumiTransportation.apk "out/LumiTransportation-${{ steps.ver.outputs.tag }}.apk"
+          cp "$APK" "out/LumiTransport-v${{ steps.ver.outputs.version }}.apk"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: LumiTransportation-apk
-          path: out/*.apk
-
-      # Satu rilis per versi (release-notes/CURRENT). Push berikutnya memperbarui APK di rilis itu.
-      - name: Pindahkan tag versi ke commit ini
-        if: github.ref == 'refs/heads/main'
+      - name: Pastikan baseline profile ikut di APK
         run: |
-          git tag -f "${{ steps.ver.outputs.tag }}" "${{ github.sha }}"
-          git push -f origin "refs/tags/${{ steps.ver.outputs.tag }}"
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          if unzip -l "$APK" | grep -qE 'baseline\.prof(\.m)?$'; then
+            echo "baseline profile ditemukan:"
+            unzip -l "$APK" | grep -E 'baseline\.prof'
+          else
+            echo "::error::baseline profile tidak dikemas AGP"
+            exit 1
+          fi
+
+      - name: Android lint (gagal = ada temuan baru di luar app/lint-baseline.xml)
+        run: ./gradlew --no-daemon lintRelease
+
+      - name: Ringkasan lint
+        if: always()
+        run: |
+          if [ -f app/lint-baseline.xml ] && ! git ls-files --error-unmatch app/lint-baseline.xml >/dev/null 2>&1; then
+            echo "::warning::lint-baseline.xml baru dibuat; salin isinya ke repo (app/lint-baseline.xml)."
+            echo "----- BASELINE-MULAI -----"; cat app/lint-baseline.xml; echo "----- BASELINE-SELESAI -----"
+          fi
+          R=app/build/reports/lint-results-release.txt
+          [ -f "$R" ] && tail -5 "$R" | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload laporan lint
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lint
+          path: |
+            app/build/reports/lint-results-release.html
+            app/lint-baseline.xml
+          if-no-files-found: ignore
+
+      - name: Upload artifact Gradle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: LumiTransport-gradle
+          path: out/LumiTransport-v*.apk
+          if-no-files-found: error
+
+  smoke:
+    name: Uji asap di emulator
+    # Menangkap force close seperti v2.13 sebelum APK dirilis.
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
+    needs: [gradle]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Aktifkan KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: LumiTransport-gradle
+          path: out
+      - name: Jalankan emulator + uji asap
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash tools/smoke.sh "$(ls out/LumiTransport-v*.apk | head -1)"
+
+  release:
+    name: Rilis dari tag
+    # Hanya tag v* yang membuat rilis. Tag tidak pernah dipindahkan.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, gradle, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Tag harus menunjuk kepala main
+        run: |
+          set -euo pipefail
+          EXPECTED=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$EXPECTED" != "$GITHUB_SHA" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME menunjuk $GITHUB_SHA, bukan kepala main ($EXPECTED). Rilis hanya dari commit terbaru main."
+            exit 1
+          fi
+          echo "Tag menunjuk kepala main: $EXPECTED"
+
+      - name: Pastikan tag cocok dengan release-notes/CURRENT
+        run: |
+          set -euo pipefail
+          V=$(tr -d ' \r\n' < release-notes/CURRENT); V=${V#v}
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$V" != "$TAG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME tidak cocok dengan release-notes/CURRENT ($V). Naikkan CURRENT lewat PR dulu."
+            exit 1
+          fi
+
+      - name: Unduh APK hasil build Gradle (R8)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: LumiTransport-gradle
+          path: out
 
       - name: Terbitkan rilis
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
-          tag_name: ${{ steps.ver.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          name: "✦ Lumi Transportation ${{ steps.ver.outputs.tag }}"
-          body_path: release-notes/${{ steps.ver.outputs.tag }}.md
-          files: out/*.apk
-          overwrite_files: true
+          tag_name: ${{ github.ref_name }}
+          name: "✦ Lumi Transport ${{ github.ref_name }}"
+          body_path: release-notes/${{ github.ref_name }}.md
+          files: out/LumiTransport-v${{ needs.gradle.outputs.version }}.apk
+          draft: false
+          prerelease: false
           make_latest: "true"

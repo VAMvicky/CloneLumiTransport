@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:shortcutId="search"
+        android:shortcutShortLabel="@string/sc_search_short"
+        android:shortcutLongLabel="@string/sc_search_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="id.lumi.transport.MainActivity"
+            android:targetPackage="id.lumi.transport">
+            <extra android:name="lumi_shortcut" android:value="search" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:shortcutId="history"
+        android:shortcutShortLabel="@string/sc_history_short"
+        android:shortcutLongLabel="@string/sc_history_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="id.lumi.transport.MainActivity"
+            android:targetPackage="id.lumi.transport">
+            <extra android:name="lumi_shortcut" android:value="history" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+</shortcuts>

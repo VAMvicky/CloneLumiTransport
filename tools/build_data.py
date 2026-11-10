@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Lumi Transportation — data builder.
+Lumi Transport — data builder.
 
 Menggabungkan sumber data mentah di folder data-raw/ menjadi satu file
 app/src/main/assets/www/js/data.js yang dipakai aplikasi secara offline.
@@ -21,6 +21,11 @@ import csv, json, math, os, re, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(ROOT, "data-raw")
 OUT = os.path.join(ROOT, "app", "src", "main", "assets", "www", "js", "data.js")
+# Mode mentah untuk tools/osm_stops.py: koordinat asli (tanpa koreksi OSM) ditulis ke file lain,
+# supaya koreksi selalu dihitung dari titik asli dan tidak "hilang" saat dihitung ulang.
+RAW_OUT = os.environ.get("LUMI_RAW_OUT")
+if RAW_OUT:
+    OUT = RAW_OUT
 
 
 def hav(a, b):
@@ -484,15 +489,70 @@ for l in lines:
         if d["shape"]:
             d["shape"] = [list(p) for p in d["shape"]]
 
-meta = {"built": "2026-10-10", "counts": {}, "noStops": sum(1 for l in lines if l.get("noStops"))}
+# R7: titik halte/stasiun yang sudah dicocokkan dengan OpenStreetMap (data/stop_fix.json, tools/osm_stops.py)
+# langsung dipakai di data bawaan. Aturan sama dengan applyStopFix() di app.js: nama sama + ≤80 m dari titik lama.
+FIX_PATH = os.path.join(ROOT, "data", "stop_fix.json")
+STOPFIX = json.load(open(FIX_PATH, encoding="utf-8")) if os.path.exists(FIX_PATH) and not RAW_OUT else None
+fixed = 0
+if STOPFIX and STOPFIX.get("v") == 2:
+    for l in lines:
+        for d in l["dirs"]:
+            for st in d["s"]:
+                for e in STOPFIX["fix"].get(st["n"], []):
+                    if hav((e[0], e[1]), st["p"]) <= 0.08:
+                        st["p"] = [r5(e[2]), r5(e[3])]
+                        fixed += 1
+                        break
+
+meta = {"built": STOPFIX["date"][:10] if STOPFIX else "2026-10-10", "counts": {}, "noStops": sum(1 for l in lines if l.get("noStops")),
+        "stopFix": fixed}
 for l in lines:
     if not l.get("noStops"):
         meta["counts"][l["mode"]] = meta["counts"].get(l["mode"], 0) + 1
+
+# R8: tarif dari satu sumber (data/fares.json)
+FARES = json.load(open(os.path.join(ROOT, "data", "fares.json"), encoding="utf-8"))
+if FARES.get("v") != 1 or not all(k in FARES for k in ("tj", "krl", "mrt", "lrt", "lrtj", "kaBandara", "whoosh", "ojol")):
+    sys.exit("data/fares.json tidak lengkap")
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w") as f:
     f.write("/* Dibuat otomatis oleh tools/build_data.py — jangan diedit manual. */\n")
     f.write("window.LUMI_DATA=")
-    json.dump({"meta": meta, "lines": lines}, f, separators=(",", ":"), ensure_ascii=False)
+    json.dump({"meta": meta, "fares": FARES, "lines": lines}, f, separators=(",", ":"), ensure_ascii=False)
     f.write(";\n")
 print("OK", OUT, os.path.getsize(OUT), "bytes", meta["counts"])
+if RAW_OUT:
+    sys.exit(0)
+
+# Salinan stop_fix.json terbaru ikut di APK (dipakai juga untuk data GTFS yang diunduh).
+if STOPFIX:
+    sf = os.path.join(os.path.dirname(OUT), "stopfix.js")
+    with open(sf, "w", encoding="utf-8") as f:
+        f.write("/* Titik halte & stasiun diselaraskan dengan OpenStreetMap (tools/osm_stops.py). Data © OpenStreetMap contributors, ODbL. */\n")
+        f.write("window.LUMI_STOPFIX=")
+        json.dump(STOPFIX, f, separators=(",", ":"), ensure_ascii=False)
+        f.write(";\n")
+
+# R6: ringkasan GTFS resmi terbaru (cabang gtfs-data) ikut di APK, supaya HP yang belum/gagal mengunduh
+# tetap punya daftar halte lengkap untuk semua rute. Sumber: data-raw/tj_gtfs.json (diambil CI sebelum build,
+# tidak di-commit) atau variabel LUMI_GTFS_JSON. Tanpa sumber, gtfs.js berisi null dan aplikasi memakai data bawaan.
+GP = os.environ.get("LUMI_GTFS_JSON") or os.path.join(RAW, "tj_gtfs.json")
+GOUT = os.path.join(os.path.dirname(OUT), "gtfs.js")
+g = None
+if os.path.exists(GP):
+    g = json.load(open(GP, encoding="utf-8"))
+    ok = isinstance(g, dict) and isinstance(g.get("lines"), list) and len(g["lines"]) >= 100 and \
+        all(isinstance(r.get("dirs"), list) and r.get("code") for r in g["lines"])
+    if not ok:
+        sys.exit("tj_gtfs.json tidak valid (butuh ≥100 rute berisi code + dirs)")
+    meta_p = os.path.join(ROOT, "data", "gtfs_meta.json")
+    if not re.match(r"\d{4}-\d{2}-\d{2}", str(g.get("date", ""))):
+        g["date"] = json.load(open(meta_p))["updated"][:10] if os.path.exists(meta_p) else "?"
+with open(GOUT, "w", encoding="utf-8") as f:
+    f.write("/* Dibuat otomatis oleh tools/build_data.py dari cabang gtfs-data — jangan diedit manual. */\n")
+    f.write("window.LUMI_GTFS=")
+    if g: json.dump(g, f, separators=(",", ":"), ensure_ascii=False)
+    else: f.write("null")
+    f.write(";\n")
+print("GTFS bawaan:", (str(len(g["lines"])) + " rute, " + g["date"]) if g else "tidak ada (data bawaan saja)", "· titik OSM:", fixed)

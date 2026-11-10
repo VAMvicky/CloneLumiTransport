@@ -1,5 +1,5 @@
 /*
- * Lumi Transportation — mesin perencana rute multimoda (offline).
+ * Lumi Transport — mesin perencana rute multimoda (offline).
  * Bekerja di browser/WebView dan Node (untuk pengujian).
  *
  * Model:
@@ -65,66 +65,55 @@
     return w;
   }
 
-  /* ---------------------------------------------------------------- tarif */
-  function ojolMotor(km) {
-    // KP Menhub 564/2022 zona II (Jabodetabek): Rp2.550–2.800/km, minimum Rp10.200–11.200 (4 km pertama)
-    // + biaya jasa aplikasi ±Rp2.000.
-    var lo = Math.max(10200, km * 2550) + 2000, hi = Math.max(11200, km * 2800) + 4000;
-    return { lo: round500(lo), hi: round500(hi) };
+  /* ---------------------------------------------------------------- tarif
+   * Semua angka tarif ada di data/fares.json (R8) dan masuk lewat data.fares (build_data.py) atau versi
+   * terbaru yang diunduh aplikasi. Lihat file itu untuk sumber/aturan tiap moda. */
+  var FARES = null;
+  function rpId(n) { return "Rp" + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+  function useFares(f) {
+    if (!f || f.v !== 1 || !f.tj || !f.krl || !f.ojol) throw new Error("data tarif (fares.json) tidak valid");
+    FARES = f;
   }
-  function ojolCar(km) {
-    // Perkiraan taksi online Jabodetabek: ±Rp4.000–6.000/km, minimum ±Rp15.000–20.000 + biaya jasa.
-    var lo = Math.max(15000, km * 4000) + 3000, hi = Math.max(20000, km * 6000) + 5000;
-    return { lo: round500(lo), hi: round500(hi) };
+  function range(km, o) {
+    return { lo: round500(Math.max(o.min[0], km * o.perKm[0]) + o.fee[0]), hi: round500(Math.max(o.min[1], km * o.perKm[1]) + o.fee[1]) };
   }
+  function ojolMotor(km) { return range(km, FARES.ojol.motor); }   // KP Menhub 564/2022 zona II + biaya jasa
+  function ojolCar(km) { return range(km, FARES.ojol.car); }       // perkiraan taksi online Jabodetabek
   function round500(x) { return Math.round(x / 500) * 500; }
   function ojolMinutes(km, kind) {
     var speed = kind === "car" ? 20 : 24; // rata-rata Jakarta, km/jam
     return km / speed * 60 + (kind === "car" ? 6 : 4); // + waktu jemput
   }
-
-  /*
-   * Tarif per naik (diperbarui 29 Okt 2026):
-   *  - Transjakarta BRT/non-BRT & Transjabodetabek Rp3.500 (Rp2.000 pukul 05–07). Penyesuaian tarif TJ
-   *    diumumkan berlaku 1 Jan 2027 (besaran belum diumumkan).
-   *  - SH2 Blok M–Bandara Soetta Rp15.000 sejak 1 Sep 2026 (Kepgub 685/2026). SH1 tetap Rp3.500.
-   *  - Hub Connector (HC1, HC2 PIK 2–Dukuh Atas) & Royaltrans Rp20.000. Mikrotrans gratis.
-   *  - MRT: Rp3.000 + Rp1.000 per stasiun yang dilewati, maks. Rp14.000 (Lebak Bulus–Fatmawati Rp4.000 … Dukuh Atas Rp14.000).
-   *  - LRT Jakarta flat Rp5.000 (termasuk Velodrome–Manggarai). LRT Jabodebek Rp5.000 + Rp700/km, maks. Rp20.000.
-   *  - KRL Rp3.000 untuk 25 km pertama, +Rp1.000 tiap 10 km.
-   *  - KA Bandara: Manggarai/BNI City/Duri–Bandara Rp70.000, Rawa Buaya/Batu Ceper–Bandara Rp35.000,
-   *    antar-stasiun kota (mis. Manggarai–BNI City) Rp10.000.
-   *  - Whoosh tarif dinamis, mulai Rp250.000.
-   */
   function premiumFare(line) {
-    var c = String(line.code || "").toUpperCase();
-    if (c === "SH2") return 15000;
-    if (/^HC\d/.test(c)) return 20000;
+    var c = String(line.code || "").toUpperCase(), p = FARES.tj.premium || [];
+    for (var i = 0; i < p.length; i++) if (new RegExp(p[i][0]).test(c)) return p[i][1];
     return 0;
   }
   function legFare(line, km, fromName, toName, hops) {
     var pf = premiumFare(line);
     if (pf) return pf;
+    var F = FARES;
     switch (line.mode) {
-      case "TJ": return line.code === "GR4" || line.code === "GR5" ? 0 : 3500;
-      case "MIKRO": return 0;
-      case "ROYAL": return line.cat === "JABODETABEK" ? 3500 : 20000;
-      case "KRL": return 3000 + Math.max(0, Math.ceil((km - 25) / 10)) * 1000;
-      case "MRT": return hops != null ? Math.min(14000, 3000 + Math.max(1, hops) * 1000)
-        : Math.min(14000, Math.max(3000, Math.round((3000 + km * 700) / 1000) * 1000));
-      case "LRT": return 5000;
-      case "LRTJ": return Math.min(20000, Math.round((5000 + Math.max(0, km - 1) * 700) / 100) * 100);
+      case "TJ": return F.tj.free.indexOf(line.code) >= 0 ? 0 : F.tj.base;
+      case "MIKRO": return F.tj.mikro;
+      case "ROYAL": return line.cat === "JABODETABEK" ? F.tj.jabodetabek : F.tj.royal;
+      case "KRL": return F.krl.base + Math.max(0, Math.ceil((km - F.krl.baseKm) / F.krl.stepKm)) * F.krl.step;
+      case "MRT": return hops != null ? Math.min(F.mrt.max, F.mrt.base + Math.max(1, hops) * F.mrt.perStop)
+        : Math.min(F.mrt.max, Math.max(F.mrt.base, Math.round((F.mrt.base + km * F.mrt.perKmEst) / 1000) * 1000));
+      case "LRT": return F.lrt.flat;
+      case "LRTJ": return Math.min(F.lrtj.max, Math.round((F.lrtj.base + Math.max(0, km - 1) * F.lrtj.perKm) / 100) * 100);
       case "KABANDARA":
         var ft = fromName + "|" + toName;
-        if (/Bandara|Soekarno/.test(ft)) return /(Manggarai|BNI City|Sudirman Baru|Duri)/.test(ft) ? 70000 : 35000;
-        return /(Rawa Buaya|Batu Ceper)/.test(ft) ? 35000 : 10000;
-      case "WHOOSH": return 250000;
+        if (/Bandara|Soekarno/.test(ft)) return /(Manggarai|BNI City|Sudirman Baru|Duri)/.test(ft) ? F.kaBandara.airportFar : F.kaBandara.airportNear;
+        return /(Rawa Buaya|Batu Ceper)/.test(ft) ? F.kaBandara.airportNear : F.kaBandara.city;
+      case "WHOOSH": return F.whoosh.from;
     }
     return 0;
   }
 
   /* ---------------------------------------------------------- bangun graf */
   function Planner(data) {
+    useFares(data.fares);
     this.lines = data.lines;
     this.byId = {};
     var self = this;
@@ -419,7 +408,9 @@
     return summarize(legs, opts.depMin == null ? nowMin() : opts.depMin, this.isHalte.bind(this), this.dow);
   };
 
-  function nowMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+  /* Jam dinding WIB (UTC+7, tanpa DST) apa pun zona waktu HP: getHours()/getDay() objek ini = WIB. */
+  function nowWib() { var d = new Date(); return new Date(d.getTime() + (d.getTimezoneOffset() + 420) * 60000); }
+  function nowMin() { var d = nowWib(); return d.getHours() * 60 + d.getMinutes(); }
 
   /* Tarif Transjakarta: Rp3.500 sekali tap masuk (Rp2.000 pukul 05.00–07.00). Pindah rute GRATIS selama
      penumpang tidak keluar halte (turun & naik lagi di halte yang sama). Bila turun di luar halte
@@ -430,7 +421,7 @@
      di luar jam sibuk, Sabtu, Minggu (dan hari libur) maksimal Rp10.000. */
   function lrtjPeak(mm, dow) {
     if (dow === 0 || dow === 6) return false;
-    return (mm >= 360 && mm < 540) || (mm >= 960 && mm < 1200);
+    return FARES.lrtj.peak.some(function (r) { return mm >= r[0] && mm < r[1]; });
   }
   function summarize(legs, depMin, isHalte, dow) {
     var min = 0, fareLo = 0, fareHi = 0, rides = 0, prevRide = null, walkSince = 0;
@@ -442,15 +433,15 @@
         rides++;
         var f = l.fare;
         l.fareNote = "";
-        if (l.line.mode === "LRTJ" && f > 10000) {
+        if (l.line.mode === "LRTJ" && f > FARES.lrtj.offPeakMax) {
           var mmL = ((depMin + min - l.min) % 1440 + 1440) % 1440;
           var dayL = dow == null ? 1 : (dow + Math.floor((depMin + min - l.min) / 1440)) % 7;
-          if (!lrtjPeak(mmL, dayL)) { f = 10000; l.fareNote = (dayL === 0 || dayL === 6 ? "akhir pekan" : "di luar jam sibuk") + ": maks. Rp10.000"; }
-          else l.fareNote = "jam sibuk: Rp5.000 + Rp700/km";
+          if (!lrtjPeak(mmL, dayL)) { f = FARES.lrtj.offPeakMax; l.fareNote = (dayL === 0 || dayL === 6 ? "akhir pekan" : "di luar jam sibuk") + ": maks. " + rpId(f); }
+          else l.fareNote = "jam sibuk: " + rpId(FARES.lrtj.base) + " + " + rpId(FARES.lrtj.perKm) + "/km";
         }
         if (TJ_FAMILY(l.line) && f > 0) {
           var mm = ((depMin + min - l.min) % 1440 + 1440) % 1440;
-          if (mm >= 300 && mm < 420) f = 2000;          // tarif Rp2.000 pukul 05.00–07.00
+          if (mm >= FARES.tj.morningFrom && mm < FARES.tj.morningTo) f = Math.min(f, FARES.tj.morning);   // tarif pagi (05.00–07.00)
           var free = prevRide && TJ_FAMILY(prevRide.line) && prevRide.farePaid !== undefined && walkSince <= 0.12 &&
             isHalte(prevRide.toP) && isHalte(l.fromP);
           if (free) { f = 0; l.fareNote = "transit di dalam halte, tanpa tap ulang"; }
@@ -483,7 +474,7 @@
 
   Planner.prototype.plan = function (from, to, roadKm, depMin, dow) {
     var self = this;
-    this.dow = dow == null ? new Date().getDay() : dow;   // hari (0 = Minggu) untuk tarif yang bergantung hari
+    this.dow = dow == null ? nowWib().getDay() : dow;   // hari (0 = Minggu) untuk tarif yang bergantung hari
     PLAN_DOW = this.dow;
     if (depMin == null) depMin = nowMin();
     var directKm = hav(from, to);
@@ -802,18 +793,27 @@
     return out;
   };
 
+  /*
+   * Moda/kelompok yang TUTUP pada menit m. Satu kelompok hanya disebut tutup bila SEMUA rutenya tutup
+   * (dulu: satu rute wisata yang belum buka pukul 08.00 membuat "Transjakarta non-BRT" seolah tutup semua).
+   * Bus wisata (jam terbatas, bukan angkutan harian) tidak diumumkan.
+   */
   Planner.prototype.closedAt = function (m) {
-    var seen = {}, out = [];
+    var g = {}, order = [];
     this.lines.forEach(function (l) {
-      if (l.noStops || openAt(l, m)) return;
-      var k = l.mode === "TJ" ? (l.brt ? "Transjakarta BRT (selain koridor 1–14)" : "Transjakarta non-BRT") :
-        l.mode === "MIKRO" ? "Mikrotrans (kecuali JAK36/47/52/75)" : MODES[l.mode].label;
-      if (!seen[k]) { seen[k] = 1; out.push(k); }
+      if (l.noStops) return;
+      var code = String(l.code || "").toUpperCase().replace(/\W/g, "");
+      var k = l.mode === "TJ" ? (l.main ? "" : l.brt ? "Transjakarta BRT (selain koridor 1–14)" : l.cat === "WISATA" ? "" : "Transjakarta non-BRT") :
+        l.mode === "MIKRO" ? (/^JAK(36|47|52|75)$/.test(code) ? "" : "Mikrotrans (kecuali JAK36/47/52/75)") : MODES[l.mode].label;
+      if (!k) return;
+      if (!g[k]) { g[k] = { n: 0, shut: 0 }; order.push(k); }
+      g[k].n++;
+      if (!openAt(l, m)) g[k].shut++;
     });
-    return out;
+    return order.filter(function (k) { return g[k].shut === g[k].n; });
   };
 
-  var api = { Planner: Planner, MODES: MODES, RAIL: RAIL, hav: hav, openAt: openAt, isNight: isNight, ojolMotor: ojolMotor, ojolCar: ojolCar, ojolMinutes: ojolMinutes };
+  var api = { Planner: Planner, MODES: MODES, RAIL: RAIL, hav: hav, openAt: openAt, isNight: isNight, ojolMotor: ojolMotor, ojolCar: ojolCar, ojolMinutes: ojolMinutes, useFares: useFares, fares: function () { return FARES; } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LumiEngine = api;
 })(typeof window !== "undefined" ? window : this);

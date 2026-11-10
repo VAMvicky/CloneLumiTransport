@@ -2,7 +2,8 @@
 """
 Selaraskan titik halte/stasiun Lumi dengan OpenStreetMap (peta yang dilihat pengguna).
 
-Masukan : data Lumi bawaan (app/src/main/assets/www/js/data.js) + GTFS resmi ringkas (tj_gtfs.json, opsional)
+Masukan : data Lumi bawaan dengan koordinat ASLI (dibangun ulang lewat tools/build_data.py, LUMI_RAW_OUT)
+          + GTFS resmi ringkas (tj_gtfs.json, opsional)
 Sumber  : Overpass API (halte bus, halte Transjakarta, stasiun KRL/MRT/LRT/KA Bandara/Whoosh) di Jabodetabek
 Keluaran: data/stop_fix.json  {"v":1,"date":..,"fix":{"<nama>|<lat4>,<lon4>":[lat,lon], ...}}
           data/stop_fix_report.txt (ringkasan + perpindahan terbesar)
@@ -87,7 +88,12 @@ def load_lumi(path):
 
 def main():
     root = sys.argv[1] if len(sys.argv) > 1 else "."
-    data = load_lumi(os.path.join(root, "app/src/main/assets/www/js/data.js"))
+    # Titik ASLI (tanpa koreksi OSM yang sudah dipakai di data.js), supaya hasilnya stabil antar-run.
+    import subprocess, tempfile
+    raw = os.path.join(tempfile.mkdtemp(), "data-raw.js")
+    subprocess.run([sys.executable, os.path.join(root, "tools/build_data.py")], check=True,
+                   env=dict(os.environ, LUMI_RAW_OUT=raw), stdout=subprocess.DEVNULL)
+    data = load_lumi(raw)
     stops = {}   # key -> (name, p, rail, jenis kereta yang diharapkan)
     def add(name, p, rail, want=None):
         k = "%s|%.4f,%.4f" % (name, p[0], p[1])

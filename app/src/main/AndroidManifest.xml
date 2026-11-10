@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="id.lumi.transport"
-    android:versionCode="39"
-    android:versionName="2.3">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
-
+    <!-- minSdk/targetSdk/versi/namespace diisi oleh app/build.gradle (versi dari release-notes/CURRENT). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -39,11 +35,17 @@
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/LumiTheme"
         android:allowBackup="true"
         android:usesCleartextTraffic="false"
         android:supportsRtl="false">
+
+        <!-- Tekan lama ikon aplikasi: pintasan cepat -->
+        <meta-data
+            android:name="android.app.shortcuts"
+            android:resource="@xml/shortcuts" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -81,5 +83,28 @@
             android:name=".RouteUpdateJob"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- Ubin Quick Settings: satu ketuk membuka pencarian rute -->
+        <service
+            android:name=".LumiTileService"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_foreground"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <!-- Widget Berangkat / Pulang -->
+        <receiver
+            android:name=".LumiWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
     </application>
 </manifest>

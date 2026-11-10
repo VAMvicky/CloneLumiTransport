@@ -57,7 +57,7 @@ public class GtfsImporter {
                 got += n;
                 if (got - lastReport > 512 * 1024) {
                     lastReport = got;
-                    p.update("Mengunduh GTFS… " + (got / 1024 / 1024) + (total > 0 ? " / " + (total / 1024 / 1024) : "") + " MB");
+                    p.update(Lang.t("Mengunduh GTFS… ", "Downloading GTFS… ") + (got / 1024 / 1024) + (total > 0 ? " / " + (total / 1024 / 1024) : "") + " MB");
                 }
             }
             out.close();
@@ -106,7 +106,7 @@ public class GtfsImporter {
             r = new BufferedReader(new InputStreamReader(z.getInputStream(e), "UTF-8"), 1 << 16);
             String head = r.readLine();
             if (head == null) throw new IOException(name + " kosong");
-            if (head.startsWith("﻿")) head = head.substring(1);
+            if (head.startsWith("\uFEFF")) head = head.substring(1);
             List<String> h = parseCsv(head);
             for (int i = 0; i < h.size(); i++) col.put(h.get(i).trim(), i);
         }
@@ -162,7 +162,7 @@ public class GtfsImporter {
     public static String summarize(File zipFile, String sourceDate, Progress p, StringBuilder index) throws IOException {
         ZipFile z = new ZipFile(zipFile);
         try {
-            p.update("Membaca daftar rute…");
+            p.update(Lang.t("Membaca daftar rute…", "Reading route list…"));
             Map<String, String[]> routes = new LinkedHashMap<String, String[]>();   // id -> short,long,desc,color,type
             Table t = new Table(z, "routes.txt");
             while (t.next()) {
@@ -170,7 +170,7 @@ public class GtfsImporter {
                         t.get("route_desc"), t.get("route_color"), t.get("route_type")});
             }
 
-            p.update("Membaca perjalanan…");
+            p.update(Lang.t("Membaca perjalanan…", "Reading trips…"));
             Map<String, Pattern> repByKey = new LinkedHashMap<String, Pattern>();
             Map<String, Pattern> repByTrip = new HashMap<String, Pattern>();
             t = new Table(z, "trips.txt");
@@ -189,7 +189,7 @@ public class GtfsImporter {
                 repByTrip.put(pt.tripId, pt);
             }
 
-            p.update("Membaca halte…");
+            p.update(Lang.t("Membaca halte…", "Reading stops…"));
             Map<String, Integer> stopIdx = new HashMap<String, Integer>();
             List<String> stopName = new ArrayList<String>();
             List<double[]> stopPos = new ArrayList<double[]>();
@@ -203,11 +203,11 @@ public class GtfsImporter {
                 } catch (NumberFormatException ignored) { }
             }
 
-            p.update("Membaca urutan halte…");
+            p.update(Lang.t("Membaca urutan halte…", "Reading stop order…"));
             t = new Table(z, "stop_times.txt");
             long rows = 0;
             while (t.next()) {
-                if (++rows % 200000 == 0) p.update("Membaca urutan halte… " + (rows / 1000) + " rb baris");
+                if (++rows % 200000 == 0) p.update(Lang.t("Membaca urutan halte… ", "Reading stop order… ") + (rows / 1000) + Lang.t(" rb baris", "k rows"));
                 Pattern pt = repByTrip.get(t.get("trip_id"));
                 if (pt == null) continue;
                 Integer si = stopIdx.get(t.get("stop_id"));
@@ -242,7 +242,7 @@ public class GtfsImporter {
 
             Map<String, List<double[]>> shapes = new HashMap<String, List<double[]>>();
             try {
-                p.update("Membaca bentuk jalur…");
+                p.update(Lang.t("Membaca bentuk jalur…", "Reading route shapes…"));
                 t = new Table(z, "shapes.txt");
                 Map<String, List<double[]>> raw = new HashMap<String, List<double[]>>();
                 while (t.next()) {
@@ -271,7 +271,7 @@ public class GtfsImporter {
                 }
             } catch (IOException noShapes) { /* shapes.txt opsional */ }
 
-            p.update("Menyusun data rute…");
+            p.update(Lang.t("Menyusun data rute…", "Building route data…"));
             Map<String, List<Pattern>> byRoute = new LinkedHashMap<String, List<Pattern>>();
             for (Pattern pt : all) {
                 List<Pattern> l = byRoute.get(pt.routeId);
@@ -356,7 +356,7 @@ public class GtfsImporter {
                 sb.append("]}");
             }
             sb.append("]}");
-            p.update("Selesai: " + count + " rute");
+            p.update(Lang.t("Selesai: ", "Done: ") + count + Lang.t(" rute", " routes"));
             return sb.toString();
         } finally {
             z.close();
