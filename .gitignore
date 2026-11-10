@@ -16,3 +16,7 @@ keystore/
 # kunci penandatangan APK: jangan pernah di-commit
 *.keystore
 *.jks
+
+# Dibuat tools/build_data.py dari cabang gtfs-data (tidak di-commit)
+data-raw/tj_gtfs.json
+app/src/main/assets/www/js/gtfs.js

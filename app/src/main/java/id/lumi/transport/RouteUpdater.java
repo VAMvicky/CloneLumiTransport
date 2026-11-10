@@ -137,9 +137,9 @@ public class RouteUpdater {
     public static void markSeen(Context ctx) { prefs(ctx).edit().putBoolean("unseen", false).apply(); }
 
     static void channel(Context ctx) {
-        if (Build.VERSION.SDK_INT < 26) return;
-        NotificationChannel c = new NotificationChannel(CH_ROUTES, "Perubahan rute", NotificationManager.IMPORTANCE_DEFAULT);
-        c.setDescription("Info bila ada rute Transjakarta yang berubah (dicek tiap hari)");
+        Lang.ensure(ctx);
+        NotificationChannel c = new NotificationChannel(CH_ROUTES, Lang.t("Perubahan rute", "Route changes"), NotificationManager.IMPORTANCE_DEFAULT);
+        c.setDescription(Lang.t("Info bila ada rute Transjakarta yang berubah (dicek tiap hari)", "Alerts when a Transjakarta route changes (checked daily)"));
         ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE)).createNotificationChannel(c);
     }
 
@@ -151,16 +151,16 @@ public class RouteUpdater {
         for (int i = 0; i < items.size(); i++) {
             RouteDiff.Item it = items.get(i);
             if (i < 6) { if (i > 0) codes.append(", "); codes.append(it.code); }
-            if (i < 8) body.append(it.code).append(": ").append(it.text).append('\n');
+            if (i < 8) body.append(it.code).append(": ").append(Lang.diff(it.text)).append('\n');
         }
-        if (items.size() > 6) codes.append(" dll.");
+        if (items.size() > 6) codes.append(Lang.t(" dll.", " etc."));
         Intent open = new Intent(ctx, MainActivity.class);
         open.putExtra("openChanges", true);
         open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pi = PendingIntent.getActivity(ctx, 3, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(ctx, CH_ROUTES) : new Notification.Builder(ctx);
+        Notification.Builder b = new Notification.Builder(ctx, CH_ROUTES);
         b.setSmallIcon(android.R.drawable.ic_popup_sync)
-                .setContentTitle(items.size() + " rute Transjakarta berubah")
+                .setContentTitle(items.size() + Lang.t(" rute Transjakarta berubah", items.size() == 1 ? " Transjakarta route changed" : " Transjakarta routes changed"))
                 .setContentText(codes.toString())
                 .setStyle(new Notification.BigTextStyle().bigText(body.toString().trim()))
                 .setColor(0xFF1565D8).setAutoCancel(true).setContentIntent(pi);

@@ -39,6 +39,7 @@ public class RouteWatchJob extends JobService {
 
     @Override
     public boolean onStartJob(final JobParameters params) {
+        Lang.load(this);
         worker = new Thread(new Runnable() {
             @Override public void run() {
                 try { check(RouteWatchJob.this); } catch (Throwable ignored) { }
@@ -66,6 +67,45 @@ public class RouteWatchJob extends JobService {
             while ((n = in.read(b)) > 0 && bo.size() < max) bo.write(b, 0, n);
             return bo.toString("UTF-8");
         } finally { c.disconnect(); }
+    }
+
+    /**
+     * R10: umpan dari GitHub diperiksa sebelum dipakai: bentuk, jenis perubahan, panjang teks, dan jumlah isi.
+     * Umpan yang tidak lolos diabaikan seluruhnya (tidak ada notifikasi, revisi tidak dicatat).
+     */
+    static boolean validFeed(org.json.JSONObject o) {
+        int rev = o.optInt("rev", -1);
+        if (rev < 0 || rev > 1000000) return false;
+        org.json.JSONObject latest = o.optJSONObject("latest");
+        if (latest == null) return true;
+        if (!latest.optString("date", "").matches("\\d{4}-\\d{2}-\\d{2}.*")) return false;
+        org.json.JSONArray arr = latest.optJSONArray("items");
+        if (arr == null) return true;
+        if (arr.length() > 400) return false;
+        for (int i = 0; i < arr.length(); i++) {
+            org.json.JSONObject x = arr.optJSONObject(i);
+            if (x == null) return false;
+            String k = x.optString("k");
+            if (!k.equals("add") && !k.equals("del") && !k.equals("chg")) return false;
+            if (x.optString("code").isEmpty() || x.optString("code").length() > 24) return false;
+            if (x.optString("name").length() > 300 || x.optString("text").length() > 1500) return false;
+            if (!shortList(x.optJSONArray("add")) || !shortList(x.optJSONArray("rm"))) return false;
+            if (!dirsOk(x.optJSONObject("b")) || !dirsOk(x.optJSONObject("a"))) return false;
+        }
+        return true;
+    }
+    private static boolean shortList(org.json.JSONArray a) {
+        if (a == null) return true;
+        if (a.length() > 500) return false;
+        for (int i = 0; i < a.length(); i++) if (a.optString(i).length() > 200) return false;
+        return true;
+    }
+    private static boolean dirsOk(org.json.JSONObject o) {
+        if (o == null) return true;
+        if (o.length() > 20) return false;
+        java.util.Iterator<String> k = o.keys();
+        while (k.hasNext()) if (!shortList(o.optJSONArray(k.next()))) return false;
+        return true;
     }
 
     static void strs(org.json.JSONArray a, List<String> out) {
@@ -101,6 +141,7 @@ public class RouteWatchJob extends JobService {
             String feed = httpGet(FEED, 200000);
             if (feed != null) {
                 org.json.JSONObject o = new org.json.JSONObject(feed);
+                if (!validFeed(o)) throw new IllegalArgumentException("route_changes.json tidak valid");   // R10
                 int rev = o.optInt("rev", 0);
                 int seen = p.getInt("feedRev", -1);
                 if (seen < 0) {

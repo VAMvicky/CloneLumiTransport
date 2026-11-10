@@ -1,0 +1,1 @@
+overpass gagal: https://overpass-api.de/api/interpreter HTTP Error 502: Bad Gateway

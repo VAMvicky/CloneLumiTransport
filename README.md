@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.png" width="112" alt="Logo Lumi Transportation">
+<img src="docs/logo.png" width="112" alt="Logo Lumi Transport">
 
-# ✦ Lumi Transportation ✦
+# ✦ Lumi Transport ✦
 
 ### Perencana perjalanan semua moda Jabodetabek untuk Android
 
@@ -22,7 +22,7 @@
 
 ---
 
-## 🌟 Kenapa Lumi Transportation?
+## 🌟 Kenapa Lumi Transport?
 
 > Masukkan **asal** dan **tujuan**, lalu Lumi menghitung **semua kombinasi angkutan umum** yang masuk akal (bus, mikrotrans, kereta, sampai ojol), lengkap dengan **waktu, tarif, dan tempat turun**. Saat berangkat, Lumi **mendampingimu lewat GPS** dan mengingatkan saat harus turun.
 
@@ -32,11 +32,11 @@
 | 🎯 **Filter yang kamu mau** | Urutkan Tercepat, Termurah, atau Minim transit, lalu pilih moda: hanya yang **mengandung TJ**, atau TJ + LRT, dan seterusnya. |
 | 🚌 **Posisi bus langsung** | **Bus di sekitarmu** menampilkan posisi Transjakarta, Mikrotrans, Royaltrans, dan Transjabodetabek saat ini di peta. Di detail perjalanan ada perkiraan **bus berikutnya tiba di halte naik**, dan di detail rute ada semua bus rute itu. |
 | 🧭 **Pendampingan GPS** | Tahu posisimu di peta, **sisa pemberhentian**, dan HP bergetar saat **"Siap-siap turun"** dan **"Turun sekarang"**, juga saat layar mati. |
-| 🔔 **Tahu kalau rute berubah** | Data resmi Transjakarta **dicek tiap jam**. Begitu ada rute baru, rute dihapus, atau halte berubah, kamu dapat **notifikasi**. |
+| 🔔 **Tahu kalau rute berubah** | Data resmi Transjakarta **dicek berkala**. Begitu ada rute baru, rute dihapus, atau halte berubah, kamu dapat **notifikasi**. |
 | 🖼️ **Bagikan sebagai gambar** | Setiap rute bisa dibagikan sebagai **gambar rapi** ke WhatsApp, IG, atau mana saja. |
 | 💸 **Tarif yang benar** | Pindah di dalam halte = tidak bayar lagi. Turun di luar halte = tap ulang. Termasuk tarif SH2, Hub Connector, MRT per stasiun, KA Bandara. |
 | 🌙 **Sadar jam operasional** | Pukul 00.00? Lumi hanya memakai layanan 24 jam (AMARI koridor 1–14, JAK36/47/52/75) dan ojol. |
-| 📍 **Alamat dari Google Maps** | Cari tempat di Google Maps, ketuk **Bagikan → Lumi**. Koordinat tempat terbaca otomatis. |
+| 📍 **Alamat dari Google** | Saran alamat langsung dari Google Places saat mengetik, memakai **kunci API internal Google Maps** (paket & sertifikat Google ditiru). Koordinat terbaca otomatis. |
 | 🪶 **Super ringan & offline** | APK sekitar **350 KB**. Perhitungan rute berjalan **di HP**, tanpa server. |
 
 ---
@@ -107,7 +107,7 @@
 **🔔 Rute selalu terbaru**
 - Saat pertama dibuka, Lumi mengunduh **GTFS resmi Transjakarta** dan memprosesnya di HP
 - **Tiap jam** (latar belakang, sangat hemat kuota) Lumi mengecek:
-  1. umpan perubahan rute dari repo ini (`data/route_changes.json`), yang diperbarui GitHub Actions tiap jam, dan
+  1. umpan perubahan rute dari repo ini (`data/route_changes.json`), yang diperbarui GitHub Actions beberapa kali sehari (dijadwalkan tiap jam, tetapi GitHub sering menunda jadwal hingga beberapa jam), dan
   2. tanda versi file GTFS resmi (ETag / Last-Modified / ukuran)
 - Bila ada yang berubah, data rute diunduh ulang, perbedaannya dihitung (rute baru, dihapus, halte bertambah/berkurang, pola varian berubah), lalu muncul **notifikasi**
 - Riwayat perubahan ada di Beranda dan **Pengaturan → Perubahan rute**
@@ -117,15 +117,17 @@
 - Gambar PNG berisi asal → tujuan, total waktu & tarif, strip moda, serta langkah per langkah (jam naik, arah, tempat turun, tarif)
 
 **📍 Alamat lewat Google Maps**
-- Ketuk kolom Dari/Ke → **Cari di Google Maps** → pilih tempat → **Bagikan → Lumi Transportation**
+- Ketuk kolom Dari/Ke → **Cari di Google Maps** → pilih tempat → **Bagikan → Lumi Transport**
 - Koordinat **tempat** dibaca dari tautan (bukan posisi peta), dengan tiga cara berjalan bersamaan dan hasil disimpan di HP agar instan saat dipakai lagi
 - **Tempat tersimpan**, **Lokasi saya**, dan pilih titik di peta
 
 **🎨 Tampilan**
 - Tema **biru muda** dengan logo gradasi biru, layar sambutan dan izin yang **muat satu layar**
+- **Dua bahasa**: Indonesia atau Inggris (Pengaturan → Bahasa). Seluruh aplikasi ikut berganti, termasuk hasil rute, gambar yang dibagikan, notifikasi, dan panduan suara
 - Info rute lengkap: cari rute (`9`, `13C`, `JAK.10`, `Bogor`, `MRT`), lihat urutan halte, arah, varian, jam operasional, dan rute sambungan di tiap halte
 - Nama trayek resmi (mis. **9N Pinang Ranti – Simpang Cawang**). Rute memutar dipecah menjadi dua arah, dan setiap varian diberi keterangan singkat: *via Tol*, *lewat Senen*, *tanpa ASEAN*, *mulai Bundaran Senayan*, *putar balik di Harmoni*
-- Peta **OpenFreeMap** (vektor, MapLibre GL) — gratis tanpa API key; pilihan gaya Liberty, Bright, Positron, atau OpenStreetMap standar
+- Peta **OpenFreeMap** (vektor, MapLibre GL) — gratis tanpa API key; pilihan gaya Liberty, Bright, Positron, atau OpenStreetMap standar, ditambah pilihan **Google Maps** (raster) memakai kunci internal Google
+- **Saran alamat dari Google Places** langsung di kolom Dari/Ke: kunci API internal Google Maps diambil dari APK Google Maps dan dipakai dengan meniru header paket + sertifikat Google (lihat [docs/google-api-keys.md](docs/google-api-keys.md))
 
 ---
 
@@ -176,7 +178,7 @@ Diperbarui **29 Oktober 2026**. Tarif adalah perkiraan; selalu cek pengumuman op
 ## ⬇️ Unduh & Pasang
 
 1. Buka halaman **[Releases](https://github.com/VAMvicky/LumiTransport/releases/latest)**.
-2. Di bagian **Assets**, unduh `LumiTransportation-v2.3.apk`.
+2. Di bagian **Assets**, unduh `LumiTransport-v2.0.apk`.
 3. Buka file yang sudah diunduh. Kalau Android meminta, izinkan **"Instal aplikasi tidak dikenal"** untuk browser atau pengelola file yang kamu pakai.
 4. Tekan **Instal**. Selesai! 🎉
 
@@ -195,12 +197,12 @@ Diperbarui **29 Oktober 2026**. Tarif adalah perkiraan; selalu cek pengumuman op
 ### 0️⃣ Pertama kali dibuka
 Lumi menampilkan dua layar singkat, masing-masing **pas dalam satu layar tanpa scroll**:
 1. **Sambutan**: ringkasan fitur, ketuk **Mulai**.
-2. **Satu langkah lagi**: izinkan **lokasi**, **notifikasi**, dan **berjalan di latar belakang**. Untuk HP Xiaomi, Oppo, Vivo, Realme, dan Infinix ada tombol opsional **Buka pengaturan Mulai otomatis**.
+2. **Satu langkah lagi**: izinkan **lokasi**, **notifikasi**, dan **berjalan di latar belakang**. Tombol **Mulai cari rute** baru aktif setelah ketiganya diizinkan; izin yang pernah ditolak permanen membuka halaman info aplikasi. Untuk HP Xiaomi, Oppo, Vivo, Realme, dan Infinix ada tombol opsional **Buka pengaturan Mulai otomatis**.
 
 Setelah itu Lumi mengunduh data rute resmi Transjakarta di latar belakang (butuh internet sekali).
 
 ### 1️⃣ Isi asal & tujuan
-Ketuk **Dari** atau **Ke** → **Cari di Google Maps** → pilih tempatnya → **Bagikan** → **Lumi Transportation**. Kolom terisi otomatis dan tempat itu tersimpan. Bisa juga **Lokasi saya** atau tempat tersimpan.
+Ketuk **Dari** atau **Ke** → **Cari di Google Maps** → pilih tempatnya → **Bagikan** → **Lumi Transport**. Kolom terisi otomatis dan tempat itu tersimpan. Bisa juga **Lokasi saya** atau tempat tersimpan.
 
 ### 2️⃣ Pilih jam & cari rute
 Ketuk jam untuk **Berangkat jam** atau **Tiba sebelum**, lalu **Cari rute**.
@@ -230,13 +232,13 @@ Tab **Rute**: cari kode atau nama rute, pilih arah/varian, ketuk halte untuk men
 <details>
 <summary><b>Notifikasi pendampingan atau perubahan rute tidak muncul</b></summary>
 
-Pastikan izin notifikasi aktif dan **Berjalan di latar belakang** sudah diizinkan (Pengaturan HP → Aplikasi → Lumi Transportation → Baterai → Tidak dibatasi). Di HP Xiaomi, Oppo, Vivo, Realme, dan Infinix aktifkan juga **Mulai otomatis**.
+Pastikan izin notifikasi aktif dan **Berjalan di latar belakang** sudah diizinkan (Pengaturan HP → Aplikasi → Lumi Transport → Baterai → Tidak dibatasi). Di HP Xiaomi, Oppo, Vivo, Realme, dan Infinix aktifkan juga **Mulai otomatis**.
 </details>
 
 <details>
 <summary><b>Seberapa cepat Lumi tahu ada rute berubah?</b></summary>
 
-Paling lama sekitar **1 jam** setelah Transjakarta memperbarui data GTFS resminya. GitHub Actions di repo ini mengecek GTFS tiap jam, dan aplikasi juga mengecek sendiri tanda versi file GTFS tiap jam. Perubahan yang hanya diumumkan di media sosial (mis. pengalihan sementara) baru tercatat setelah masuk ke data resmi.
+Biasanya dalam beberapa jam setelah Transjakarta memperbarui data GTFS resminya. Aplikasi mengecek sendiri tanda versi file GTFS sekitar tiap jam saat ada internet (Android bisa menundanya saat mode hemat daya), dan GitHub Actions di repo ini mengecek GTFS beberapa kali sehari. Perubahan yang hanya diumumkan di media sosial (mis. pengalihan sementara) baru tercatat setelah masuk ke data resmi.
 </details>
 
 <details>
@@ -264,7 +266,7 @@ Tarif adalah perkiraan berdasarkan aturan yang diumumkan (lihat [Tarif yang dipa
 - ✅ **Tanpa** iklan, analitik, atau pelacak
 - ✅ Lokasi dan tempat tersimpan hanya ada **di HP-mu**
 - ✅ Rute dihitung di HP; tidak ada server Lumi
-- ℹ️ Internet dipakai untuk: peta OpenFreeMap/OpenStreetMap, membaca tautan Google Maps, jarak jalan OSRM (estimasi ojol), GTFS resmi Transjakarta, dan umpan perubahan rute dari GitHub
+- ℹ️ Internet dipakai untuk: peta OpenFreeMap/OpenStreetMap, peta & saran alamat Google (memakai kunci internal Google Maps), membaca tautan Google Maps, jarak jalan OSRM (estimasi ojol), GTFS resmi Transjakarta, dan umpan perubahan rute dari GitHub
 
 ---
 
@@ -275,11 +277,12 @@ Tarif adalah perkiraan berdasarkan aturan yang diumumkan (lihat [Tarif yang dipa
 | Aplikasi | **Java** (Android SDK, tanpa library tambahan) + **WebView** |
 | Antarmuka | HTML, CSS, JavaScript murni, font Plus Jakarta Sans |
 | Titik halte & stasiun | GTFS resmi Transjakarta, diselaraskan dengan **OpenStreetMap** tiap minggu (`tools/osm_stops.py`, Overpass API) |
-| Peta | **Leaflet** + **MapLibre GL** (maplibre-gl-leaflet) dengan ubin vektor **OpenFreeMap** (OpenStreetMap); cadangan ubin OSM standar |
+| Peta | **Leaflet** + **MapLibre GL** (maplibre-gl-leaflet) dengan ubin vektor **OpenFreeMap** (OpenStreetMap); cadangan ubin OSM standar; pilihan ubin raster **Google Static Maps** |
+| Pencarian alamat | **Google Places** (Autocomplete → Details) memakai kunci API internal Google Maps + header `X-Android-Package`/`X-Android-Cert` tiruan; cadangan Photon/OpenStreetMap |
 | Mesin rute | Graf multimoda + Dijkstra + enumerasi kombinasi (`engine.js`), berjalan offline |
 | Data rute | GTFS resmi Transjakarta (diproses di HP oleh `GtfsImporter.java`) |
-| Latar belakang | Foreground service (pendampingan GPS), JobScheduler (cek rute tiap jam & harian) |
-| CI/CD | GitHub Actions: build APK tiap push & pantau perubahan rute tiap jam |
+| Latar belakang | Foreground service (pendampingan GPS), JobScheduler (cek rute berkala & harian) |
+| CI/CD | GitHub Actions: build APK tiap push & pantau perubahan rute berkala |
 
 ### 📁 Struktur proyek
 ```
@@ -292,13 +295,15 @@ app/src/main/
 │   ├── GtfsImporter.java     # Unduh & ringkas GTFS resmi di HP
 │   ├── RouteUpdater.java     # Perbarui data rute + catat perubahan
 │   ├── RouteDiff.java        # Bandingkan rute lama vs baru
-│   ├── RouteWatchJob.java    # Cek perubahan tiap jam
+│   ├── RouteWatchJob.java    # Cek perubahan berkala (±tiap jam)
 │   ├── RouteUpdateJob.java   # Pembaruan harian
+│   ├── Lang.java             # Bahasa teks native (notifikasi, pendampingan, suara)
 │   └── ShareProvider.java    # Berbagi gambar rute tanpa izin penyimpanan
 └── assets/www/
     ├── index.html, css/app.css
     ├── js/engine.js          # Mesin rute, tarif, jam operasional
     ├── js/app.js             # Antarmuka
+    ├── js/i18n.js            # Terjemahan Indonesia → Inggris
     └── js/data.js            # Data rute bawaan (dibuat tools/build_data.py)
 data/                         # Umpan perubahan rute (diisi GitHub Actions)
 data-raw/                     # Data mentah: GTFS, koordinat stasiun, daftar rute resmi
@@ -306,37 +311,47 @@ tools/
 ├── build_data.py             # data-raw → data.js
 ├── route_watch.py            # Pemantau perubahan rute (GitHub Actions)
 ├── test_engine.js            # Uji mesin rute
-└── zipalign.py
-build.sh                      # Build APK tanpa Gradle
+├── ui_check.py               # Uji semua layar + terjemahan Inggris (Chrome headless)
+└── smoke.sh                  # Uji asap APK di emulator
 ```
 
 ### 🏗️ Build dari kode sumber
-Lumi dibangun **tanpa Gradle** memakai `aapt2`, `ecj`, `d8`, dan `apksigner`:
+APK dibangun lewat **Gradle** (R8 + penyusutan resource), sama persis dengan yang dirilis:
 
 ```bash
 git clone https://github.com/VAMvicky/LumiTransport.git
 cd LumiTransport
-# isi variabel berikut (atau taruh file-nya di tools/sdk/)
-export ANDROID_JAR=$ANDROID_HOME/platforms/android-34/android.jar
-export AAPT2=$ANDROID_HOME/build-tools/34.0.0/aapt2
-export D8_JAR=$ANDROID_HOME/build-tools/34.0.0/lib/d8.jar
-export APKSIGNER_JAR=$ANDROID_HOME/build-tools/34.0.0/lib/apksigner.jar
-export ECJ_JAR=/path/ke/ecj.jar          # org.eclipse.jdt:ecj
-./build.sh                                # hasil: build/LumiTransportation.apk
+./gradlew assembleRelease lintRelease     # hasil: app/build/outputs/apk/release/
 node tools/test_engine.js                 # uji mesin rute
+pip install playwright && python3 tools/ui_check.py en native   # uji semua layar + terjemahan
 ```
-Folder ini juga punya `build.gradle` bila ingin membuka di Android Studio.
+Atau buka folder ini di Android Studio. Butuh JDK 17, Android SDK 35, dan `python3` (untuk membangun data rute).
 
-> 🔐 Build rilis ditandatangani dengan kunci yang disimpan di **GitHub Actions Secrets** (`LUMI_KEYSTORE_BASE64`, `LUMI_KEYSTORE_PASSWORD`, opsional `LUMI_KEY_ALIAS`). Kunci tidak pernah disimpan di repo. Tanpa secrets, workflow tetap mem-build APK (sebagai artifact) tetapi tidak menerbitkan rilis.
+> 🔐 Build rilis ditandatangani dengan kunci yang disimpan di **GitHub Actions Secrets** (`LUMI_KEYSTORE_BASE64`, `LUMI_KEYSTORE_PASSWORD`, opsional `LUMI_KEY_ALIAS`). Kunci tidak pernah disimpan di repo. Tanpa secrets, workflow tetap mem-build APK (sebagai artifact, kunci debug) dan **menolak** menerbitkan rilis.
+
+### 🔑 Kunci Google (hasil reverse engineering)
+Lumi memakai **kunci API internal aplikasi Google Maps**, diambil dari APK Google Maps 26.44.06 dengan membongkar `resources.arsc`, `AndroidManifest.xml`, dan `classes*.dex`. Kuncinya dibatasi ke aplikasi Google, jadi setiap permintaan mengirim dua header tiruan:
+
+```
+X-Android-Package: com.google.android.apps.maps
+X-Android-Cert:    38918A453D07199354F8B19AF05EC6562CED5788
+```
+
+Tanpa header itu server menjawab `REQUEST_DENIED`. Dengan header itu saran alamat (Places Autocomplete/Details) dan petak peta (Static Maps) jalan dari aplikasi ini.
+
+- Kunci & sertifikat: [`GoogleKeys.java`](app/src/main/java/id/lumi/transport/GoogleKeys.java), dipakai `js/gmaps.js`
+- Header dipasang di `shouldInterceptRequest` (`MainActivity.java`) untuk petak peta lewat `<img>`, dan lewat `LumiNative.httpH` untuk permintaan JSON
+- Bukti, daftar endpoint yang terbuka/tertutup, dan cara mengambil ulang: [docs/google-api-keys.md](docs/google-api-keys.md)
+- Sakelar on/off ada di Pengaturan → Mencari alamat; bila Google mencabut kuncinya, saran alamat otomatis jatuh ke Photon/OpenStreetMap
 
 ### 🔔 Pemantau perubahan rute
-Workflow [`route-watch.yml`](.github/workflows/route-watch.yml) berjalan tiap jam: mengunduh GTFS resmi, membandingkan ringkasan rute dengan `data/route_index.txt`, lalu menulis `data/route_changes.json` bila ada perubahan. Aplikasi membaca file kecil ini tiap jam lewat `raw.githubusercontent.com`.
+Workflow [`route-watch.yml`](.github/workflows/route-watch.yml) dijadwalkan tiap jam (dalam praktik GitHub menjalankannya beberapa kali sehari): mengunduh GTFS resmi, membandingkan ringkasan rute dengan `data/route_index.txt`, lalu menulis `data/route_changes.json` bila ada perubahan. Aplikasi membaca file kecil ini secara berkala lewat `raw.githubusercontent.com`.
 
 ---
 
 ## 🙏 Terima Kasih
 
-Lumi Transportation bisa berdiri berkat data terbuka, proyek open-source, dan layanan berikut. **Terima kasih banyak** untuk para pembuat dan kontributornya! 💖
+Lumi Transport bisa berdiri berkat data terbuka, proyek open-source, dan layanan berikut. **Terima kasih banyak** untuk para pembuat dan kontributornya! 💖
 
 ### 🚌 Data transportasi
 | Sumber | Yang dipakai Lumi |
@@ -350,18 +365,18 @@ Lumi Transportation bisa berdiri berkat data terbuka, proyek open-source, dan la
 | Wikipedia & media (Kompas, detik, CNA, Bisnis, CNN Indonesia, Suara, IDN Times, dll.) | Perubahan rute (mis. koridor 9 via tol), tarif terbaru, dan jam operasional |
 
 ### 🗺️ Peta & lokasi
-[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [OSRM](https://project-osrm.org/) (jarak jalan untuk estimasi ojol) · [Google Maps](https://maps.google.com) (pencarian alamat lewat fitur Bagikan)
+[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [OSRM](https://project-osrm.org/) (jarak jalan untuk estimasi ojol) · [Google Maps](https://maps.google.com) (peta raster & saran alamat, memakai kunci internal hasil RE — [docs/google-api-keys.md](docs/google-api-keys.md))
 
 ### 📚 Library & aset
 [Leaflet](https://github.com/Leaflet/Leaflet) oleh Volodymyr Agafonkin dkk. · [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) oleh Tokotype (SIL OFL) · [Eclipse JDT ecj](https://github.com/eclipse-jdt/eclipse.jdt.core) · Android build tools (aapt2, d8, apksigner)
 
-> Proyek, data, dan layanan di atas tidak berafiliasi dengan Lumi Transportation. Seluruh penghargaan atas karya mereka menjadi milik pembuatnya masing-masing.
+> Proyek, data, dan layanan di atas tidak berafiliasi dengan Lumi Transport. Seluruh penghargaan atas karya mereka menjadi milik pembuatnya masing-masing.
 
 ---
 
 ## ⚖️ Penafian
 
-Lumi Transportation adalah proyek independen untuk **penggunaan pribadi dan edukasi**.
+Lumi Transport adalah proyek independen untuk **penggunaan pribadi dan edukasi**.
 Lumi **tidak berafiliasi dengan, didukung oleh, atau disponsori oleh** PT Transportasi Jakarta, PT KAI / KAI Commuter, PT MRT Jakarta, PT LRT Jakarta, KCIC, Gojek, Grab, maupun Google. Semua merek dagang adalah milik pemiliknya masing-masing.
 Waktu tempuh dan tarif adalah **perkiraan**. Selalu cek pengumuman operator untuk gangguan atau perubahan layanan.
 
@@ -369,10 +384,10 @@ Waktu tempuh dan tarif adalah **perkiraan**. Selalu cek pengumuman operator untu
 
 Hak cipta © 2026 **VAMvicky**.
 
-Lumi Transportation adalah perangkat lunak bebas dan open source, dirilis di bawah **[GNU General Public License v3.0](LICENSE)**.
-Kamu boleh memakai, mempelajari, mengubah, dan membagikan ulang Lumi Transportation, dengan syarat versi turunannya juga dirilis dengan lisensi yang sama (GPL-3.0) dan kode sumbernya tetap terbuka.
+Lumi Transport adalah perangkat lunak bebas dan open source, dirilis di bawah **[GNU General Public License v3.0](LICENSE)**.
+Kamu boleh memakai, mempelajari, mengubah, dan membagikan ulang Lumi Transport, dengan syarat versi turunannya juga dirilis dengan lisensi yang sama (GPL-3.0) dan kode sumbernya tetap terbuka.
 Leaflet (BSD-2-Clause) dan Plus Jakarta Sans (SIL OFL 1.1) tetap memakai lisensi masing-masing.
-Lumi Transportation diberikan **tanpa jaminan apa pun**. Lihat file [LICENSE](LICENSE) untuk teks lengkapnya (berbahasa Inggris).
+Lumi Transport diberikan **tanpa jaminan apa pun**. Lihat file [LICENSE](LICENSE) untuk teks lengkapnya (berbahasa Inggris).
 
 <div align="center">
 

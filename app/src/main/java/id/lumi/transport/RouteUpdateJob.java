@@ -9,6 +9,7 @@ public class RouteUpdateJob extends JobService {
 
     @Override
     public boolean onStartJob(final JobParameters params) {
+        Lang.load(this);
         if (RouteUpdater.freshEnough(this)) return false;   // sudah diperbarui hari ini (mis. dari aplikasi)
         worker = new Thread(new Runnable() {
             @Override public void run() {

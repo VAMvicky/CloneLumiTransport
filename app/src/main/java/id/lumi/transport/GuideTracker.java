@@ -73,12 +73,12 @@ public class GuideTracker {
         return -1;
     }
 
-    private static String plural(int n, String w) { return n + " " + w; }
+    private static String plural(int n, String w) { return n + " " + (Lang.en && n == 1 ? w.replace("stops", "stop") : w); }
 
     public State update(double lat, double lon, double acc) {
         State s = new State();
         s.lat = lat; s.lon = lon; s.acc = acc;
-        if (cps.isEmpty()) { s.phase = "done"; s.done = true; s.title = "Rute kosong"; s.text = ""; return last = s; }
+        if (cps.isEmpty()) { s.phase = "done"; s.done = true; s.title = Lang.t("Rute kosong", "Empty route"); s.text = ""; return last = s; }
         int old = cursor;
         // Geser kursor: cari titik terdekat di depan (maks. 14 titik) yang sudah "dicapai".
         int bestJ = -1; double bestD = Double.MAX_VALUE;
@@ -101,9 +101,9 @@ public class GuideTracker {
             if (c.kind == 'A' && !alighted[c.leg]) {
                 alighted[c.leg] = true; warned[c.leg] = true;
                 int nb = indexOf('B', c.leg + 1);
-                s.alert = "Turun sekarang di " + c.name + (nb >= 0 ? ". Lanjut naik " + cps.get(nb).line + " di " + cps.get(nb).name : "");
+                s.alert = Lang.t("Turun sekarang di ", "Get off now at ") + c.name + (nb >= 0 ? Lang.t(". Lanjut naik ", ". Then take ") + cps.get(nb).line + Lang.t(" di ", " at ") + cps.get(nb).name : "");
             }
-            if (c.kind == 'D' && !arrived) { arrived = true; s.alert = "Kamu sudah sampai di " + c.name; }
+            if (c.kind == 'D' && !arrived) { arrived = true; s.alert = Lang.t("Kamu sudah sampai di ", "You have arrived at ") + c.name; }
         }
 
         int next = Math.min(cursor + 1, cps.size() - 1);
@@ -113,8 +113,8 @@ public class GuideTracker {
 
         if (arrived || (cur != null && cur.kind == 'D')) {
             s.phase = "done"; s.done = true;
-            s.title = "Sampai tujuan";
-            s.text = "Kamu sudah sampai di " + cps.get(cps.size() - 1).name + ". Pendampingan selesai.";
+            s.title = Lang.t("Sampai tujuan", "Arrived");
+            s.text = Lang.t("Kamu sudah sampai di ", "You have arrived at ") + cps.get(cps.size() - 1).name + Lang.t(". Pendampingan selesai.", ". Guidance finished.");
             return last = s;
         }
         if (cur != null && (cur.kind == 'B' || cur.kind == 'S') && cps.get(next).leg == cur.leg && nx.kind != 'B') {
@@ -125,16 +125,16 @@ public class GuideTracker {
             s.stopsLeft = left;
             if (cur.kind == 'B') {
                 s.phase = "wait";
-                s.title = "Tunggu " + cur.line + (cur.head.isEmpty() ? "" : " arah " + cur.head);
-                s.text = "Di " + cur.name + " · turun di " + a.name + " (" + plural(left, "pemberhentian") + ")";
+                s.title = Lang.t("Tunggu ", "Wait for ") + cur.line + (cur.head.isEmpty() ? "" : Lang.t(" arah ", " towards ") + cur.head);
+                s.text = Lang.t("Di ", "At ") + cur.name + Lang.t(" · turun di ", " · get off at ") + a.name + " (" + plural(left, Lang.t("pemberhentian", "stops")) + ")";
             } else {
                 s.phase = "ride";
-                s.title = cur.line + " · " + (left <= 1 ? "turun di pemberhentian berikutnya" : plural(left, "pemberhentian lagi"));
-                s.text = "Turun di " + a.name + " · sekarang dekat " + cur.name;
+                s.title = cur.line + " · " + (left <= 1 ? Lang.t("turun di pemberhentian berikutnya", "get off at the next stop") : plural(left, Lang.t("pemberhentian lagi", "stops to go")));
+                s.text = Lang.t("Turun di ", "Get off at ") + a.name + Lang.t(" · sekarang dekat ", " · now near ") + cur.name;
             }
             if (left == 1 && !warned[cur.leg]) {
                 warned[cur.leg] = true;
-                s.alert = "Siap-siap turun! Pemberhentian berikutnya: " + a.name;
+                s.alert = Lang.t("Siap-siap turun! Pemberhentian berikutnya: ", "Get ready to get off! Next stop: ") + a.name;
             }
             return last = s;
         }
@@ -147,19 +147,20 @@ public class GuideTracker {
         s.metersLeft = m;
         if (t.kind == 'D') {
             s.phase = "walk";
-            s.title = "Jalan ke tujuan";
-            s.text = "±" + fmtM(m) + " lagi ke " + t.name;
+            s.title = Lang.t("Jalan ke tujuan", "Walk to your destination");
+            s.text = "±" + fmtM(m) + Lang.t(" lagi ke ", " to go to ") + t.name;
         } else {
             s.phase = cur != null && cur.kind == 'A' ? "alight" : "walk";
-            s.title = (s.phase.equals("alight") ? "Pindah: jalan ke " : "Jalan ke ") + t.name;
-            s.text = "±" + fmtM(m) + " lagi · naik " + t.line + (t.head.isEmpty() ? "" : " arah " + t.head);
+            s.title = (s.phase.equals("alight") ? Lang.t("Pindah: jalan ke ", "Transfer: walk to ") : Lang.t("Jalan ke ", "Walk to ")) + t.name;
+            s.text = "±" + fmtM(m) + Lang.t(" lagi · naik ", " to go · take ") + t.line + (t.head.isEmpty() ? "" : Lang.t(" arah ", " towards ") + t.head);
         }
         return last = s;
     }
 
     static String fmtM(int m) {
         if (m < 1000) return (Math.round(m / 10.0) * 10) + " m";
-        return String.format(java.util.Locale.US, "%.1f km", m / 1000.0).replace('.', ',');
+        String k = String.format(java.util.Locale.US, "%.1f km", m / 1000.0);
+        return Lang.en ? k : k.replace('.', ',');
     }
 
     static void esc(StringBuilder sb, String s) {

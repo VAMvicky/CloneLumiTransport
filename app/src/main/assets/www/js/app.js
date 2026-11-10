@@ -1,4 +1,4 @@
-/* Lumi Transportation — logika antarmuka */
+/* Lumi Transport — logika antarmuka */
 (function () {
   "use strict";
   var E = window.LumiEngine, DATA = window.LUMI_DATA;
@@ -35,10 +35,13 @@
   }
   (function mergeOfficial() {
     var raw = null;
-    try { raw = window.LumiNative && window.LumiNative.getRouteData && window.LumiNative.getRouteData(); } catch (e) { }
-    if (!raw) { try { raw = localStorage.getItem("lumi:gtfsTest"); } catch (e) { } }   // untuk uji di browser
-    if (!raw) return;
-    var g; try { g = JSON.parse(raw); } catch (e) { return; }
+    try { raw = window.LumiNative && window.LumiNative.getRouteData && window.LumiNative.getRouteData(); } catch (e) { lumiLog(e); }
+    if (!raw) { try { raw = localStorage.getItem("lumi:gtfsTest"); } catch (e) { lumiLog(e); } }   // untuk uji di browser
+    // R6: belum ada unduhan → pakai ringkasan GTFS resmi yang ikut di APK (js/gtfs.js).
+    var g = null, bundled = false;
+    if (raw) { try { g = JSON.parse(raw); } catch (e) { lumiLog(e, "gtfs"); } }
+    if (!g && window.LUMI_GTFS) { g = window.LUMI_GTFS; bundled = true; }
+    window.LUMI_GTFS = null;   // lepaskan memori; DATA.lines sudah memegang yang dipakai
     if (!g || !g.lines || !g.lines.length) return;
     var MAIN = {}; for (var i = 1; i <= 14; i++) MAIN[String(i)] = 1;
     var M24 = { JAK36: 1, JAK47: 1, JAK52: 1, JAK75: 1 };
@@ -142,16 +145,58 @@
     for (var k in replaced) lines.push(replaced[k]);
     DATA.lines = lines;
     var n = 0; lines.forEach(function (l) { if (/^GTFS resmi/.test(String(l.note).replace("Halte: ", ""))) n++; });
-    ROUTE_SRC = { kind: "gtfs", date: g.date, count: g.lines.length };
+    ROUTE_SRC = { kind: "gtfs", date: g.date, count: g.lines.length, bundled: bundled };
   })();
   /*
    * Titik halte/stasiun diselaraskan dengan OpenStreetMap (peta yang kamu lihat). Berlaku untuk data bawaan
    * maupun GTFS resmi yang diunduh harian: dicocokkan per nama + jarak ≤80 m dari titik asal.
    * Daftar terbaru diambil dari GitHub (diperbarui tiap minggu) dan dipakai sejak aplikasi dibuka berikutnya.
    */
+  /* R10: data yang diambil dari GitHub diperiksa dulu (bentuk, jumlah, rentang nilai) sebelum disimpan/dipakai. */
+  function inJabo(lat, lon) { return lat > -7.2 && lat < -5.7 && lon > 105.9 && lon < 107.6; }
+  function validStopFix(j) {
+    if (!j || j.v !== 2 || !j.fix || typeof j.fix !== "object" || !/^\d{4}-\d{2}-\d{2}/.test(String(j.date || ""))) return false;
+    var keys = Object.keys(j.fix), n = 0;
+    if (keys.length > 20000) return false;
+    for (var i = 0; i < keys.length; i++) {
+      var arr = j.fix[keys[i]];
+      if (!Array.isArray(arr) || keys[i].length > 120) return false;
+      for (var k = 0; k < arr.length; k++) {
+        var e = arr[k];
+        if (!Array.isArray(e) || e.length !== 4 || !e.every(function (x) { return typeof x === "number" && isFinite(x); })) return false;
+        if (!inJabo(e[0], e[1]) || !inJabo(e[2], e[3]) || E.hav([e[0], e[1]], [e[2], e[3]]) > 1.5) return false;   // geser maks. 1,5 km
+        if (++n > 50000) return false;
+      }
+    }
+    return true;
+  }
+  function validFares(f) {
+    if (!f || f.v !== 1 || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.updated || ""))) return false;
+    var need = ["tj", "krl", "mrt", "lrt", "lrtj", "kaBandara", "whoosh", "ojol"];
+    for (var i = 0; i < need.length; i++) if (!f[need[i]] || typeof f[need[i]] !== "object") return false;
+    var ok = true;
+    (function walk(o, d) {
+      if (d > 5) { ok = false; return; }
+      for (var k in o) {
+        var v = o[k];
+        if (typeof v === "number") { if (!isFinite(v) || v < 0 || v > 1000000) ok = false; }
+        else if (v && typeof v === "object" && k !== "notes") walk(v, d + 1);
+      }
+    })(f, 0);
+    if (!ok || !Array.isArray(f.tj.free) || !Array.isArray(f.tj.premium) || !Array.isArray(f.lrtj.peak)) return false;
+    try { f.tj.premium.forEach(function (p) { new RegExp(p[0]); }); } catch (e) { return false; }
+    return true;
+  }
+  /* Tarif terbaru dari repo (data/fares.json) menggantikan tarif bawaan bila lebih baru (R8). */
+  (function applyFares() {
+    try {
+      var f = JSON.parse(localStorage.getItem("lumi:fares") || "null");
+      if (f && validFares(f) && f.updated > ((DATA.fares || {}).updated || "")) DATA.fares = f;
+    } catch (e) { lumiLog(e); }
+  })();
   (function applyStopFix() {
     var F = window.LUMI_STOPFIX;
-    try { var c = JSON.parse(localStorage.getItem("lumi:stopfix") || "null"); if (c && c.fix && (!F || c.date > F.date)) F = c; } catch (e) { }
+    try { var c = JSON.parse(localStorage.getItem("lumi:stopfix") || "null"); if (c && validStopFix(c) && (!F || c.date > F.date)) F = c; } catch (e) { lumiLog(e); }
     if (!F || !F.fix || F.v !== 2) return;
     var n = 0;
     DATA.lines.forEach(function (l) {
@@ -168,17 +213,23 @@
     window.__lumiStopFix = { date: F.date, applied: n };
   })();
   var planner = new E.Planner(DATA);
-  window.__lumiDebug = { planner: planner, data: DATA, src: function () { return ROUTE_SRC; }, tripZoom: function () { return tripMap ? tripMap.getZoom() : -1; }, liveWalk: function () { return LIVEW; }, dynKm: function () { return (GT.trip.dyn || []).map(function (d) { return pathKm(d.lines[1].getLatLngs().map(function (q) { return [q.lat, q.lng]; })); }); } };   // untuk pengujian
+  // B10: kait uji hanya aktif di browser (bukan aplikasi Android) atau bila localStorage "lumi:debug" = "1".
+  var DEBUG = !window.LumiNative; try { if (localStorage.getItem("lumi:debug") === "1") DEBUG = true; } catch (e) { lumiLog(e); }
+  if (DEBUG) window.__lumiDebug = { planner: planner, data: DATA, src: function () { return ROUTE_SRC; }, tripZoom: function () { return tripMap ? tripMap.getZoom() : -1; }, liveWalk: function () { return LIVEW; }, busEta: function (b, l, p, f) { return busEta(b, l, p, f); }, routeEta: function (b, l, p) { return routeEta(b, l, p); }, dynKm: function () { return (GT.trip.dyn || []).map(function (d) { return pathKm(d.lines[1].getLatLngs().map(function (q) { return [q.lat, q.lng]; })); }); } };   // untuk pengujian
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var NATIVE = window.LumiNative || null;
+  /* Bahasa: tl("teks id", "english") untuk kalimat berisi nama/angka; T() untuk teks yang keluar dari halaman. */
+  var I18 = window.LumiI18n || { en: false, t: function (s) { return s; }, L: function (a) { return a; } };
+  var EN = I18.en, T = I18.t, tl = I18.L;
 
   /* ------------------------------------------------------------ util */
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
-  function rp(n) { return "Rp" + Math.round(n).toLocaleString("id-ID"); }
+  function rp(n) { return "Rp" + Math.round(n).toLocaleString(window.LumiI18n && window.LumiI18n.en ? "en-US" : "id-ID"); }
   function fareText(lo, hi) { return lo === hi ? (lo === 0 ? "Gratis" : rp(lo)) : rp(lo) + "–" + rp(hi).replace("Rp", ""); }
-  function mins(m) { m = Math.round(m); return m < 60 ? m + " mnt" : Math.floor(m / 60) + " j " + (m % 60) + " mnt"; }
-  function km(k) { return k < 1 ? Math.round(k * 1000 / 10) * 10 + " m" : k.toFixed(1).replace(".", ",") + " km"; }
+  function mins(m) { m = Math.round(m); var u = tl(" mnt", " min"); return m < 60 ? m + u : Math.floor(m / 60) + tl(" j ", " h ") + (m % 60) + u; }
+  function dec(x) { return EN ? x.toFixed(1) : x.toFixed(1).replace(".", ","); }
+  function km(k) { return k < 1 ? Math.round(k * 1000 / 10) * 10 + " m" : dec(k) + " km"; }
   function clock(d) { return ("0" + d.getHours()).slice(-2) + "." + ("0" + d.getMinutes()).slice(-2); }
   function addMin(d, m) { return new Date(d.getTime() + m * 60000); }
   function textColor(hex) {
@@ -210,31 +261,320 @@
     return it;
   }
   function lc(l) { return l._c || l.line.color; }
-  function nextRideText(n) { return n && n.type === "ride" ? ", lalu ganti ke <b>" + esc(modeLabel(n.line) + " " + n.line.code) + "</b>" : ""; }
+  function nextRideText(n) { return n && n.type === "ride" ? tl(", lalu ganti ke ", ", then change to ") + "<b>" + esc(modeLabel(n.line) + " " + n.line.code) + "</b>" : ""; }
   function sameStopText(p, n) {
     var railBoth = p && n && p.type === "ride" && n.type === "ride" && RAIL[p.line.mode] && RAIL[n.line.mode];
-    if (railBoth) return "Pindah peron/jalur di stasiun yang sama" + nextRideText(n);
-    if (n && n.type === "ride") return "Turun, lalu ganti ke <b>" + esc(modeLabel(n.line) + " " + n.line.code) + "</b> di " + (RAIL[n.line.mode] ? "stasiun" : "halte") + " yang sama";
-    return "Pindah di tempat yang sama";
+    if (railBoth) return tl("Pindah peron/jalur di stasiun yang sama", "Change platforms at the same station") + nextRideText(n);
+    if (n && n.type === "ride") return tl("Turun, lalu ganti ke ", "Get off, then change to ") + "<b>" + esc(modeLabel(n.line) + " " + n.line.code) + "</b>" +
+      (RAIL[n.line.mode] ? tl(" di stasiun yang sama", " at the same station") : tl(" di halte yang sama", " at the same stop"));
+    return tl("Pindah di tempat yang sama", "Change at the same place");
   }
   function modeLabel(line) {
     if (line.mode === "TJ") return line.brt ? "Transjakarta" : "Transjakarta non-BRT";
     if (line.mode === "ROYAL" && line.cat === "JABODETABEK") return "Transjabodetabek";
+    if (line.mode === "KABANDARA") return tl("KA Bandara", "Airport Rail");
     return MODES[line.mode].label;
   }
+  function stopWord(n, rail) { return n + " " + (rail ? tl("stasiun", n === 1 ? "station" : "stations") : tl("halte", n === 1 ? "stop" : "stops")); }
   var toastT;
   function toast(msg) {
     var t = $("#toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove("show"); }, 2600);
   }
   window.lumiToast = toast;
+  /* Tinggi status bar / navigation bar dari Android, dipakai CSS (--safe-top/--safe-bottom). */
+  /* Nilai dalam dp (= px CSS). `ime` true selama keyboard terbuka: WebView sudah dikecilkan native,
+     nav bawah disembunyikan agar daftar dan kolom pencarian punya ruang. */
+  window.__lumiInsets = function (top, bottom, ime) {
+    try {
+      var de = document.documentElement, r = de.style;
+      r.setProperty("--safe-t", Math.max(0, +top || 0) + "px");
+      r.setProperty("--safe-b", Math.max(0, +bottom || 0) + "px");
+      de.classList.toggle("kb-open", !!ime);
+    } catch (e) { lumiLog(e); }
+  };
+  try {
+    if (window.LumiNative && window.LumiNative.insets) {
+      var in0 = JSON.parse(window.LumiNative.insets());
+      window.__lumiInsets(in0.top, in0.bottom, in0.ime);
+    }
+  } catch (e) { lumiLog(e); }
   function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem("lumi:" + k)); localStorage.setItem("lumi:" + k, JSON.stringify(v)); } catch (e) { return null; } }
+
+  /* ------------------------------------------------------- riwayat perjalanan */
+  function trips() { var t = store("trips"); return Array.isArray(t) ? t : []; }
+  function recordTrip(it) {
+    try {
+      if (!S.from || !S.to || !it) return;
+      var now = Date.now();
+      var list = trips();
+      var key = (S.from.name || "") + "|" + (S.to.name || "") + "|" + (it.min || 0);
+      // Panduan yang dihentikan lalu dimulai lagi dalam 2 menit tidak dihitung dua kali.
+      if (list[0] && list[0].key === key && now - list[0].ts < 120000) return;
+      var modes = [], seen = {};
+      (it.legs || []).forEach(function (l) {
+        if (l.type === "ride" && l.line && !seen[l.line.mode]) { seen[l.line.mode] = 1; modes.push(MODES[l.line.mode] ? MODES[l.line.mode].label : l.line.mode); }
+      });
+      list.unshift({ key: key, ts: now, from: S.from.name || "", to: S.to.name || "", mins: it.min || 0, fare: it.fareLo || 0, modes: modes.join(" + ") });
+      store("trips", list.slice(0, 50));
+    } catch (e) { lumiLog(e); }
+  }
+  function historyCardHTML() {
+    var list = trips();
+    if (!list.length) {
+      return '<div class="set-card"><h3>Riwayat perjalanan</h3><p>Belum ada perjalanan. Begitu kamu memulai pendampingan pada sebuah rute, perjalanan itu tercatat di sini beserta ongkosnya.</p></div>';
+    }
+    var m0 = nowWib(); m0.setDate(1); m0.setHours(0, 0, 0, 0);
+    var total = 0, n = 0;
+    list.forEach(function (t) { if (wibOf(t.ts || 0).getTime() >= m0.getTime()) { total += t.fare || 0; n++; } });
+    var rows = list.slice(0, 12).map(function (t) {
+      var d = wibOf(t.ts || 0);
+      var tanggal = d.getDate() + "/" + (d.getMonth() + 1) + "/" + String(d.getFullYear()).slice(2);
+      return '<div class="hist-row"><div class="hist-main"><b>' + esc(t.from) + " → " + esc(t.to) + "</b><span>" + tanggal +
+        (t.modes ? " · " + esc(T(t.modes)) : "") + (t.mins ? " · " + mins(t.mins) : "") + '</span></div><div class="hist-fare">' + rp(t.fare || 0) + "</div></div>";
+    }).join("");
+    return '<div class="set-card"><h3>Riwayat perjalanan</h3>' +
+      "<p><b>" + n + tl(" perjalanan bulan ini", n === 1 ? " trip this month" : " trips this month") + "</b> · total <b>" + rp(total) + "</b></p>" +
+      '<div class="hist-list">' + rows + "</div>" +
+      '<button class="btn-sec" id="btnClearTrips" type="button">Hapus riwayat</button></div>';
+  }
+
+  /* ------------------------------------------------------- tab halte & riwayat */
+  var STOP_INDEX = null;
+  function stopIndex() {
+    if (STOP_INDEX) return STOP_INDEX;
+    var byKey = {}, out = [];
+    var lines = (window.LUMI_DATA && LUMI_DATA.lines) ? LUMI_DATA.lines : [];
+    lines.forEach(function (l) {
+      (l.dirs || []).forEach(function (d) {
+        (d.s || []).forEach(function (st) {
+          if (!st || !st.n || !st.p) return;
+          var key = st.n + "@" + (+st.p[0]).toFixed(4) + "," + (+st.p[1]).toFixed(4);
+          if (!byKey[key]) { byKey[key] = { n: st.n, p: st.p, codes: {} }; out.push(byKey[key]); }
+          byKey[key].codes[l.code] = 1;
+        });
+      });
+    });
+    STOP_INDEX = out.sort(function (a, b) { return a.n.localeCompare(b.n); });
+    return STOP_INDEX;
+  }
+  function renderStops(q) {
+    q = (q || "").toLowerCase();
+    var list = stopIndex().filter(function (s) { return !q || s.n.toLowerCase().indexOf(q) >= 0; }).slice(0, 200);
+    var box = $("#stopList");
+    if (!box) return;
+    if (!list.length) { box.innerHTML = '<p class="fav-empty">' + tl("Tidak ada halte atau stasiun yang cocok.", "No matching stop or station.") + "</p>"; return; }
+    box.innerHTML = list.map(function (s, i) {
+      var codes = Object.keys(s.codes).slice(0, 5).join(", ");
+      return '<button class="stop-row" data-stop="' + i + '"><b>' + esc(s.n) + '</b><span>' + esc(codes) + "</span></button>";
+    }).join("");
+    $$("#stopList .stop-row").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var s = list[+b.dataset.stop];
+        if (s) openStopActions(s);
+      });
+    });
+  }
+  /* Rute yang benar-benar berhenti di halte/stasiun ini: nama sama dan titiknya berdekatan
+     (halte dua arah biasanya berjarak puluhan meter). Halte bus dan stasiun yang namanya sama
+     (mis. "Manggarai") dipisah: entri ini dianggap stasiun bila rute di titik persisnya semuanya kereta. */
+  function linesAtStop(s) {
+    var key = nmKey(s.n), near = [], exact = [];
+    planner.lines.forEach(function (l) {
+      var best = 9;
+      (l.dirs || []).forEach(function (d) {
+        (d.s || []).forEach(function (x) { if (x && x.p && nmKey(x.n) === key) best = Math.min(best, E.hav(s.p, x.p)); });
+      });
+      if (best < 0.2) near.push(l);
+      if (best < 0.01) exact.push(l);
+    });
+    var station = exact.length > 0 && exact.every(function (l) { return RAIL[l.mode]; });
+    return near.filter(function (l) { return station ? RAIL[l.mode] : !RAIL[l.mode]; });
+  }
+  /* Lembar aksi halte/stasiun: berangkat dari sini, pergi ke sini, dan (khusus halte bus) posisi bus. */
+  function openStopActions(s) {
+    var m = $("#sheetStop"); if (!m) return;
+    var lines = linesAtStop(s), isStation = lines.length > 0 && lines.every(function (l) { return RAIL[l.mode]; }), bus = isStation ? [] : lines.filter(liveOk);
+    $("#stopActName").textContent = s.n;
+    $("#stopActKind").textContent = isStation ? tl("Stasiun", "Station") : tl("Halte", "Stop");
+    $("#stopActLines").innerHTML = lines.slice(0, 14).map(function (l) { return badge(l, "xs"); }).join("") +
+      (lines.length > 14 ? '<span class="s-num">+' + (lines.length - 14) + "</span>" : "");
+    $("#stopActLive").hidden = !bus.length;
+    var use = function (which) {
+      m.hidden = true;
+      setPoint(which, { name: s.n, p: s.p });
+      setTab("plan");
+      if (S.from && S.to) runPlan(); else { S.field = which === "from" ? "to" : "from"; (which === "from" ? inTo : inFrom).focus(); }
+    };
+    $("#stopActFrom").onclick = function () { use("from"); };
+    $("#stopActTo").onclick = function () { use("to"); };
+    $("#stopActLive").onclick = function () { m.hidden = true; openLiveAt(s.p, s.n, { stop: s, lines: bus }); };
+    m.hidden = false;
+  }
+  function renderHistoryTab() {
+    var box = $("#historyBody");
+    if (!box) return;
+    box.innerHTML = tr(historyCardHTML()).replace('id="btnClearTrips"', 'id="btnClearHistory"');
+    var c = $("#btnClearHistory");
+    if (c) c.addEventListener("click", function () { store("trips", []); renderHistoryTab(); toast(tl("Riwayat perjalanan dihapus", "Trip history cleared")); });
+  }
+
+  /* ------------------------------------------------------- aksesibilitas */
+  function langCardHTML() {
+    var lang = cfg().lang === "en" ? "en" : "id";
+    return '<div class="set-card"><h3>Bahasa / Language</h3>' +
+      '<label class="set-field"><span>Bahasa aplikasi</span><select id="setLang">' +
+      '<option value="id"' + (lang === "id" ? " selected" : "") + '>Bahasa Indonesia</option>' +
+      '<option value="en"' + (lang === "en" ? " selected" : "") + '>English</option>' +
+      '</select></label>' +
+      '<p>Semua teks aplikasi ikut berganti, termasuk hasil rute, notifikasi, dan panduan suara.</p></div>';
+  }
+  function accessCardHTML() {
+    return '<div class="set-card"><h3>Aksesibilitas</h3>' +
+      '<label class="set-row"><span>Mode aksesibel</span><input type="checkbox" id="setAccess"' + (cfg().accessible ? " checked" : "") + '></label>' +
+      '<label class="set-row"><span>Panduan suara</span><input type="checkbox" id="setVoice"' + (cfg().voice ? " checked" : "") + '></label>' +
+      '<p>Huruf lebih besar, tombol lebih tinggi, dan animasi dikurangi. Panduan suara membacakan langkah saat pendampingan berjalan.</p></div>';
+  }
+
+  /* ------------------------------------------------------- cadangkan & pulihkan */
+  var BACKUP_KEYS = ["cfg", "favs", "trips", "places", "recent", "onboarded", "guide"];
+  function backupText() {
+    var data = {};
+    BACKUP_KEYS.forEach(function (k) {
+      var v = store(k);
+      if (v !== null && v !== undefined) data[k] = v;
+    });
+    return JSON.stringify({ app: "LumiTransport", v: 1, ts: Date.now(), data: data });
+  }
+  function doBackup() {
+    var txt = backupText();
+    if (NATIVE && NATIVE.share) {
+      NATIVE.share(tl("Lumi Transport — cadangan data", "Lumi Transport — data backup") + "\n\n" + txt);
+      toast("Cadangan dibagikan · simpan ke file atau catatan");
+    } else {
+      try { window.prompt(tl("Salin cadangan ini:", "Copy this backup:"), txt); } catch (e) { lumiLog(e); }
+    }
+  }
+  function doRestore() {
+    var ta = $("#restoreText");
+    if (!ta) return;
+    var raw = (ta.value || "").trim();
+    var start = raw.indexOf("{");
+    if (start > 0) raw = raw.slice(start);
+    try {
+      var o = JSON.parse(raw);
+      if (!o || o.v !== 1 || !o.data) throw new Error("format");
+      var n = 0;
+      BACKUP_KEYS.forEach(function (k) {
+        if (o.data[k] !== undefined) { store(k, o.data[k]); n++; }
+      });
+      renderSettings(["backup", "ok", tl("Dipulihkan: " + n + " bagian data.", "Restored: " + n + " data sections.")]);
+      toast("Data dipulihkan");
+    } catch (e) {
+      toast("Teks cadangan tidak dikenali");
+    }
+  }
+  function backupCardHTML() {
+    return '<div class="set-card"><h3>Cadangkan &amp; pulihkan</h3>' +
+      '<p>Cadangan berisi pengaturan, rute favorit, riwayat perjalanan, dan tempat tersimpan.</p>' +
+      '<button class="btn-sec" id="btnBackup" type="button">Cadangkan (bagikan)</button>' +
+      '<textarea id="restoreText" class="restore-box" placeholder="Tempel teks cadangan di sini, lalu ketuk Pulihkan"></textarea>' +
+      '<button class="btn-sec" id="btnRestore" type="button">Pulihkan dari teks</button></div>';
+  }
+
+  /* ------------------------------------------------------- rute favorit */
+  function favs() { var f = store("favs"); return Array.isArray(f) ? f : []; }
+  function saveFav() {
+    if (!S.from || !S.to) { toast("Isi asal dan tujuan dulu"); return; }
+    var key = (S.from.name || "") + "|" + (S.to.name || "");
+    var list = favs();
+    if (list.some(function (f) { return f.key === key; })) { toast("Rute ini sudah ada di favorit"); return; }
+    list.unshift({ key: key, from: { name: S.from.name, p: S.from.p }, to: { name: S.to.name, p: S.to.p }, ts: Date.now() });
+    store("favs", list.slice(0, 20));
+    toast("Rute disimpan ke favorit");
+    if (!$("#sheetSettings").hidden) renderSettings(["fav", "ok", "Rute favorit disimpan."]);
+    paintFavBtn();
+  }
+  function curFavIndex() {
+    if (!S.from || !S.to) return -1;
+    var key = (S.from.name || "") + "|" + (S.to.name || "");
+    for (var i = 0, l = favs(); i < l.length; i++) if (l[i].key === key) return i;
+    return -1;
+  }
+  /* Tombol bintang di hasil pencarian: sekali ketuk simpan, ketuk lagi hapus. */
+  function paintFavBtn() {
+    var b = $("#btnFav"); if (!b) return;
+    var on = curFavIndex() >= 0;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on);
+    b.lastChild.textContent = on ? tl("Tersimpan", "Saved") : tl("Simpan", "Save");
+    b.setAttribute("aria-label", on ? tl("Hapus dari favorit", "Remove from favourites") : tl("Simpan ke favorit", "Save to favourites"));
+  }
+  function toggleFav() {
+    var i = curFavIndex();
+    if (i < 0) { saveFav(); return; }
+    var list = favs(); list.splice(i, 1); store("favs", list);
+    toast(tl("Favorit dihapus.", "Favourite removed.")); paintFavBtn();
+  }
+  function useFav(i) {
+    var f = favs()[i]; if (!f) return;
+    S.from = { name: f.from.name, p: f.from.p };
+    S.to = { name: f.to.name, p: f.to.p };
+    $("#inFrom").value = S.from.name; $("#inTo").value = S.to.name;
+    $("#sheetSettings").hidden = true;
+    runPlan();
+  }
+  function delFav(i) {
+    var list = favs(); list.splice(i, 1); store("favs", list);
+    renderSettings(["fav", "ok", "Favorit dihapus."]);
+  }
+  function favCardHTML() {
+    var list = favs();
+    var rows = list.length ? list.map(function (f, i) {
+      return '<div class="place-row"><span class="sg-ico saved">' + ICO_STAR + '</span><div class="pm"><b>' + esc(f.from.name) + " → " + esc(f.to.name) +
+        "</b><span>Rute tersimpan</span></div><button class=\"use\" data-fav=\"" + i + '">Pakai</button><button data-favdel="' + i + '">Hapus</button></div>';
+    }).join("") : '<p>Belum ada rute favorit. Cari rute, lalu ketuk ☆ Simpan di hasil pencarian.</p>';
+    return '<div class="set-card"><h3>Rute favorit</h3>' + rows +
+      '<button class="btn-sec" id="btnSaveFav" type="button">Simpan rute yang sedang aktif</button></div>';
+  }
 
   /* ------------------------------------------------------- jembatan native */
   var httpCb = {}, httpSeq = 0;
   window.__lumiHttp = function (id, status, body) { var cb = httpCb[id]; delete httpCb[id]; if (cb) cb(status, body); };
   /* http(url, timeout, headers, raw) → Promise<JSON | {status, body}> */
+  /*
+   * R9: pemutus sirkuit per server pihak ketiga (OSRM, Photon, GitHub, …). Server yang 3× berturut-turut
+   * gagal/timeout, atau menjawab 429 (terlalu banyak permintaan), diistirahatkan 10 menit (berlipat sampai
+   * 1 jam) supaya Lumi tidak membanjiri layanan gratis dan fitur langsung memakai cadangannya (garis lurus,
+   * estimasi jarak lurus, saran dari halte & tempat tersimpan saja).
+   */
+  var SVC = {};
+  function svcHost(url) { var m = /^https?:\/\/([^/]+)/.exec(url); return m ? m[1] : ""; }
+  function svcPaused(host) { var s = SVC[host]; return !!(s && s.until > Date.now()); }
+  function svcResult(host, ok, status) {
+    var s = SVC[host] || (SVC[host] = { fails: 0, until: 0, trips: 0 });
+    if (ok) { s.fails = 0; s.trips = 0; return; }
+    s.fails++;
+    if (status === 429 || s.fails >= 3) {
+      s.until = Date.now() + Math.min(60, 10 * Math.pow(2, s.trips)) * 60000; s.trips++; s.fails = 0;
+      lumiLog(new Error("layanan " + host + " diistirahatkan (" + (status || "gagal") + ")"), "svc");
+    }
+  }
+  window.__lumiSvc = function () { return SVC; };
   function http(url, timeoutMs, headers, raw) {
+    var host = svcHost(url);
+    if (svcPaused(host)) return Promise.reject(new Error("layanan " + host + " sedang diistirahatkan"));
+    return httpOnce(url, timeoutMs, headers, raw).then(function (v) {
+      var st = raw ? v.status : 200;
+      svcResult(host, !(st === 0 || st === 429 || st >= 500), st);
+      return v;
+    }, function (e) {
+      var st = e && e.status;
+      svcResult(host, !!(st && st < 500 && st !== 429), st);   // 4xx biasa = server sehat, permintaan yang salah
+      throw e;
+    });
+  }
+  function httpOnce(url, timeoutMs, headers, raw) {
     return new Promise(function (resolve, reject) {
       var done = false, t = setTimeout(function () { if (!done) { done = true; reject(new Error("timeout")); } }, timeoutMs || 12000);
       function fin(ok, val) { if (done) return; done = true; clearTimeout(t); ok ? resolve(val) : reject(val); }
@@ -253,6 +593,9 @@
       }
     });
   }
+  /* Google Places/Static Maps memakai jembatan HTTP native: maps.googleapis.com tidak
+   * mengirim header CORS, jadi fetch dari file:// akan ditolak. */
+  if (window.LumiGoogle) LumiGoogle.bind(http);
   /* Ikuti redirect (untuk tautan pendek Google Maps), kembalikan URL akhir. */
   var resCb = {};
   window.__lumiResolved = function (id, url) { var cb = resCb[id]; delete resCb[id]; if (cb) cb(url); };
@@ -273,7 +616,7 @@
   function ensureGps() {
     return new Promise(function (resolve, reject) {
       if (!gpsOff()) { resolve(); return; }
-      if (gpsWait) { try { gpsWait.reject(new Error("GPS belum aktif")); } catch (e) { } }
+      if (gpsWait) { try { gpsWait.reject(new Error(tl("GPS belum aktif", "GPS is off"))); } catch (e) { lumiLog(e); } }
       gpsWait = { resolve: resolve, reject: reject };
       closeGpsAsk();
       var m = document.createElement("div"); m.id = "gpsAsk"; m.className = "gps-ask"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true");
@@ -282,7 +625,7 @@
         '<button class="btn-go" id="gpsOn" type="button">Aktifkan GPS</button><button class="gps-later" id="gpsLater" type="button">Nanti saja</button></div>';
       $("#app").appendChild(m);
       $("#gpsOn").addEventListener("click", function () { if (NATIVE && NATIVE.openGpsSettings) NATIVE.openGpsSettings(); });
-      $("#gpsLater").addEventListener("click", function () { var w = gpsWait; gpsWait = null; closeGpsAsk(); if (w) w.reject(new Error("GPS belum aktif")); });
+      $("#gpsLater").addEventListener("click", function () { var w = gpsWait; gpsWait = null; closeGpsAsk(); if (w) w.reject(new Error(tl("GPS belum aktif", "GPS is off"))); });
     });
   }
   // dipanggil dari MainActivity.onResume (kembali dari pengaturan Lokasi)
@@ -307,7 +650,7 @@
             m.invalidateSize(false);
             if (glLost(m)) { m.removeLayer(m._lumiTiles); m._lumiTiles = baseLayer().addTo(m); }
             else if (m._lumiTiles && m._lumiTiles.getMaplibreMap) { var g = m._lumiTiles.getMaplibreMap(); g.resize(); g.triggerRepaint(); }
-          } catch (e) { }
+          } catch (e) { lumiLog(e); }
         });
         [GT.trip, GT.pip].forEach(function (T) { T.sig = null; });
         paintGuideMap(S.guideSt);
@@ -325,8 +668,8 @@
         NATIVE.locate(id);
       } else if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function (p) { resolve({ lat: p.coords.latitude, lon: p.coords.longitude }); },
-          function (e) { reject(new Error("Izin lokasi ditolak")); }, { enableHighAccuracy: true, timeout: 15000 });
-      } else reject(new Error("Lokasi tidak tersedia"));
+          function (e) { reject(new Error(tl("Izin lokasi ditolak", "Location permission denied"))); }, { enableHighAccuracy: true, timeout: 15000 });
+      } else reject(new Error(tl("Lokasi tidak tersedia", "Location unavailable")));
     });
   }
   function openApp(pkg) { if (NATIVE) NATIVE.openApp(pkg); else window.open("https://play.google.com/store/apps/details?id=" + pkg); }
@@ -364,7 +707,7 @@
     for (var i = 0; i < b.stops.length; i++) if (+b.stops[i].eta > 0) return { name: b.stops[i].name, eta: +b.stops[i].eta };
     return null;
   }
-  /* ETA (detik) bus ini ke halte `from`, hanya bila bus juga akan lewat `to` sesudahnya (arah benar).
+  /* ETA (menit) bus ini ke halte `from`, hanya bila bus juga akan lewat `to` sesudahnya (arah benar).
      Nama halte di data rute dan di feed kadang berbeda ("Cawang Sentral" vs "Cawang"), jadi
      dicocokkan lewat nama dulu, lalu lewat koordinat halte. */
   function etaTo(b, from, to, fromP, toP) {
@@ -397,40 +740,130 @@
     var e2 = +b.stops[fi].eta;
     return isFinite(e2) ? e2 : null;
   }
-  function busIcon(b, color, stale) {
-    var code = String(b.code || ""), w = 30 + code.length * 7;
-    return L.divIcon({ className: "", iconSize: [w, 26], iconAnchor: [w / 2, 13],
-      html: '<div class="lm-bus' + (stale ? " stale" : "") + '" style="--c:' + (color || b.color || "#1565D8") + '">' +
-        '<s style="transform:rotate(' + (b.bearing || 0) + 'deg)"><svg viewBox="0 0 10 10"><path d="M5 0 9.5 9 5 7 .5 9z" fill="currentColor"/></svg></s><b>' + esc(code) + "</b></div>" });
+  /*
+   * Perkiraan tiba Lumi sendiri: posisi bus diproyeksikan ke urutan halte rute (searah bearing bus),
+   * lalu jarak sepanjang rute sampai halte naik dibagi kecepatan rata-rata moda.
+   * Hasil: { m: menit } bila bus masih akan melewati halte itu, { passed: true } bila sudah lewat,
+   * atau null bila bus tidak bisa dicocokkan ke rute.
+   */
+  var BUS_KMH = { MIKRO: 14, ROYAL: 24, TJ: 18 };
+  function brgOf(a, b) {
+    var k = Math.cos(a[0] * Math.PI / 180), dx = (b[1] - a[1]) * k, dy = b[0] - a[0];
+    return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
   }
-  function fmtEta(mnt) { var m = Math.round(mnt); return m <= 0 ? "tiba" : "±" + m + " mnt"; }
+  function angDiff(a, b) { var d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+  function routeEta(b, line, boardP) {
+    if (!line || !line.dirs || !boardP) return null;
+    var bp = [b.lat, b.lon], hk = nmKey(b.head), useBrg = b.bearing > 0, best = null;
+    var kmh = line.mode === "TJ" ? (line.brt ? 20 : 16) : BUS_KMH[line.mode] || 16;
+    line.dirs.forEach(function (d) {
+      var st = d.s || []; if (st.length < 2) return;
+      var bi = -1, bd = 0.3;
+      for (var i = 0; i < st.length; i++) { var dd = E.hav(boardP, st[i].p); if (dd < bd) { bd = dd; bi = i; } }
+      if (bi < 0) return;
+      var bj = -1, bdist = 0.5;
+      for (var j = 0; j < st.length - 1; j++) {
+        var r = projOn(bp, st[j].p, st[j + 1].p);
+        if (r.d >= bdist) continue;
+        if (useBrg && angDiff(b.bearing, brgOf(st[j].p, st[j + 1].p)) > 80) continue;   // arah berlawanan
+        bdist = r.d; bj = j;
+      }
+      if (bj < 0) return;
+      var dh = nmKey(d.h), head = !!(hk && dh && (dh.indexOf(hk) >= 0 || hk.indexOf(dh) >= 0));
+      var cand;
+      if (bj >= bi) cand = { passed: true, head: head };
+      else {
+        var km = E.hav(bp, st[bj + 1].p);
+        for (var k = bj + 1; k < bi; k++) km += E.hav(st[k].p, st[k + 1].p);
+        cand = { m: km * 1.2 / kmh * 60 + (bi - bj - 1) * 0.3, head: head };
+      }
+      if (!best || (cand.head && !best.head) || (cand.head === best.head && !cand.passed && (best.passed || cand.m < best.m))) best = cand;
+    });
+    return best;
+  }
+  /* Gabungkan ETA feed dengan perkiraan Lumi. Feed dipakai bila masuk akal (ia tahu kemacetan);
+     bila jauh berbeda, atau bus menurut rute sudah lewat, perkiraan Lumi yang dipakai. */
+  function busEta(b, line, boardP, feed) {
+    var own = routeEta(b, line, boardP);
+    if (own && own.passed) return own.head || feed == null ? null : feed;
+    if (!own) return feed;
+    if (feed == null) return own.m;
+    return Math.abs(feed - own.m) <= Math.max(4, own.m * 0.6) ? feed : own.m;
+  }
+  /* Geser penanda dengan halus ke posisi baru (tanpa membuat ulang). */
+  function slideMarker(mk, to) {
+    var a = mk.getLatLng(), from = [a.lat, a.lng], t0 = performance.now(), dur = 700;
+    if (E.hav(from, to) > 0.5) { mk.setLatLng(to); return; }
+    cancelAnimationFrame(mk._slide);
+    mk._slide = requestAnimationFrame(function step() {
+      var f = Math.min(1, (performance.now() - t0) / dur), e = f * (2 - f);
+      mk.setLatLng([from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e]);
+      if (f < 1) mk._slide = requestAnimationFrame(step);
+    });
+  }
+  var LIVE_HEADING = { map: null };
+  /* Penanda bus: lingkaran panah tepat di titik bus (yang sudah ditempelkan ke jalan oleh feed),
+     kode rute di bawahnya. Ukurannya ikut zoom peta lewat --bs (lihat busScale). */
+  function busIcon(b, color, stale, label) {
+    return L.divIcon({ className: "lm-bus-wrap", iconSize: [0, 0], iconAnchor: [0, 0],
+      html: '<div class="lm-bus2' + (stale ? " stale" : "") + '" style="--c:' + (color || b.color || "#1565D8") + '">' +
+        '<i style="transform:translate(-50%,-50%) rotate(' + (b.bearing || 0) + 'deg)"><svg viewBox="0 0 10 10"><path d="M5 .6 9 9 5 7.1 1 9z" fill="currentColor"/></svg></i>' +
+        "<b>" + esc(String(label || b.code || "")) + "</b></div>" });
+  }
+  function busScale(z) { return Math.max(0.55, Math.min(1.5, Math.pow(1.22, z - 16))); }
+  function bindBusScale(map) {
+    if (map._busScale) return;
+    map._busScale = function () { map.getContainer().style.setProperty("--bs", busScale(map.getZoom()).toFixed(3)); };
+    map.on("zoom zoomend", map._busScale);
+    map._busScale();
+  }
+  function fmtEta(mnt) { var m = Math.round(mnt); return m <= 0 ? tl("tiba", "arriving") : "±" + m + tl(" mnt", " min"); }
   function liveStatusText(st, n) {
-    return st === "connected" ? (n ? n + " bus aktif" : "Terhubung · menunggu data bus…") : st === "connecting" ? "Menghubungkan…" :
+    return st === "connected" ? (n ? n + tl(" bus aktif", n === 1 ? " active bus" : " active buses") : "Terhubung · menunggu data bus…") : st === "connecting" ? "Menghubungkan…" :
       st === "reconnecting" ? "Menyambung ulang…" : st === "error" ? "Gagal terhubung" : "";
   }
   /* Penjelasan gagal + jalan keluar (buka aplikasi resmi TJ). */
   function liveFailHTML() {
     var why = LumiLive.lastError();
     return '<div class="live-card"><b>Belum bisa terhubung ke data armada</b><p>Lumi akan mencoba lagi otomatis.' +
-      (why ? ' <span class="live-why">Detail: ' + esc(why) + "</span>" : "") + "</p>" +
+      (why ? ' <span class="live-why">' + tl("Detail: ", "Details: ") + esc(why) + "</span>" : "") + "</p>" +
       '<div class="btn-row"><button class="btn-sec" data-tjapp>Buka aplikasi TJ</button></div></div>';
   }
   /* Satu "papan" bus langsung pada sebuah peta: menyimpan bus, menggambar marker, membuang data basi. */
-  function LiveBoard(map, codes, colorOf, onUpdate) {
-    var buses = {}, markers = {}, layer = L.layerGroup().addTo(map);
+  function LiveBoard(map, codes, colorOf, onUpdate, labelOf) {
+    var buses = {}, markers = {}, layer = L.layerGroup().addTo(map), only = null;
+    bindBusScale(map);
     this.buses = buses;
+    var lab = function (b) { return labelOf ? labelOf(b) : b.code; };
+    var shown = function (b) { return !only || LumiLive.norm(b.code) === only; };
+    /* Hanya tampilkan bus satu kode (null = semua). */
+    this.setFilter = function (code) {
+      only = code ? LumiLive.norm(code) : null;
+      Object.keys(markers).forEach(function (k) {
+        var on = shown(buses[k]);
+        if (on && !layer.hasLayer(markers[k])) layer.addLayer(markers[k]);
+        if (!on && layer.hasLayer(markers[k])) layer.removeLayer(markers[k]);
+      });
+    };
+    this.filter = function () { return only; };
     var stop = LumiLive.watch(codes, function (msg, topic) {
       var b = busOf(msg, topic); if (!b) return;
       buses[b.key] = b;
       var col = colorOf(b);
       if (!markers[b.key]) {
-        markers[b.key] = L.marker([b.lat, b.lon], { icon: busIcon(b, col), zIndexOffset: 800 }).addTo(layer);
+        markers[b.key] = L.marker([b.lat, b.lon], { icon: busIcon(b, col, false, lab(b)), zIndexOffset: 800 });
+        if (shown(b)) markers[b.key].addTo(layer);
         markers[b.key].on("click", function () {
           var x = buses[b.key], ns = nextStop(x);
-          markers[b.key].bindPopup('<div class="bus-pop"><b>' + esc(x.code) + " · " + esc(x.key) + "</b><br>Menuju " + esc(x.head || "-") +
-            (ns ? "<br>Berikutnya: " + esc(ns.name) + " (" + fmtEta(ns.eta) + ")" : "") + (x.pax ? "<br>Penumpang: " + esc(x.pax) : "") + "</div>").openPopup();
+          markers[b.key].bindPopup('<div class="bus-pop"><b>' + esc(lab(x)) + " · " + esc(x.key) + "</b><br>" + tl("Menuju ", "Towards ") + esc(x.head || "-") +
+            (ns ? "<br>" + tl("Berikutnya: ", "Next: ") + esc(ns.name) + " (" + fmtEta(ns.eta) + ")" : "") + (x.pax ? "<br>" + tl("Penumpang: ", "Passengers: ") + esc(x.pax) : "") + "</div>").openPopup();
         });
-      } else { markers[b.key].setLatLng([b.lat, b.lon]); markers[b.key].setIcon(busIcon(b, col)); }
+      } else {
+        markers[b.key].setLatLng([b.lat, b.lon]); markers[b.key].setIcon(busIcon(b, col, false, lab(b)));
+        var on = shown(b);
+        if (on && !layer.hasLayer(markers[b.key])) layer.addLayer(markers[b.key]);
+        if (!on && layer.hasLayer(markers[b.key])) layer.removeLayer(markers[b.key]);
+      }
       if (onUpdate) onUpdate();
     });
     var unSt = LumiLive.onStatus(function () { if (onUpdate) onUpdate(); });
@@ -439,11 +872,11 @@
       Object.keys(buses).forEach(function (k) {
         var age = now - buses[k].at;
         if (age > 150000) { layer.removeLayer(markers[k]); delete markers[k]; delete buses[k]; }
-        else if (age > 50000) markers[k].setIcon(busIcon(buses[k], colorOf(buses[k]), true));
+        else if (age > 50000) markers[k].setIcon(busIcon(buses[k], colorOf(buses[k]), true, lab(buses[k])));
       });
       if (onUpdate) onUpdate();
     }, 10000);
-    this.stop = function () { stop(); unSt(); clearInterval(gc); layer.remove(); };
+    this.stop = function () { stop(); unSt(); clearInterval(gc); layer.remove(); if (this.onStop) this.onStop(); };
     this.count = function () { return Object.keys(buses).length; };
   }
   /* Hentikan papan saat sheet ditutup. */
@@ -454,72 +887,178 @@
 
   /* ---- layar "Bus di sekitarmu" */
   var liveMap, nearBoard = null;
-  function openLiveNear() {
+  function openLiveNear() { openLiveAt(null, null); }
+  function openLiveAt(center, title, opt) {
+    opt = opt || {};
     var sheet = $("#sheetLive"); if (!sheet) return;
+    var titleEl = $("#sheetLive .sheet-title");
+    if (titleEl) titleEl.textContent = title || tl("Bus di sekitarmu", "Buses near you");
     sheet.hidden = false;
-    $("#liveBody").innerHTML = '<div class="live-card"><b>Mencari lokasimu…</b><p>Lumi akan menampilkan bus Transjakarta, Mikrotrans, dan Royaltrans yang melintas di sekitarmu.</p></div>';
+    $("#liveBody").innerHTML = opt.stop ? '<div class="live-card"><b>Menghubungkan ke data armada…</b></div>' :
+      '<div class="live-card"><b>Mencari lokasimu…</b><p>Lumi akan menampilkan bus Transjakarta, Mikrotrans, dan Royaltrans yang melintas di sekitarmu.</p></div>';
     if (!liveMap) liveMap = makeMap($("#liveMap"));
     setTimeout(function () { liveMap.invalidateSize(); }, 60);
     var go = function (p) {
-      S.myPos = p;
-      liveMap.setView(p, 15);
+      var stop = opt.stop || null;
+      if (!stop) S.myPos = p;
+      liveMap.setView(p, stop ? 16 : 15);
       if (liveMap._me) liveMap._me.remove();
-      liveMap._me = L.marker(p, { icon: L.divIcon({ className: "", html: '<div class="lm-me"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000 }).addTo(liveMap);
-      // rute bus dengan halte dalam 900 m (maks. 12 terdekat)
-      var near = {};
-      planner.nearby(p, 0.9).forEach(function (e) {
-        var nd = planner.nodes[e[0]], l = planner.lines[nd.li];
-        if (!liveOk(l)) return;
-        if (!near[l.id] || near[l.id].d > e[1]) near[l.id] = { l: l, d: e[1] };
-      });
-      var list = Object.keys(near).map(function (k) { return near[k]; }).sort(function (a, b) { return a.d - b.d; }).slice(0, 12);
+      if (liveMap._here) { liveMap._here.remove(); liveMap._here = null; }
+      // Posisiku: titik biru + senter arah hadap (kompas), ikut bergerak saat berjalan.
+      var myP = S.myPos || (stop ? null : p);
+      if (myP) liveMap._me = L.marker(myP, { icon: meIcon(), zIndexOffset: 1000, interactive: false }).addTo(liveMap);
+      else liveMap._me = null;
+      if (stop) liveMap._here = L.marker(p, { icon: L.divIcon({ className: "", html: '<div class="lm-stop-here"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 900 }).addTo(liveMap);
+      var me0 = function () { return stop ? p : (S.myPos || p); };
+      var list;
+      if (stop) list = (opt.lines || []).map(function (l) { return { l: l, d: 0 }; });
+      else {
+        // rute bus dengan halte dalam 900 m (maks. 12 terdekat)
+        var near = {};
+        planner.nearby(p, 0.9).forEach(function (e) {
+          var nd = planner.nodes[e[0]], l = planner.lines[nd.li];
+          if (!liveOk(l)) return;
+          if (!near[l.id] || near[l.id].d > e[1]) near[l.id] = { l: l, d: e[1] };
+        });
+        list = Object.keys(near).map(function (k) { return near[k]; }).sort(function (a, b) { return a.d - b.d; }).slice(0, 12);
+      }
       if (!list.length) { $("#liveBody").innerHTML = '<div class="live-card"><b>Tidak ada rute bus di dekatmu</b><p>Coba di dekat halte Transjakarta atau jalur Mikrotrans.</p></div>'; return; }
-      var colors = {}; list.forEach(function (x) { colors[LumiLive.norm(x.l.code)] = x.l.color; });
+      var colors = {}, lineOfBus = {};
+      list.forEach(function (x) { var k = LumiLive.norm(x.l.code); colors[k] = x.l.color; if (!lineOfBus[k]) lineOfBus[k] = x.l; });
+      // Label di peta memakai kode yang sama dengan aplikasi (mis. JAK71, bukan JAK.71 dari feed).
+      var labelOf = function (b) { var l = lineOfBus[LumiLive.norm(b.code)]; return l ? l.code : b.code; };
       if (nearBoard) nearBoard.stop();
       var render = function () {
-        var st = LumiLive.state(), bs = nearBoard ? Object.keys(nearBoard.buses).map(function (k) { return nearBoard.buses[k]; }) : [];
-        bs.forEach(function (b) { b.dist = E.hav(p, [b.lat, b.lon]); });
-        bs.sort(function (a, b) { return a.dist - b.dist; });
+        var st = LumiLive.state(), all = nearBoard ? Object.keys(nearBoard.buses).map(function (k) { return nearBoard.buses[k]; }) : [];
+        var only = nearBoard && nearBoard.filter();
+        // Jumlah bus tiap rute dalam 2 km: chip hanya menonjolkan rute yang benar-benar ada di sekitar.
+        var cnt = {};
+        all.forEach(function (b) { if (E.hav(me0(), [b.lat, b.lon]) <= 2) { var k = LumiLive.norm(b.code); cnt[k] = (cnt[k] || 0) + 1; } });
+        var bs = all.filter(function (b) { return !only || LumiLive.norm(b.code) === only; });
+        bs.forEach(function (b) {
+          b.dist = E.hav(me0(), [b.lat, b.lon]);
+          b.etaHere = stop ? busEta(b, lineOfBus[LumiLive.norm(b.code)], stop.p, etaTo(b, stop.n, null, stop.p)) : null;
+        });
+        // Untuk satu halte: bus yang akan tiba di halte ini di atas, urut waktu tiba.
+        bs.sort(function (a, b) {
+          if (stop && (a.etaHere != null) !== (b.etaHere != null)) return a.etaHere != null ? -1 : 1;
+          if (stop && a.etaHere != null) return a.etaHere - b.etaHere;
+          return a.dist - b.dist;
+        });
         var used = LumiLive.bytes();
-        $("#liveNearStatus").textContent = liveStatusText(st, bs.length) + (used > 50000 ? " · " + (used / 1048576).toFixed(1).replace(".", ",") + " MB" : "");
-        var html = '<div class="live-routes">' + list.map(function (x) { return badge(x.l, "sm"); }).join("") + "</div>";
+        $("#liveNearStatus").textContent = liveStatusText(st, bs.length) + (used > 50000 ? " · " + dec(used / 1048576) + " MB" : "");
+        var chips = list.slice().sort(function (a, b) {
+          var ca = cnt[LumiLive.norm(a.l.code)] || 0, cb = cnt[LumiLive.norm(b.l.code)] || 0;
+          return (cb > 0) - (ca > 0) || a.d - b.d;
+        });
+        var html = '<div class="live-routes">' + chips.map(function (x) {
+          var k = LumiLive.norm(x.l.code), n = cnt[k] || 0;
+          return '<button type="button" class="live-chip' + (only === k ? " on" : "") + (n ? "" : " none") + '" data-code="' + esc(k) + '" aria-pressed="' + (only === k) + '">' +
+            badge(x.l, "sm") + (n ? '<i class="tnum">' + n + "</i>" : "") + "</button>";
+        }).join("") + "</div>" +
+          (only ? '<p class="live-filter">' + tl("Hanya menampilkan ", "Showing only ") + "<b>" + esc(lineOfBus[only] ? lineOfBus[only].code : only) + "</b> · " +
+            '<button type="button" class="link" data-code="">' + tl("Tampilkan semua", "Show all") + "</button></p>" : "");
         if (!bs.length) html += st === "error" || st === "reconnecting" ? liveFailHTML() :
           '<div class="live-card"><b>Menunggu posisi bus…</b><p>Data muncul begitu bus mengirim posisi (biasanya beberapa detik).</p></div>';
         html += '<ul class="bus-list">' + bs.slice(0, 30).map(function (b) {
           var ns = nextStop(b);
-          return '<li data-bus="' + esc(b.key) + '"><span class="badge sm" style="background:' + (colors[LumiLive.norm(b.code)] || "#1565D8") + ';color:#fff">' + esc(b.code) + "</span>" +
-            "<div><b>Menuju " + esc(b.head || "-") + "</b><span>" + (ns ? "Berikutnya " + esc(ns.name) + " · " + fmtEta(ns.eta) : "Bus " + esc(b.key)) + "</span></div>" +
-            '<em class="tnum">' + (b.dist < 1 ? Math.round(b.dist * 1000) + " m" : b.dist.toFixed(1).replace(".", ",") + " km") + "</em></li>";
+          return '<li data-bus="' + esc(b.key) + '"><span class="badge sm" style="background:' + (colors[LumiLive.norm(b.code)] || "#1565D8") + ';color:#fff">' + esc(labelOf(b)) + "</span>" +
+            "<div><b>" + tl("Menuju ", "Towards ") + esc(b.head || "-") + "</b><span>" +
+            (b.etaHere != null ? tl("Tiba di halte ini ", "Reaches this stop ") + fmtEta(b.etaHere) : ns ? tl("Berikutnya ", "Next ") + esc(ns.name) + " · " + fmtEta(ns.eta) : "Bus " + esc(b.key)) + "</span></div>" +
+            '<em class="tnum">' + (b.dist < 1 ? Math.round(b.dist * 1000) + " m" : dec(b.dist) + " km") + "</em></li>";
         }).join("") + "</ul>";
         html += '<p class="disclaim">Posisi dari feed armada Transjakarta (diperbarui tiap beberapa detik). Lumi tidak berafiliasi dengan Transjakarta.</p>';
-        $("#liveBody").innerHTML = html;
+        $("#liveBody").innerHTML = tr(html);
         bindTjApp($("#liveBody"));
         $$("[data-bus]", $("#liveBody")).forEach(function (li) {
-          li.addEventListener("click", function () { var b = nearBoard.buses[li.dataset.bus]; if (b) liveMap.setView([b.lat, b.lon], 17); });
+          li.addEventListener("click", function () { var b = nearBoard.buses[li.dataset.bus]; if (b) { follow = false; liveMap.setView([b.lat, b.lon], 17); } });
+        });
+        // Ketuk kode: hanya bus kode itu yang tampil; ketuk lagi untuk semua.
+        $$("[data-code]", $("#liveBody")).forEach(function (c) {
+          c.addEventListener("click", function () {
+            var k = c.dataset.code || null;
+            nearBoard.setFilter(nearBoard.filter() === k ? null : k);
+            render();
+            var vis = Object.keys(nearBoard.buses).map(function (q) { return nearBoard.buses[q]; })
+              .filter(function (b) { return nearBoard.filter() && LumiLive.norm(b.code) === nearBoard.filter() && E.hav(me0(), [b.lat, b.lon]) <= 3; });
+            if (vis.length) {
+              follow = false;
+              try { liveMap.fitBounds(L.latLngBounds(vis.map(function (b) { return [b.lat, b.lon]; }).concat([me0()])), { padding: [40, 40], maxZoom: 16 }); } catch (e) { lumiLog(e); }
+            }
+          });
         });
       };
-      var rT = null;
+      // B8: panel digambar ulang paling sering tiap 1,5 dtk, dan tidak saat jari sedang menyentuh panel
+      // (ketukan tidak hilang karena tombolnya diganti di tengah sentuhan).
+      var rT = null, body = $("#liveBody");
+      if (!body._touchHook) {
+        body._touchHook = true;
+        body.addEventListener("pointerdown", function () { body._touching = true; }, true);
+        ["pointerup", "pointercancel"].forEach(function (ev) {
+          body.addEventListener(ev, function () { body._touching = false; body._touchEnd = Date.now(); }, true);
+        });
+        body.addEventListener("scroll", function () { body._touchEnd = Date.now(); }, true);
+      }
+      var schedule = function () {
+        if (rT) return;
+        rT = setTimeout(function tick() {
+          if (body._touching || Date.now() - (body._touchEnd || 0) < 600) { rT = setTimeout(tick, 400); return; }
+          rT = null; render();
+        }, 1500);
+      };
       nearBoard = new LiveBoard(liveMap, list.map(function (x) { return x.l.code; }), function (b) { return colors[LumiLive.norm(b.code)]; },
-        function () { if (!rT) rT = setTimeout(function () { rT = null; render(); }, 700); });
+        schedule, labelOf);
+      // Ikuti posisiku selama layar ini terbuka: GPS tiap ±4 dtk + kompas untuk senter.
+      var follow = !stop;
+      if (!liveMap._dragHook) { liveMap._dragHook = true; liveMap.on("dragstart", function () { if (liveMap._unfollow) liveMap._unfollow(); }); }
+      liveMap._unfollow = function () { follow = false; };
+      var alive = true, gT = null;
+      var moveMe = function (np) {
+        if (!alive) return;
+        S.myPos = np;
+        if (!liveMap._me) liveMap._me = L.marker(np, { icon: meIcon(), zIndexOffset: 1000, interactive: false }).addTo(liveMap);
+        else slideMarker(liveMap._me, np);
+        if (follow) liveMap.panTo(np, { animate: true, duration: 0.8 });
+      };
+      var native = !!(NATIVE && NATIVE.watchPos);
+      if (native) {
+        // Android: GPS terus-menerus (tiap ±2 dtk), bukan meminta posisi berulang yang bisa kembali dari cache.
+        window.__lumiPos = function (lat, lon, acc) { if (acc < 0 || acc <= 80) moveMe([lat, lon]); };
+        NATIVE.watchPos(true);
+      } else {
+        var track = function () {
+          if (!alive) return;
+          locate().then(function (o) { moveMe([o.lat, o.lon]); }).catch(function () { })
+            .then(function () { if (alive) gT = setTimeout(track, 4000); });
+        };
+        gT = setTimeout(track, 1500);
+      }
+      compass(true); LIVE_HEADING.map = liveMap;
+      nearBoard.onStop = function () {
+        alive = false; clearTimeout(gT); LIVE_HEADING.map = null;
+        if (native) { try { NATIVE.watchPos(false); } catch (e) { lumiLog(e); } window.__lumiPos = null; }
+        if (!S.guide) compass(false);
+      };
       stopWhenHidden(sheet, nearBoard);
       render();
     };
+    if (center) { go(center); return; }
     if (S.myPos) go(S.myPos);
     locate().then(function (o) { if (!S.myPos || E.hav(S.myPos, [o.lat, o.lon]) > 0.15) go([o.lat, o.lon]); })
-      .catch(function (e) { if (!S.myPos) $("#liveBody").innerHTML = '<div class="live-card"><b>Lokasi tidak tersedia</b><p>' + esc(e.message || "Aktifkan GPS lalu coba lagi.") + "</p></div>"; });
+      .catch(function (e) { if (!S.myPos) $("#liveBody").innerHTML = '<div class="live-card"><b>' + tl("Lokasi tidak tersedia", "Location unavailable") + "</b><p>" + esc(e.message || tl("Aktifkan GPS lalu coba lagi.", "Turn on GPS and try again.")) + "</p></div>"; });
   }
   if ($("#btnLiveNear")) $("#btnLiveNear").addEventListener("click", openLiveNear);
 
   /* ------------------------------------------------------- info perubahan rute */
   function getChanges() {
     var raw = null;
-    try { raw = NATIVE && NATIVE.getChanges ? NATIVE.getChanges() : localStorage.getItem("lumi:changesTest"); } catch (e) { }
+    try { raw = NATIVE && NATIVE.getChanges ? NATIVE.getChanges() : localStorage.getItem("lumi:changesTest"); } catch (e) { lumiLog(e); }
     try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
   function fmtDate(d) {
     var m = String(d || "").match(/(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
     if (!m) return d || "";
-    var bln = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"][+m[2] - 1];
+    var bln = (EN ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] : ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"])[+m[2] - 1];
     return +m[3] + " " + bln + " " + m[1] + (m[4] ? ", " + m[4] + "." + m[5] : "");
   }
   // Daftar perubahan: tiap baris bisa diketuk untuk melihat "Sebelum / Sesudah".
@@ -529,7 +1068,7 @@
     var k = KL[x.k] || KL.chg, ref = CHG_REF.push({ x: x, date: date }) - 1;
     var l = lineByCode(x.code);
     return '<li class="chg-row" data-chg="' + ref + '"><span class="chg-k ' + k[0] + '">' + k[1] + "</span><div>" + (l ? badge(l, "xs") + " " : "<b>" + esc(x.code) + "</b> ") +
-      esc(x.name || "") + '<br><span style="color:var(--muted)">' + esc(x.text) + "</span>" +
+      esc(x.name || "") + '<br><span style="color:var(--muted)">' + esc(I18.diff ? I18.diff(x.text) : x.text) + "</span>" +
       '<div class="chg-acts"><button class="st-toggle" data-chgref="' + ref + '">Sebelum &amp; sesudah</button>' +
       (l ? '<button class="st-toggle" data-chgline="' + l.id + '">Lihat rute</button>' : "") + "</div></div></li>";
   }
@@ -537,7 +1076,7 @@
     var html = '<ul class="chg-list">' + items.slice(0, max).map(function (x) { return changeRow(x, date); }).join("");
     if (items.length > max) {
       var ref = CHG_REF.push({ more: items.slice(max), date: date }) - 1;
-      html += '<li class="chg-more-li"><button class="chg-more" data-chgmore="' + ref + '">Tampilkan ' + (items.length - max) + " perubahan lainnya</button></li>";
+      html += '<li class="chg-more-li"><button class="chg-more" data-chgmore="' + ref + '">' + tl("Tampilkan " + (items.length - max) + " perubahan lainnya", "Show " + (items.length - max) + " more changes") + "</button></li>";
     }
     return html + "</ul>";
   }
@@ -612,15 +1151,15 @@
     var KL = { add: "Rute baru", del: "Rute dihapus", chg: "Rute berubah" };
     var pa = parseList(x.text, "Halte baru"), pr = parseList(x.text, "Tidak lagi lewat");
     var added = x.add || pa.list, removed = x.rm || pr.list, nAdd = x.add ? x.add.length : pa.total, nRm = x.rm ? x.rm.length : pr.total;
-    var html = '<div class="chg-head">' + (l ? badge(l) : "<b>" + esc(x.code) + "</b>") + "<div><b>" + esc(x.name || x.code) + "</b><span>" + (KL[x.k] || KL.chg) + " · " + esc(fmtDate(ref.date)) + "</span></div></div>";
+    var html = '<div class="chg-head">' + (l ? badge(l) : "<b>" + esc(x.code) + "</b>") + "<div><b>" + esc(x.name || x.code) + "</b><span>" + T(KL[x.k] || KL.chg) + " · " + esc(fmtDate(ref.date)) + "</span></div></div>";
     if (x.on) html += '<div class="chg-name"><span>Nama trayek</span><s>' + esc(x.on) + "</s><b>" + esc(x.name) + "</b></div>";
     var sum = [];
-    if (nAdd) sum.push('<span class="cs add">+' + nAdd + " halte baru</span>");
-    if (nRm) sum.push('<span class="cs del">−' + nRm + " halte tidak dilewati</span>");
+    if (nAdd) sum.push('<span class="cs add">+' + nAdd + tl(" halte baru", nAdd === 1 ? " new stop" : " new stops") + "</span>");
+    if (nRm) sum.push('<span class="cs del">−' + nRm + tl(" halte tidak dilewati", nRm === 1 ? " stop no longer served" : " stops no longer served") + "</span>");
     if (/Urutan halte berubah/.test(x.text)) sum.push('<span class="cs">Urutan halte berubah</span>');
-    if (/Pola perjalanan/.test(x.text)) sum.push('<span class="cs">' + esc(x.text) + "</span>");
+    if (/Pola perjalanan/.test(x.text)) sum.push('<span class="cs">' + esc(T(x.text)) + "</span>");
     if (sum.length) html += '<div class="chg-sum">' + sum.join("") + "</div>";
-    function dirTitle(list) { return list && list.length ? "Arah " + list[list.length - 1] : "Arah"; }
+    function dirTitle(list) { return list && list.length ? tl("Arah ", "Towards ") + list[list.length - 1] : tl("Arah", "Direction"); }
     if (det && (Object.keys(det.b || {}).length || Object.keys(det.a || {}).length)) {
       html += '<div class="chg-tabs" role="tablist"><button data-v="m" class="is-on">Perbandingan</button><button data-v="b">Sebelum</button><button data-v="a">Sesudah</button></div>' +
         '<div class="chg-legend"><span><i class="lg add"></i>Halte baru</span><span><i class="lg del"></i>Tidak dilewati lagi</span><span><i class="lg"></i>Tetap</span></div>';
@@ -628,22 +1167,22 @@
       keys.forEach(function (k) {
         var b = (det.b || {})[k], a = (det.a || {})[k], mg = mergeStops(b, a);
         var nb = mg.filter(function (r) { return r[0] !== "+"; }).length, na = mg.filter(function (r) { return r[0] !== "-"; }).length;
-        html += '<div class="chg-dir"><div class="chg-dir-h">' + esc(dirTitle(a && a.length ? a : b)) + '<small>' + (b ? nb + " → " : "") + (a ? na : 0) + " halte</small></div><ol class=\"chg-stops\">" +
+        html += '<div class="chg-dir"><div class="chg-dir-h">' + esc(dirTitle(a && a.length ? a : b)) + '<small>' + (b ? nb + " → " : "") + stopWord(a ? na : 0) + "</small></div><ol class=\"chg-stops\">" +
           mg.map(function (r) { return '<li class="' + (r[0] === "+" ? "add" : r[0] === "-" ? "del" : "same") + '"><i></i><span>' + esc(r[1]) + "</span>" + (r[0] === "+" ? "<em>baru</em>" : r[0] === "-" ? "<em>dihapus</em>" : "") + "</li>"; }).join("") + "</ol></div>";
       });
     } else {
       // Perubahan lama: urutan halte sebelumnya tidak tersimpan. Tampilkan rute sekarang + daftar yang berubah.
       html += '<p class="chg-note">Urutan halte sebelum perubahan ini belum tersimpan (tercatat sebelum fitur ini ada). Di bawah: halte yang berubah dan rute saat ini.</p>';
       if (removed.length) html += '<div class="chg-dir"><div class="chg-dir-h">Tidak dilewati lagi</div><ol class="chg-stops">' + removed.map(function (n) { return '<li class="del"><i></i><span>' + esc(n) + "</span><em>dihapus</em></li>"; }).join("") + "</ol>" +
-        (nRm > removed.length ? '<p class="chg-note">…dan ' + (nRm - removed.length) + " halte lain.</p>" : "") + "</div>";
+        (nRm > removed.length ? '<p class="chg-note">' + tl("…dan " + (nRm - removed.length) + " halte lain.", "…and " + (nRm - removed.length) + " more stops.") + "</p>" : "") + "</div>";
       if (l) l.dirs.slice(0, 2).forEach(function (d) {
         var names = d.s.map(function (q) { return q.n; });
-        html += '<div class="chg-dir"><div class="chg-dir-h">Sekarang · ' + esc(dirTitle(names)) + "<small>" + names.length + ' halte</small></div><ol class="chg-stops">' +
+        html += '<div class="chg-dir"><div class="chg-dir-h">' + tl("Sekarang · ", "Now · ") + esc(dirTitle(names)) + "<small>" + stopWord(names.length) + '</small></div><ol class="chg-stops">' +
           names.map(function (n) { var nw = added.indexOf(n) >= 0; return '<li class="' + (nw ? "add" : "same") + '"><i></i><span>' + esc(n) + "</span>" + (nw ? "<em>baru</em>" : "") + "</li>"; }).join("") + "</ol></div>";
       });
     }
-    if (l) html += '<div class="btn-row"><button class="btn-sec" id="chgOpenLine">Lihat rute ' + esc(l.code) + " di peta</button></div>";
-    var body = $("#chgBody"); body.innerHTML = html; body.scrollTop = 0;
+    if (l) html += '<div class="btn-row"><button class="btn-sec" id="chgOpenLine">' + tl("Lihat rute " + esc(l.code) + " di peta", "View route " + esc(l.code) + " on the map") + "</button></div>";
+    var body = $("#chgBody"); body.innerHTML = tr(html); body.scrollTop = 0;
     $$(".chg-tabs button", body).forEach(function (t) {
       t.addEventListener("click", function () {
         $$(".chg-tabs button", body).forEach(function (o) { o.classList.toggle("is-on", o === t); });
@@ -662,19 +1201,22 @@
     var c = getChanges();
     if (!c || !c.unseen || !c.list || !c.list.length) { el.innerHTML = ""; return; }
     var e = c.list[0];
-    el.innerHTML = '<div class="chg-card"><b>' + e.items.length + " rute Transjakarta berubah</b><p>Hasil pengecekan data resmi " + esc(fmtDate(e.date)) + ". Lumi sudah memakai rute terbaru.</p>" +
+    el.innerHTML = '<div class="chg-card"><b>' + e.items.length + tl(" rute Transjakarta berubah", e.items.length === 1 ? " Transjakarta route changed" : " Transjakarta routes changed") + "</b><p>" +
+      tl("Hasil pengecekan data resmi " + esc(fmtDate(e.date)) + ". Lumi sudah memakai rute terbaru.", "From the official data check on " + esc(fmtDate(e.date)) + ". Lumi is already using the latest routes.") + "</p>" +
       changeItems(e.items, 5, e.date) + '<div class="chg-actions"><button class="btn-sec" id="chgAll">Semua perubahan</button><button class="btn-sec" id="chgOk">Oke, mengerti</button></div></div>';
     bindChangeLinks(el);
-    $("#chgOk").addEventListener("click", function () { try { NATIVE && NATIVE.markChangesSeen && NATIVE.markChangesSeen(); } catch (x) { } el.innerHTML = ""; });
+    $("#chgOk").addEventListener("click", function () { try { NATIVE && NATIVE.markChangesSeen && NATIVE.markChangesSeen(); } catch (x) { lumiLog(x); } el.innerHTML = ""; });
     $("#chgAll").addEventListener("click", function () { openSettings(); setTimeout(function () { var h = $("#chgHistory"); if (h) h.scrollIntoView(); }, 50); });
   }
   function changesHistoryHTML() {
     var c = getChanges();
-    var html = '<div class="set-card" id="chgHistory"><h3>Perubahan rute</h3><p>Lumi mengunduh data resmi Transjakarta setiap hari (otomatis, butuh internet) dan memberi notifikasi bila ada rute yang berubah.' +
-      (c && c.lastDate ? " Terakhir diperiksa: " + esc(fmtDate(c.lastDate)) + "." : "") + "</p>";
-    if (!c || !c.list || !c.list.length) return html + '<p style="margin:0">Belum ada perubahan tercatat sejak data pertama diunduh.</p></div>';
+    var html = '<div class="set-card" id="chgHistory"><h3>' + tl("Perubahan rute", "Route changes") + "</h3><p>" +
+      tl("Lumi memeriksa data resmi Transjakarta secara berkala (otomatis, butuh internet) dan memberi notifikasi bila ada rute yang berubah.",
+        "Lumi checks the official Transjakarta data regularly (automatically, needs internet) and notifies you when a route changes.") +
+      (c && c.lastDate ? tl(" Terakhir diperiksa: ", " Last checked: ") + esc(fmtDate(c.lastDate)) + "." : "") + "</p>";
+    if (!c || !c.list || !c.list.length) return html + '<p>Belum ada perubahan tercatat sejak data pertama diunduh.</p></div>';
     c.list.slice(0, 8).forEach(function (e) {
-      html += '<div class="sub-h">' + esc(fmtDate(e.date)) + " · " + e.items.length + " perubahan</div>" + changeItems(e.items, 12, e.date);
+      html += '<div class="sub-h">' + esc(fmtDate(e.date)) + " · " + e.items.length + tl(" perubahan", e.items.length === 1 ? " change" : " changes") + "</div>" + changeItems(e.items, 12, e.date);
     });
     return html + "</div>";
   }
@@ -702,19 +1244,21 @@
   }
   function startGuide(it) {
     if (!NATIVE || !NATIVE.startGuide) { toast("Mode pendampingan hanya tersedia di aplikasi Android"); return; }
-    ensureGps().then(function () { startGuideNow(it); }, function (e) { toast(e.message || "GPS belum aktif"); });
+    ensureGps().then(function () { startGuideNow(it); }, function (e) { toast(e.message || tl("GPS belum aktif", "GPS is off")); });
   }
   function startGuideNow(it) {
     var spec = guideSpec(it);
     S.guide = { it: it, title: S.from.name + " → " + S.to.name, names: spec.split("\n").map(function (r) { return r.split("\t")[4]; }) };
     store("guide", { title: S.guide.title, names: S.guide.names });
     NATIVE.startGuide(spec, "Lumi · " + S.guide.title);
+    recordTrip(it);
     GT.trip.fitted = false; GT.trip.zoomed = false; GT.trip.follow = true; compass(true);
-    renderGuide({ phase: "walk", next: 0, cursor: -1, title: "Mencari posisi GPS…", text: "Kamu akan diberi tahu sebelum harus turun.", stopsLeft: -1, metersLeft: -1 });
+    renderGuide({ phase: "walk", next: 0, cursor: -1, title: tl("Mencari posisi GPS…", "Finding GPS position…"), text: tl("Kamu akan diberi tahu sebelum harus turun.", "You'll be told before you need to get off."), stopsLeft: -1, metersLeft: -1 });
     if ($("#btnGuide")) $("#btnGuide").innerHTML = ICO_NAV + "Pendampingan sedang berjalan";
   }
   function stopGuide() {
-    try { NATIVE && NATIVE.stopGuide && NATIVE.stopGuide(); } catch (e) { }
+    try { NATIVE && NATIVE.stopGuide && NATIVE.stopGuide(); } catch (e) { lumiLog(e); }
+    try { NATIVE && NATIVE.stopSpeak && NATIVE.stopSpeak(); } catch (e) { lumiLog(e); }
     S.guide = null; store("guide", null);
     dropPipMap();
     var g = $("#guide"); if (g) g.remove();
@@ -816,9 +1360,14 @@
     footFetch(a, b, function (pts) {
       if (!pts) return;
       FOOT[k].pts = pts; FOOTVER++; paintGuideMap(S.guideSt);
-      (FOOT[k].cbs || []).forEach(function (f) { try { f(pts); } catch (e) { } }); FOOT[k].cbs = [];
+      (FOOT[k].cbs || []).forEach(function (f) { try { f(pts); } catch (e) { lumiLog(e); } }); FOOT[k].cbs = [];
     });
     return null;
+  }
+  /* Dua rute jalan kaki praktis sama (ujung & panjang hampir sama): tidak perlu digambar ulang. */
+  function samePath(a, b) {
+    if (!a || !b) return false;
+    return Math.abs(pathKm(a) - pathKm(b)) < 0.02 && E.hav(a[a.length - 1], b[b.length - 1]) < 0.01 && E.hav(a[0], b[0]) < 0.04;
   }
   function pathKm(line) { var d = 0; for (var i = 1; i < line.length; i++) d += E.hav(line[i - 1], line[i]); return d; }
   /* Sisa jarak jalan kaki menyusuri rute (bukan garis lurus): dari titik rute terdekat ke posisiku sampai tujuan. */
@@ -832,10 +1381,14 @@
   function liveFootPath(me, tgt) {
     var tk = tgt[0].toFixed(5) + "," + tgt[1].toFixed(5), now = Date.now();
     if (LIVEW && LIVEW.tk === tk && (E.hav(me, LIVEW.from) < 0.035 || LIVEW.busy || now - LIVEW.at < 12000)) return LIVEW.pts;
-    var keep = LIVEW && LIVEW.tk === tk ? LIVEW.pts : null;
-    LIVEW = { tk: tk, from: me, at: now, pts: keep, busy: true };
+    var keep = LIVEW && LIVEW.tk === tk ? LIVEW.pts : null, ver = LIVEW && LIVEW.tk === tk ? LIVEW.ver : 0;
+    LIVEW = { tk: tk, from: me, at: now, pts: keep, busy: true, ver: ver };
     var mine = LIVEW;
-    footFetch(me, tgt, function (pts) { mine.busy = false; if (pts && LIVEW === mine) { mine.pts = pts; paintGuideMap(S.guideSt); } });
+    footFetch(me, tgt, function (pts) {
+      mine.busy = false;
+      if (!pts || LIVEW !== mine || samePath(mine.pts, pts)) return;
+      mine.pts = pts; mine.ver++; paintGuideMap(S.guideSt);
+    });
     return keep;
   }
   /* Garis jalan kaki. Bila "dyn", titik awalnya (posisiku) diperbarui tiap frame tanpa menggambar ulang. */
@@ -845,9 +1398,12 @@
     var pts = live ? liveFootPath(a, b) : footPath(a, b);
     var rest = pts && pts.length > 1 ? pts.concat([b]) : [b];
     var path = pts && pts.length > 1 ? pts.concat([b]) : [a, b];
-    var w = L.polyline([a].concat(rest), { color: "#fff", weight: 9, opacity: .85, dashArray: "0.1 12", lineCap: "round" }).addTo(T.layer);
-    var c = L.polyline([a].concat(rest), { color: "#1A73E8", weight: 6, opacity: 1, dashArray: "0.1 12", lineCap: "round" }).addTo(T.layer);
-    if (dyn) T.dyn.push({ lines: [w, c], path: path });
+    // Pola titik SVG dihitung dari awal garis. Garis disusun terbalik (tujuan → posisiku) agar titik
+    // menempel di jalan dan hanya ujung di posisiku yang berubah saat berjalan.
+    var ll = [a].concat(rest).reverse();
+    var w = L.polyline(ll, { color: "#fff", weight: 9, opacity: .85, dashArray: "0.1 12", lineCap: "round" }).addTo(T.layer);
+    var c = L.polyline(ll, { color: "#1A73E8", weight: 6, opacity: 1, dashArray: "0.1 12", lineCap: "round" }).addTo(T.layer);
+    if (dyn) T.dyn.push({ lines: [w, c], path: path, rev: true });
   }
   var FOOTVER = 0;
   /*
@@ -862,11 +1418,11 @@
     var it = S.guide && S.guide.it;
     var rides = it ? it.legs.filter(function (l) { return l.type === "ride"; }) : [];
     var onBusNow = st.phase === "ride";
-    var sig = [it ? 1 : 0, target ? 1 : 0, st.cursor, st.next, st.phase, LIVEW && LIVEW.pts ? LIVEW.pts.length + "@" + LIVEW.at : "-", FOOTVER,
+    var sig = [it ? 1 : 0, target ? 1 : 0, st.cursor, st.next, st.phase, LIVEW && LIVEW.pts ? LIVEW.tk + "#" + LIVEW.ver : "-", FOOTVER,
       follow ? "p" : "t"].join("|");
     if (sig !== T.sig || !T.layer || !map.hasLayer(T.layer)) {
       T.sig = sig;
-      if (T.layer) T.layer.remove();
+      var oldLayer = T.layer;
       T.layer = L.featureGroup().addTo(map);
       T.dyn = [];
       var me = T.pos || target;
@@ -904,6 +1460,8 @@
         }
         if (S.to && S.to.p) L.marker(S.to.p, { icon: dotIcon("lm-dest") }).addTo(T.layer);
       }
+      if (T.pos) moveDyn(T, T.pos);
+      if (oldLayer) oldLayer.remove();
     }
     if (T.pos) moveDyn(T, T.pos);
     // Titik posisiku: satu penanda tetap di lapisan sendiri.
@@ -912,8 +1470,8 @@
     } else if (T.me) { T.me.remove(); T.me = null; }
     T.map = map; T.followMode = follow;
     if (!target) {
-      if (follow) { try { map.fitBounds(T.layer.getBounds(), { padding: [16, 16], maxZoom: 17 }); } catch (e) { } }
-      else if (!T.fitted) { T.fitted = true; try { map.fitBounds(T.layer.getBounds(), { padding: [30, 30], maxZoom: 17 }); } catch (e) { } }
+      if (follow) { try { map.fitBounds(T.layer.getBounds(), { padding: [16, 16], maxZoom: 17 }); } catch (e) { lumiLog(e); } }
+      else if (!T.fitted) { T.fitted = true; try { map.fitBounds(T.layer.getBounds(), { padding: [30, 30], maxZoom: 17 }); } catch (e) { lumiLog(e); } }
       return;
     }
     if (!follow) hookTripMapFollow();
@@ -942,7 +1500,7 @@
   function moveDyn(T, p) {
     (T.dyn || []).forEach(function (d) {
       var path = d.path, best = null, bj = 0;
-      if (path.length < 2) { d.lines.forEach(function (x) { x.setLatLngs([p].concat(path)); }); return; }
+      if (path.length < 2) { var l0 = [p].concat(path); if (d.rev) l0.reverse(); d.lines.forEach(function (x) { x.setLatLngs(l0); }); return; }
       // Cari segmen terdekat; utamakan sekitar posisi sebelumnya (tidak melompat ke bagian rute lain yang kebetulan dekat).
       var from = Math.max(0, (d.j || 0) - 4), to = path.length - 1;
       for (var j = from; j < to; j++) {
@@ -954,6 +1512,7 @@
       }
       d.j = bj;
       var ll = [p, best.q].concat(path.slice(bj + 1));
+      if (d.rev) ll.reverse();
       d.lines.forEach(function (x) { x.setLatLngs(ll); });
     });
   }
@@ -980,7 +1539,7 @@
   /* Arah hadap dari kompas HP (MainActivity) → putar "senter" tanpa menggambar ulang peta. */
   window.__lumiHeading = function (deg) {
     S.heading = deg; var u = unwrapHeading(deg);
-    [GT.trip, GT.pip].forEach(function (T) {
+    [GT.trip, GT.pip, { me: LIVE_HEADING.map && LIVE_HEADING.map._me }].forEach(function (T) {
       if (!T.me) return;
       var el = T.me.getElement && T.me.getElement(); if (!el) return;
       var b = el.querySelector(".lm-beam");
@@ -988,7 +1547,7 @@
       b.style.transform = "rotate(" + Math.round(u) + "deg)";
     });
   };
-  function compass(on) { try { NATIVE && NATIVE.compass && NATIVE.compass(!!on); } catch (e) { } }
+  function compass(on) { try { NATIVE && NATIVE.compass && NATIVE.compass(!!on); } catch (e) { lumiLog(e); } }
   function guideRouteMeters(st) {
     if (!(st.metersLeft >= 0) || !st.lat || !LIVEW || !LIVEW.pts) return null;
     var tgt = LIVEW.tk.split(","), b = [+tgt[0], +tgt[1]];
@@ -996,6 +1555,10 @@
     return km2 == null ? null : Math.round(km2 * 1000);
   }
   function renderGuide(st) {
+    if (st && cfg().voice && (st.text || st.title)) {
+      var say = (st.title ? st.title + ". " : "") + (st.text || "");
+      if (say !== S._voice) { S._voice = say; try { if (NATIVE && NATIVE.speak) NATIVE.speak(say); } catch (e) { lumiLog(e); } }
+    }
     var g = $("#guide");
     if (!g) {
       g = document.createElement("div"); g.id = "guide"; g.className = "guide"; g.setAttribute("role", "status"); g.setAttribute("aria-live", "polite");
@@ -1003,7 +1566,7 @@
       $("#app").appendChild(g);
       g.addEventListener("click", function (e) {
         if (e.target.closest(".guide-stop")) { e.stopPropagation(); stopGuide(); toast("Pendampingan dihentikan"); return; }
-        if (e.target.closest(".guide-pip")) { e.stopPropagation(); try { NATIVE.enterPip(); } catch (x) { } return; }
+        if (e.target.closest(".guide-pip")) { e.stopPropagation(); try { NATIVE.enterPip(); } catch (x) { lumiLog(x); } return; }
         if (S.guide && S.guide.it) openTrip(S.guide.it);
       });
     }
@@ -1015,14 +1578,14 @@
       st = Object.assign({}, st, { metersLeft: routeM });
       if (st.text) st.text = st.text.replace(/±[\d.,]+ (?:m|km) lagi/, "±" + (routeM < 1000 ? Math.round(routeM / 10) * 10 + " m" : (routeM / 1000).toFixed(1).replace(".", ",") + " km") + " lagi");
     }
-    if (st.metersLeft >= 0) counts += '<div><b class="tnum">' + (st.metersLeft < 1000 ? Math.round(st.metersLeft / 10) * 10 + " m" : (st.metersLeft / 1000).toFixed(1).replace(".", ",") + " km") + "</b><span>jalan kaki lagi</span></div>";
+    if (st.metersLeft >= 0) counts += '<div><b class="tnum">' + (st.metersLeft < 1000 ? Math.round(st.metersLeft / 10) * 10 + " m" : dec(st.metersLeft / 1000) + " km") + "</b><span>jalan kaki lagi</span></div>";
     var pipBtn = !st.done && NATIVE && NATIVE.pipOk && NATIVE.pipOk() ? '<button class="guide-pip" type="button" aria-label="Mode jendela kecil (PiP)">' + ICO_PIP + "PiP</button>" : "";
     $(".guide-body", g).innerHTML = '<div class="guide-top"><span class="guide-live">' + (st.done ? "SELESAI" : "PENDAMPINGAN") + "</span>" + pipBtn + '<button class="guide-stop" type="button">' + (st.done ? "Tutup" : "Berhenti") + "</button></div>" +
       '<div class="guide-main">' + esc(st.alert || st.title) + "</div>" + '<div class="guide-sub">' + esc(st.alert ? st.title + " · " + st.text : st.text) + "</div>" +
       (counts && !st.done ? '<div class="guide-count">' + counts + "</div>" : "");
     if (st.alert) {
       g.classList.add("alert");
-      try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) { }
+      try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) { lumiLog(e); }
       clearTimeout(alertTimer); alertTimer = setTimeout(function () { g.classList.remove("alert"); }, 8000);
     }
     // posisi + sisa rute di peta perjalanan
@@ -1042,11 +1605,11 @@
     if (!GT.pip.map) return;
     var m = GT.pip.map; GT.pip.map = null; GT.pip.layer = null; GT.pip.me = null; GT.pip.pos = null; GT.pip.anim = null; GT.pip.sig = null;
     allMaps = allMaps.filter(function (x) { return x !== m; });
-    try { m.remove(); } catch (e) { }
+    try { m.remove(); } catch (e) { lumiLog(e); }
   }
   function refitMaps() {
     // Peta yang sedang tersembunyi (mis. peta perjalanan saat PiP) jangan diukur: ukurannya 0 dan merusak tampilan.
-    allMaps.forEach(function (m) { try { if (m.getContainer().offsetWidth) m.invalidateSize(false); } catch (e) { } });
+    allMaps.forEach(function (m) { try { if (m.getContainer().offsetWidth) m.invalidateSize(false); } catch (e) { lumiLog(e); } });
     paintGuideMap(S.guideSt);
   }
   window.__lumiPip = function (on) {
@@ -1078,15 +1641,26 @@
   };
 
   /* ------------------------------------------------------- pengaturan */
-  // Tidak ada layanan yang butuh API key: peta OpenFreeMap/OSM, alamat lewat Google Maps (Bagikan).
-  var DEFAULT_CFG = { basemap: "liberty" };
-  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1 };
+  // Bawaan tanpa API key (OpenFreeMap/OSM, Photon). Google Places & Static Maps opsional
+  // lewat kunci internal aplikasi Google Maps — lihat js/gmaps.js dan docs/google-api-keys.md.
+  var DEFAULT_CFG = { basemap: "liberty", gsearch: true, accessible: false, voice: false, lang: ((navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en") };
+  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, google: 1 };
   function cfg() {
     var c = store("cfg") || {};
-    // migrasi dari CARTO (v1–v2.3 lama): gaya lama → gaya OpenFreeMap yang mirip
-    if (!MAPSTYLES_KEYS[c.basemap]) c.basemap = c.basemap === "positron" ? "positron" : "liberty";
     var o = {}; for (var k in DEFAULT_CFG) o[k] = c[k] === undefined ? DEFAULT_CFG[k] : c[k];
+    if (!MAPSTYLES_KEYS[o.basemap]) o.basemap = "liberty";
     return o;
+  }
+  function applyAccessible() {
+    try { document.body.classList.toggle("is-accessible", !!cfg().accessible); } catch (e) { lumiLog(e); }
+  }
+
+  /* ------------------------------------------------------- bahasa (ID/EN) */
+  /* Terjemahan ada di js/i18n.js (kamus DOM + LumiI18n). Mengganti bahasa memuat ulang halaman. */
+  function tr(s) { return s; }
+  function applyLang() {
+    try { document.documentElement.lang = I18.lang || (EN ? "en" : "id"); } catch (e) { lumiLog(e); }
+    try { NATIVE && NATIVE.setLang && NATIVE.setLang(EN ? "en" : "id"); } catch (e) { lumiLog(e); }
   }
 
   /* ------------------------------------------------------- tempat tersimpan (dari Google Maps) */
@@ -1105,13 +1679,13 @@
     return http(url, 6000).then(function (j) { return j.routes && j.routes[0] ? j.routes[0].distance / 1000 : null; }).catch(function () { return null; });
   }
 
-  /* Google Maps: buka pencarian; hasilnya kembali lewat Bagikan → Lumi Transportation. */
+  /* Google Maps: buka pencarian; hasilnya kembali lewat Bagikan → Lumi Transport. */
   function openGoogleMaps(which, q) {
     S.shareTarget = which;
     store("shareTarget", { w: which, t: Date.now() });
     var url = q ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q) : "https://www.google.com/maps/@-6.2,106.83,12z";
     openUrl(url);
-    toast("Di Google Maps: pilih tempatnya → Bagikan → Lumi Transportation");
+    toast("Di Google Maps: pilih tempatnya → Bagikan → Lumi Transport");
   }
 
   /* Koordinat yang diketik ("-6.2, 106.8") atau tautan Google Maps/OSM. */
@@ -1158,6 +1732,8 @@
     hideSuggest();
     if (t === "lines" && !$("#lineList").childElementCount) renderLines();
     if (t === "info" && !$("#infoBody").childElementCount) renderInfo();
+    if (t === "stops" && !$("#stopList").childElementCount) renderStops("");
+    if (t === "history") renderHistoryTab();
   }
   $$(".nav-btn").forEach(function (b) { b.addEventListener("click", function () { setTab(b.dataset.tab); }); });
 
@@ -1201,7 +1777,9 @@
     if (S.from && S.to) runPlan();
   });
 
-  var sgTimer, sgSeq = 0;
+  var sgTimer, sgSeq = 0, gSeq = 0;
+  /* Pencarian alamat OpenStreetMap (Photon). Gratis, tanpa API key. */
+  var osmSeq = 0, osmPending = null;
   var ICO_PIN = '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.4" fill="currentColor"/></svg>';
   var ICO_STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor"/></svg>';
   var ICO_LINK = '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -1209,7 +1787,7 @@
     var ico;
     if (item.kind === "me") ico = '<span class="sg-ico place"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>';
     else if (item.kind === "saved") ico = '<span class="sg-ico saved">' + ICO_STAR + "</span>";
-    else if (item.kind === "gmaps") ico = '<span class="sg-ico gmaps">' + ICO_PIN + "</span>";
+    else if (item.kind === "gmaps" || item.kind === "gplace") ico = '<span class="sg-ico gmaps">' + ICO_PIN + "</span>";
     else if (item.kind === "link") ico = '<span class="sg-ico tool">' + ICO_LINK + "</span>";
     else ico = '<span class="sg-ico place">' + ICO_PIN + "</span>";
     return '<button class="sg-item' + (item.kind === "gmaps" ? " sg-primary" : "") + '" data-i="' + idx + '">' + ico + '<span class="sg-main"><div class="sg-name">' + esc(item.name) + '</div><div class="sg-sub">' + esc(item.sub || "") + "</div></span></button>";
@@ -1223,20 +1801,63 @@
       b.addEventListener("click", function () { pick(items[+b.dataset.i]); });
     });
   }
-  /* Semua alamat dicari di Google Maps. Di sini hanya ada: cari di Google Maps, lokasi saya,
+  /* Semua alamat dicari di Google Maps. Di sini ada: saran dari Google Places
+     (kalau kuncinya masih hidup), cari di Google Maps lewat Bagikan, lokasi saya,
      dan tempat yang sebelumnya sudah dibagikan dari Google Maps (tersimpan). */
   function showSuggest(q) {
     q = (q || "").trim();
     var lq = q.toLowerCase();
     if (isUrl(q)) { paintSuggest([{ name: "Gunakan lokasi dari tautan Google Maps", sub: "Membaca tautan…", kind: "link", url: q }]); return; }
-    var rows = [{ name: q ? "Cari \u201c" + q + "\u201d di Google Maps" : "Cari alamat di Google Maps",
-      sub: "Pilih tempatnya, lalu Bagikan \u2192 Lumi Transportation", kind: "gmaps", q: q }];
+    var rows = [{ name: q ? tl("Cari \u201c" + q + "\u201d di Google Maps", "Search \u201c" + q + "\u201d on Google Maps") : "Cari alamat di Google Maps",
+      sub: "Pilih tempatnya, lalu Bagikan \u2192 Lumi Transport", kind: "gmaps", q: q }];
     if (!q) rows.push({ name: "Lokasi saya sekarang", sub: "Pakai GPS ponsel", kind: "me" });
     savedPlaces().filter(function (x) { return !q || x.name.toLowerCase().indexOf(lq) >= 0 || (x.sub || "").toLowerCase().indexOf(lq) >= 0; })
       .slice(0, 8).forEach(function (x) { rows.push({ name: x.name, sub: x.sub || "Dari Google Maps", p: x.p, kind: "saved" }); });
     paintSuggest(rows, "");
+    googleSuggest(q, rows);
   }
-  function hideSuggest() { sgSeq++; clearTimeout(sgTimer); $("#suggest").hidden = true; }
+
+  /* Saran alamat langsung dari Google Places (kunci internal, lihat js/gmaps.js).
+     Diam saja bila kunci sudah tidak berlaku — baris lain tetap jalan. */
+  function googleSuggest(q, rows) {
+    if (!q || q.length < 3 || !cfg().gsearch || !window.LumiGoogle || LumiGoogle.isDown()) return;
+    var seq = ++gSeq;
+    var near = S.myPos || (S.field && S[S.field] && S[S.field].p) || JKT;
+    LumiGoogle.autocomplete(q, near).then(function (preds) {
+      if (seq !== gSeq || !preds.length) return;
+      var out = rows.slice();
+      preds.slice(0, 6).forEach(function (p, i) {
+        out.splice(1 + i, 0, { kind: "gplace", name: p.name, sub: p.sub, id: p.id });
+      });
+      paintSuggest(out, tl("Saran alamat: Google Maps", "Address suggestions: Google Maps"));
+    }).catch(function (e) { lumiLog(e, "gmap"); });
+  }
+
+  /* Ambil saran alamat dari Photon (OpenStreetMap), lalu sisipkan setelah baris pertama. */
+  function osmLookup(q, seq) {
+    var url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) +
+      "&lang=id&limit=6&lat=-6.2&lon=106.816&location_bias_scale=0.3";
+    http(url, 9000).then(function (res) {
+      if (!osmPending || osmPending.seq !== seq) return;
+      var fs = (res && res.features) || [], out = [];
+      for (var i = 0; i < fs.length && out.length < 6; i++) {
+        var f = fs[i] || {}, pr = f.properties || {}, g = f.geometry || {}, c = g.coordinates || [];
+        if (pr.countrycode && String(pr.countrycode).toUpperCase() !== "ID") continue;
+        if (!c || c.length < 2) continue;
+        var name = pr.name || pr.street || pr.city || "";
+        if (!name) continue;
+        var parts = [pr.street, pr.district, pr.city, pr.state].filter(function (x, k, a) { return x && a.indexOf(x) === k; });
+        out.push({ name: name, sub: parts.join(", ") || "OpenStreetMap", p: [c[1], c[0]] });
+      }
+      if (!out.length) return;
+      var rows = osmPending.rows.slice();
+      for (var j = 0; j < out.length; j++) {
+        rows.splice(1 + j, 0, { kind: "place", name: out[j].name, sub: out[j].sub, p: out[j].p });
+      }
+      paintSuggest(rows, "Saran alamat: OpenStreetMap");
+    }).catch(function () { /* offline / kuota habis: saran lama tetap tampil */ });
+  }
+  function hideSuggest() { sgSeq++; gSeq++; osmPending = null; clearTimeout(sgTimer); $("#suggest").hidden = true; }
   document.addEventListener("click", function (e) {
     if (!e.target.closest("#suggest") && !e.target.closest(".field")) hideSuggest();
   });
@@ -1251,8 +1872,23 @@
       window.lumiShared(item.url.trim());
       return;
     }
+    if (item.kind === "gplace") { pickGoogle(which, item); return; }
     setPoint(which, { name: item.name, p: item.p });
     afterPick(which);
+  }
+  /* place_id Google → koordinat lewat Place Details, lalu simpan seperti tempat biasa. */
+  function pickGoogle(which, item) {
+    var input = which === "from" ? inFrom : inTo;
+    input.value = tl("Mengambil lokasi…", "Reading location…");
+    LumiGoogle.details(item.id).then(function (d) {
+      setPoint(which, { name: d.name || item.name, p: d.p });
+      savePlace({ name: d.name || item.name, sub: d.sub, p: d.p });
+      afterPick(which);
+    }).catch(function (e) {
+      input.value = item.name;
+      lumiLog(e, "gmap");
+      toast(tl("Tempat tidak bisa dibaca — coba lagi", "Could not read that place — try again"));
+    });
   }
   function afterPick(which) {
     (which === "from" ? inFrom : inTo).blur();
@@ -1263,13 +1899,13 @@
 
   function useMyLocation(which) {
     var btn = $("#btnLocate"); btn.classList.add("is-busy");
-    (which === "from" ? inFrom : inTo).value = "Mencari lokasi…";
+    (which === "from" ? inFrom : inTo).value = tl("Mencari lokasi…", "Finding location…");
     locate().then(function (o) {
       var p = [o.lat, o.lon]; S.myPos = p;
-      setPoint(which, { name: "Lokasi saya", p: p, me: true });
+      setPoint(which, { name: tl("Lokasi saya", "My location"), p: p, me: true });
       if (S.from && S.to) runPlan(); else if (which === "from") { S.field = "to"; inTo.focus(); }
     }).catch(function (e) {
-      setPoint(which, null); toast(e.message || "Lokasi tidak tersedia");
+      setPoint(which, null); toast(e.message || tl("Lokasi tidak tersedia", "Location unavailable"));
     }).then(function () { btn.classList.remove("is-busy"); });
   }
   $("#btnLocate").addEventListener("click", function () { useMyLocation("from"); });
@@ -1281,30 +1917,42 @@
 
   /* ------------------------------------------------------- beranda */
   function renderIntro() {
-    $("#popular").innerHTML = POPULAR.slice(0, 10).map(function (p, i) { return '<button data-i="' + i + '">' + esc(p.name) + "</button>"; }).join("");
-    $$("#popular button").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var p = POPULAR[+b.dataset.i];
-        openGoogleMaps("to", p.name + ", " + p.sub);
+    var favList = favs().slice(0, 10);
+    var pop = $("#popular");
+    if (!favList.length) {
+      pop.innerHTML = '<p class="fav-empty">Belum ada rute favorit. Cari rute, lalu ketuk ☆ Simpan di hasil pencarian.</p>';
+    } else {
+      pop.innerHTML = favList.map(function (f, i) {
+        return '<button data-fav-i="' + i + '">' + esc(f.from.name) + " → " + esc(f.to.name) + "</button>";
+      }).join("");
+      $$("#popular button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var f = favs()[+b.dataset.favI];
+          if (!f) return;
+          S.from = { name: f.from.name, p: f.from.p };
+          S.to = { name: f.to.name, p: f.to.p };
+          $("#inFrom").value = S.from.name; $("#inTo").value = S.to.name;
+          runPlan();
+        });
       });
-    });
+    }
     var rec = store("recent") || [];
     $("#recentWrap").hidden = !rec.length;
     $("#recent").innerHTML = rec.map(function (r, i) {
       return '<button data-i="' + i + '"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg><span><span class="r-a">' +
-        esc(r.from.name) + '</span> <span class="r-b">ke</span> <span class="r-a">' + esc(r.to.name) + "</span></span></button>";
+        esc(r.from.name) + '</span> <span class="r-b">' + tl("ke", "to") + '</span> <span class="r-a">' + esc(r.to.name) + "</span></span></button>";
     }).join("");
     $$("#recent button").forEach(function (b) {
       b.addEventListener("click", function () {
         var r = rec[+b.dataset.i];
         // "Lokasi saya" di riwayat = posisi GPS SEKARANG, bukan koordinat lama saat pencarian disimpan.
-        function isMe(pt) { return pt && (pt.me || pt.name === "Lokasi saya"); }
+        function isMe(pt) { return pt && (pt.me || pt.name === "Lokasi saya" || pt.name === "My location"); }
         if (!isMe(r.from) && !isMe(r.to)) { setPoint("from", r.from); setPoint("to", r.to); runPlan(); return; }
         b.classList.add("is-busy"); toast("Mencari lokasimu…");
         locate().then(function (o) {
-          var me = { name: "Lokasi saya", p: [o.lat, o.lon], me: true }; S.myPos = me.p;
+          var me = { name: tl("Lokasi saya", "My location"), p: [o.lat, o.lon], me: true }; S.myPos = me.p;
           setPoint("from", isMe(r.from) ? me : r.from); setPoint("to", isMe(r.to) ? me : r.to); runPlan();
-        }).catch(function (e) { toast(e.message || "Lokasi tidak tersedia"); })
+        }).catch(function (e) { toast(e.message || tl("Lokasi tidak tersedia", "Location unavailable")); })
           .then(function () { b.classList.remove("is-busy"); });
       });
     });
@@ -1315,7 +1963,7 @@
       ["LRT Jakarta & Jabodebek", "#2C9E8E", "Kelapa Gading, Cibubur, Bekasi", "LRT"],
       ["Mikrotrans", "#00A3E0", "Angkot JakLingko, gratis", "MIKRO"],
       ["Ojol motor & mobil", "#00AA13", "Estimasi tarif Gojek / Grab", "OJOL"],
-      ["KA Bandara", "#0F5E9C", "Manggarai – Soekarno-Hatta", "KABANDARA"],
+      [tl("KA Bandara", "Airport Rail (KA Bandara)"), "#0F5E9C", "Manggarai – Soekarno-Hatta", "KABANDARA"],
       ["Whoosh", "#C8102E", "Kereta cepat Jakarta – Bandung", "WHOOSH"]
     ];
     $("#modeGrid").innerHTML = groups.map(function (g) {
@@ -1334,8 +1982,12 @@
   /* ------------------------------------------------------- waktu perjalanan */
   S.time = { mode: "now", hm: "08:00" };
   function minOf(d) { return d.getHours() * 60 + d.getMinutes(); }
+  /* B7: jadwal & tarif mengikuti WIB. Objek Date "jam dinding WIB": getter lokalnya = waktu WIB,
+     jadi HP dengan zona waktu lain tetap melihat jam operasional dan tarif pagi yang benar. */
+  function nowWib() { var d = new Date(); return new Date(d.getTime() + (d.getTimezoneOffset() + 420) * 60000); }
+  function wibOf(ts) { var d = new Date(ts); return new Date(ts + (d.getTimezoneOffset() + 420) * 60000); }
   function targetDate() {
-    var now = new Date();
+    var now = nowWib();
     if (S.time.mode === "now") return now;
     var hm = S.time.hm.split(":"), d = new Date(now);
     d.setHours(+hm[0], +hm[1], 0, 0);
@@ -1343,14 +1995,15 @@
     return d;
   }
   function dayWord(d) {
-    var n = new Date(); var a = new Date(n.getFullYear(), n.getMonth(), n.getDate()), b = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var n = nowWib(); var a = new Date(n.getFullYear(), n.getMonth(), n.getDate()), b = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     var diff = Math.round((b - a) / 86400000);
-    return diff === 0 ? "" : diff === 1 ? "besok " : "";
+    return diff === 0 ? "" : diff === 1 ? tl("besok ", "tomorrow ") : "";
   }
   function timeLabel() {
-    if (S.time.mode === "now") return "Berangkat sekarang";
+    var en = EN;
+    if (S.time.mode === "now") return en ? "Leaving now" : "Berangkat sekarang";
     var d = targetDate(), t = dayWord(d) + clock(d);
-    return (S.time.mode === "dep" ? "Berangkat " : "Tiba ") + t;
+    return (S.time.mode === "dep" ? (en ? "Leave " : "Berangkat ") : (en ? "Arrive " : "Tiba ")) + t;
   }
   function syncTimeChip() {
     $("#timeLabel").textContent = timeLabel();
@@ -1359,7 +2012,7 @@
   function openTimeSheet() {
     var sh = $("#sheetTime"); sh.hidden = false;
     var mode = S.time.mode;
-    $("#inTime").value = S.time.mode === "now" ? clock(new Date()).replace(".", ":") : S.time.hm;
+    $("#inTime").value = S.time.mode === "now" ? clock(nowWib()).replace(".", ":") : S.time.hm;
     function paint() {
       $$("#timeMode button").forEach(function (b) { b.classList.toggle("is-on", b.dataset.m === mode); });
       $("#timeRow").style.opacity = mode === "now" ? ".4" : "1";
@@ -1432,7 +2085,7 @@
     var total = it.legs.reduce(function (s, l) { return s + l.min + (l.wait || 0); }, 0) || 1;
     return '<div class="strip">' + it.legs.map(function (l) {
       var w = Math.max(1, (l.min + (l.wait || 0)) / total * 100);
-      if (l.type === "ride") return '<div class="seg" style="flex:' + w + ' 1 0;background:' + lc(l) + ';color:' + textColor(lc(l)) + '">' + esc(l.line.code) + "</div>";
+      if (l.type === "ride") return '<div class="seg" style="flex:' + w + ' 1 0;background:' + lc(l) + ';color:' + textColor(lc(l)) + '" translate="no">' + esc(l.line.code) + "</div>";
       if (l.type === "ojol") return '<div class="seg ojol" style="flex:' + w + ' 1 0">' + legIcon("ojol") + "</div>";
       return '<div class="seg walk" style="flex:' + Math.max(w, 2) + ' 1 0" title="jalan kaki"></div>';
     }).join("") + "</div>";
@@ -1442,10 +2095,10 @@
     it.legs.forEach(function (l) {
       if (l.type === "ride") {
         var vv = l.variant;
-        parts.push("<b>" + esc(modeLabel(l.line).replace("Transjakarta non-BRT", "TJ") + " " + l.line.code) + "</b>" + (vv ? (/Tol/.test(vv) ? " (via Tol)" : " (varian)") : ""));
+        parts.push("<b>" + esc(modeLabel(l.line).replace("Transjakarta non-BRT", "TJ") + " " + l.line.code) + "</b>" + (vv ? (/Tol/.test(vv) ? tl(" (via Tol)", " (via toll road)") : tl(" (varian)", " (variant)")) : ""));
       }
-      else if (l.type === "ojol") parts.push("<b>Ojol</b> " + km(l.km));
-      else if (l.km >= 0.15) parts.push("Jalan " + km(l.km));
+      else if (l.type === "ojol") parts.push("<b>" + tl("Ojol", "Ride-hail") + "</b> " + km(l.km));
+      else if (l.km >= 0.15) parts.push(tl("Jalan ", "Walk ") + km(l.km));
     });
     return parts.join('<span class="sep">›</span>');
   }
@@ -1458,9 +2111,9 @@
     ["MRT", "MRT", function (l) { return l.mode === "MRT"; }],
     ["KRL", "KRL", function (l) { return l.mode === "KRL"; }],
     ["ROYAL", "Royaltrans", function (l) { return l.mode === "ROYAL" && l.cat !== "JABODETABEK"; }],
-    ["KA", "KA Bandara", function (l) { return l.mode === "KABANDARA"; }],
+    ["KA", tl("KA Bandara", "Airport Rail"), function (l) { return l.mode === "KABANDARA"; }],
     ["WHOOSH", "Whoosh", function (l) { return l.mode === "WHOOSH"; }],
-    ["OJOL", "Ojol", null]
+    ["OJOL", tl("Ojol", "Ride-hail"), null]
   ];
   function hasOj(it) { return !!it.direct || it.legs.some(function (l) { return l.type === "ojol"; }); }
   function itHas(it, key) {
@@ -1495,23 +2148,24 @@
     return h;
   }
 
+  function transfersText(n) { return n + tl("× pindah", n === 1 ? " transfer" : " transfers"); }
   function renderResults(allResults, dep) {
     var res = $("#results");
     var results = filterResults(allResults);
     var transit = results.filter(function (r) { return !r.direct; });
     var h = dep.getHours() + dep.getMinutes() / 60;
-    var when = S.arriveBy ? "Tiba sebelum " + dayWord(S.arriveBy) + clock(S.arriveBy) + " · berangkat ±" + clock(dep) : (S.time.mode === "now" ? "Berangkat sekarang, " : "Berangkat ") + dayWord(dep) + clock(dep);
-    var html = '<div class="res-head"><h2>' + esc(S.from.name) + " ke " + esc(S.to.name) + '</h2><span class="res-acts"><button class="link" id="btnEdit">Ubah</button><button class="res-clear" id="btnClear" type="button" aria-label="Bersihkan dan kembali ke beranda"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Bersihkan</button></span></div>' +
-      '<div class="res-meta">' + when + " · " + (transit.length ? transit.length + " pilihan transportasi umum + ojol" : "pilihan ojol") + "</div>" +
+    var when = S.arriveBy ? tl("Tiba sebelum ", "Arrive by ") + dayWord(S.arriveBy) + clock(S.arriveBy) + tl(" · berangkat ±", " · leave ±") + clock(dep) : (S.time.mode === "now" ? tl("Berangkat sekarang, ", "Leaving now, ") : tl("Berangkat ", "Leaving ")) + dayWord(dep) + clock(dep);
+    var html = '<div class="res-head"><h2>' + esc(S.from.name) + tl(" ke ", " to ") + esc(S.to.name) + '</h2><span class="res-acts"><button class="res-fav" id="btnFav" type="button">' + ICO_STAR + "<span>Simpan</span></button>" + '<button class="link" id="btnEdit">Ubah</button><button class="res-clear" id="btnClear" type="button" aria-label="Bersihkan dan kembali ke beranda"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Bersihkan</button></span></div>' +
+      '<div class="res-meta">' + when + " · " + (transit.length ? transit.length + tl(" pilihan transportasi umum + ojol", transit.length === 1 ? " public transport option + ride-hailing" : " public transport options + ride-hailing") : tl("pilihan ojol", "ride-hailing options")) + "</div>" +
       filterBar(allResults);
     var fk = Object.keys(S.filt.modes).filter(function (k) { return S.filt.modes[k]; });
-    if (fk.length && !results.length) html += '<div class="empty"><b>Tidak ada opsi dengan ' + esc(fk.map(function (k) { return FMODES.filter(function (m) { return m[0] === k; })[0][1]; }).join(" + ")) + "</b>Coba lepas salah satu filter moda.</div>";
+    if (fk.length && !results.length) html += '<div class="empty"><b>' + tl("Tidak ada opsi dengan ", "No options with ") + esc(fk.map(function (k) { return FMODES.filter(function (m) { return m[0] === k; })[0][1]; }).join(" + ")) + "</b>Coba lepas salah satu filter moda.</div>";
     var closed = planner.closedAt(minOf(dep));
     if (closed.length) {
-      html += '<div class="closed"><b>Tidak beroperasi pukul ' + clock(dep) + ":</b> " + esc(closed.join(", ")) + "." +
-        (E.isNight(minOf(dep)) ? " Yang tersedia: Transjakarta koridor 1–14 (AMARI, tiap ±20–40 menit), Mikrotrans JAK36/JAK47/JAK52/JAK75, dan ojol." : "") + "</div>";
+      html += '<div class="closed"><b>' + tl("Tidak beroperasi pukul ", "Not running at ") + clock(dep) + ":</b> " + esc(closed.map(T).join(", ")) + "." +
+        (E.isNight(minOf(dep)) ? " " + tl("Yang tersedia: Transjakarta koridor 1–14 (AMARI, tiap ±20–40 menit), Mikrotrans JAK36/JAK47/JAK52/JAK75, dan ojol.", "Available: Transjakarta corridors 1–14 (AMARI, every ±20–40 min), Mikrotrans JAK36/JAK47/JAK52/JAK75 and ride-hailing.") : "") + "</div>";
     }
-    if (h >= 5 && h < 7) html += '<div class="warn">Tarif Transjakarta pukul 05.00–07.00 hanya Rp2.000.</div>';
+    if (h * 60 >= E.fares().tj.morningFrom && h * 60 < E.fares().tj.morningTo) html += '<div class="warn">' + tl("Tarif Transjakarta pukul 05.00–07.00 hanya " + rp(E.fares().tj.morning) + ".", "Transjakarta fare 05:00–07:00 is only " + rp(E.fares().tj.morning) + ".") + "</div>";
     if (!transit.length) html += '<div class="empty"><b>Belum ada angkutan umum yang cocok pada jam ini</b>' +
       (closed.length ? "Banyak moda sudah/belum beroperasi. Coba ubah jam berangkat, atau pakai ojol." : "Lokasi mungkin terlalu dekat atau di luar jangkauan data. Ojol bisa jadi pilihan.") + "</div>";
     var LIMIT = 12, hiddenCount = 0, moreDone = false;
@@ -1522,7 +2176,7 @@
       var withOjol = it.direct || it.legs.some(function (l) { return l.type === "ojol"; });
       if (withOjol && hiddenCount && !moreDone) {
         moreDone = true;
-        html += '<button class="btn-sec more-btn" id="btnMore">Tampilkan semua ' + (hiddenCount + LIMIT) + ' opsi angkutan umum</button>';
+        html += '<button class="btn-sec more-btn" id="btnMore">' + tl("Tampilkan semua " + (hiddenCount + LIMIT) + " opsi angkutan umum", "Show all " + (hiddenCount + LIMIT) + " public transport options") + "</button>";
       }
       var isBest = !it.direct && it === transit[0];
       var tagsH = (it.tags || []).map(function (t) {
@@ -1530,22 +2184,23 @@
         return '<span class="tag ' + cls + '">' + esc(t) + "</span>";
       }).join("");
       var arr = addMin(dep, it.min);
-      var arrText = it.latest ? "Berangkat paling lambat " + clock(it.latest) : "Tiba sekitar " + clock(arr);
+      var arrText = it.latest ? tl("Berangkat paling lambat ", "Leave by ") + clock(it.latest) : tl("Tiba sekitar ", "Arrive around ") + clock(arr);
       html += '<div class="it' + (isBest ? " is-best" : "") + '" role="button" tabindex="0" data-i="' + i + '">' +
         '<div class="tags">' + tagsH + "</div>" +
         '<div class="it-top"><div><div class="it-time tnum">' + (it.min < 60 ? it.min + "<small>mnt</small>" : Math.floor(it.min / 60) + "<small>j</small> " + (it.min % 60) + "<small>mnt</small>") + "</div>" +
         '<div class="it-arr">' + arrText + "</div></div>" +
         '<div class="it-right"><div class="it-fare tnum">' + fareText(it.fareLo, it.fareHi) + "</div>" +
-        '<div class="it-tr">' + (it.direct ? km(it.legs[0].km) + " lewat jalan" : it.transfers === 0 ? "Tanpa pindah" : it.transfers + "× pindah") + "</div></div></div>" +
+        '<div class="it-tr">' + (it.direct ? km(it.legs[0].km) + tl(" lewat jalan", " by road") : it.transfers === 0 ? tl("Tanpa pindah", "No transfers") : transfersText(it.transfers)) + "</div></div></div>" +
         stripHTML(it) + '<div class="it-legs">' + legsText(it) + "</div>" +
         (it.direct ? "" : '<div class="it-foot"><button class="it-share" type="button" aria-label="Bagikan rute ini">' + ICO_SHARE + "Bagikan rute</button></div>") +
         (it.direct ? '<div class="ojol-actions"><button class="gojek" data-app="com.gojek.app">Buka Gojek</button><button class="grab" data-app="com.grabtaxi.passenger">Buka Grab</button></div>' : "") +
         "</div>";
     });
     html += '<p class="disclaim">Waktu dan tarif adalah perkiraan. Tarif ojol mengikuti batas tarif Kemenhub zona Jabodetabek ditambah biaya jasa; harga di aplikasi bisa berbeda saat jam sibuk.</p>';
-    res.innerHTML = html;
+    res.innerHTML = tr(html);
     $("#btnEdit").addEventListener("click", function () { S.field = "to"; inTo.focus(); });
     $("#btnClear").addEventListener("click", clearPlan);
+    $("#btnFav").addEventListener("click", toggleFav); paintFavBtn();
     // "Tampilkan semua": layar tetap di posisi tombol; opsi tambahan muncul di bawahnya.
     if ($("#btnMore")) $("#btnMore").addEventListener("click", function () {
       var tab = $("#tab-plan"), btnTop = this.getBoundingClientRect().top, keep = tab.scrollTop;
@@ -1584,10 +2239,12 @@
     liberty: { name: "Liberty (berwarna)", gl: "https://tiles.openfreemap.org/styles/liberty" },
     bright: { name: "Bright (kontras)", gl: "https://tiles.openfreemap.org/styles/bright" },
     positron: { name: "Positron (terang, polos)", gl: "https://tiles.openfreemap.org/styles/positron" },
-    osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" }
+    osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" },
+    google: { name: "Google Maps (raster)", google: true }
   };
   var ATTR_OFM = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
   var ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
+  var ATTR_GOOGLE = 'Peta &copy; <a href="https://www.google.com/maps" target="_blank">Google</a>';
   var GL_OK = null;
   function glOk() {
     if (GL_OK !== null) return GL_OK;
@@ -1595,9 +2252,28 @@
     return GL_OK;
   }
   function mapStyleKey() { var b = cfg().basemap; return MAPSTYLES[b] ? b : "liberty"; }
+  var GL_DOWN = false;   // R9: OpenFreeMap tidak menjawab → peta raster OSM sampai aplikasi dibuka ulang
   function baseLayer() {
     var st = MAPSTYLES[mapStyleKey()];
-    if (st.gl && glOk()) return L.maplibreGL({ style: st.gl, attribution: ATTR_OFM });
+    /* Peta Google: petak raster dari Static Maps, dimuat lewat <img> yang headernya
+     * dipasang shouldInterceptRequest (lihat GoogleKeys.java). */
+    if (st.google && window.LumiGoogle) return LumiGoogle.tileLayer(ATTR_GOOGLE);
+    if (st.gl && glOk() && !GL_DOWN) {
+      var gl = L.maplibreGL({ style: st.gl, attribution: ATTR_OFM });
+      gl.once("add", function () {
+        var mm = null, styled = false;
+        try { mm = gl.getMaplibreMap && gl.getMaplibreMap(); if (mm) mm.once("styledata", function () { styled = true; }); } catch (e) { lumiLog(e); }
+        if (!mm) return;
+        setTimeout(function () {
+          if (GL_DOWN || styled || !navigator.onLine) return;
+          GL_DOWN = true;
+          lumiLog(new Error("gaya peta OpenFreeMap tidak termuat"), "map");
+          toast(tl("Server peta lambat — memakai peta OpenStreetMap standar.", "Map server is slow — using the standard OpenStreetMap map."));
+          applyBasemap();
+        }, 12000);
+      });
+      return gl;
+    }
     return L.tileLayer(MAPSTYLES.osm.raster, { maxZoom: 20, maxNativeZoom: 19, keepBuffer: 4, attribution: ATTR_OSM });
   }
   var allMaps = [];
@@ -1609,7 +2285,7 @@
     return m;
   }
   function applyBasemap() {
-    allMaps.forEach(function (m) { try { if (m._lumiTiles) m.removeLayer(m._lumiTiles); } catch (e) { } m._lumiTiles = baseLayer().addTo(m); });
+    allMaps.forEach(function (m) { try { if (m._lumiTiles) m.removeLayer(m._lumiTiles); } catch (e) { lumiLog(e); } m._lumiTiles = baseLayer().addTo(m); });
   }
   function dotIcon(cls, color) {
     return L.divIcon({ className: "", html: '<div class="' + cls + '" style="--c:' + (color || "#1565D8") + '"></div>', iconSize: cls === "lm-stop" ? [12, 12] : [22, 22], iconAnchor: cls === "lm-stop" ? [6, 6] : [11, 11] });
@@ -1625,11 +2301,12 @@
 
   /* ------------------------------------------------------- detail perjalanan */
   var tripMap, tripLayer, tripBoard;
+  function showStopsText(n) { return tl("Lihat " + n + " pemberhentian", "Show " + n + (n === 1 ? " stop" : " stops")); }
   function openTrip(it) {
     colorize(it);
     S.openTrip = it;
     var sheet = $("#sheetTrip"); sheet.hidden = false; raiseSheet(sheet);
-    $("#tripTitle").textContent = S.from.name + " ke " + S.to.name;
+    $("#tripTitle").textContent = S.from.name + tl(" ke ", " to ") + S.to.name;
     if (!tripMap) { tripMap = makeMap($("#tripMap")); }
     setTimeout(function () {
       tripMap.invalidateSize();
@@ -1659,10 +2336,10 @@
       else recenterBtn(false);
     }, 60);
 
-    var dep = S.dep || new Date(), t = 0;
+    var dep = S.dep || nowWib(), t = 0;
     var html = '<div class="trip-sum"><div class="big tnum">' + (it.min < 60 ? it.min + "<small>mnt</small>" : Math.floor(it.min / 60) + "<small>j</small> " + (it.min % 60) + "<small>mnt</small>") +
       '</div><div class="facts"><b class="tnum">' + fareText(it.fareLo, it.fareHi) + "</b><br>" + clock(dep) + " – " + clock(addMin(dep, it.min)) +
-      (it.direct ? "" : " · " + (it.transfers ? it.transfers + "× pindah" : "tanpa pindah")) + "</div></div>";
+      (it.direct ? "" : " · " + (it.transfers ? transfersText(it.transfers) : tl("tanpa pindah", "no transfers"))) + "</div></div>";
     if (!it.direct) html += '<button class="nav-start" id="btnGuide" type="button">' + ICO_NAV + (S.guide && S.guide.it === it ? "Pendampingan sedang berjalan" : "Mulai pendampingan") + "</button>";
     html += '<div class="steps">';
     function step(cls, color, time, place, body) {
@@ -1675,14 +2352,14 @@
       if (l.type === "walk" || l.type === "transfer") {
         var dest = l.type === "transfer" ? l.to : (i === it.legs.length - 1 ? S.to.name : l.label);
         var desc = l.type === "transfer"
-          ? (l.km < 0.05 ? sameStopText(it.legs[i - 1], it.legs[i + 1]) : "Jalan kaki " + km(l.km) + " (±" + mins(l.min) + ") ke " + esc(l.to) + nextRideText(it.legs[i + 1]))
-          : "Jalan kaki " + km(l.km) + " (±" + mins(l.min) + ")" + (dest ? " ke " + esc(dest) : "");
+          ? (l.km < 0.05 ? sameStopText(it.legs[i - 1], it.legs[i + 1]) : tl("Jalan kaki ", "Walk ") + km(l.km) + " (±" + mins(l.min) + ")" + tl(" ke ", " to ") + esc(l.to) + nextRideText(it.legs[i + 1]))
+          : tl("Jalan kaki ", "Walk ") + km(l.km) + " (±" + mins(l.min) + ")" + (dest ? tl(" ke ", " to ") + esc(dest) : "");
         html += step(l.type, null, "", "", '<div class="st-desc" data-walk="' + i + '">' + desc + "</div>");
         t += l.min;
       } else if (l.type === "ojol") {
         html += step("ojol", "#00AA13", "", "", '<div class="st-card"><div class="row"><span class="badge sm" style="background:#00AA13">' + (l.kind === "car" ? "Mobil" : "Motor") +
-          '</span><span class="ttl">Naik ojol ' + (l.kind === "car" ? "mobil" : "motor") + "</span></div>" +
-          '<div class="dir">' + km(l.km) + " · ±" + mins(l.min) + " · " + fareText(l.fare.lo, l.fare.hi) + (l.label && i === 0 ? " · turun di <b>" + esc(l.label) + "</b>" : "") + "</div>" +
+          '</span><span class="ttl">' + (l.kind === "car" ? tl("Naik ojol mobil", "Ride-hail car") : tl("Naik ojol motor", "Ride-hail bike")) + "</span></div>" +
+          '<div class="dir">' + km(l.km) + " · ±" + mins(l.min) + " · " + fareText(l.fare.lo, l.fare.hi) + (l.label && i === 0 ? tl(" · turun di ", " · drop-off at ") + "<b>" + esc(l.label) + "</b>" : "") + "</div>" +
           '<div class="ojol-actions"><button class="gojek" data-app="com.gojek.app">Buka Gojek</button><button class="grab" data-app="com.grabtaxi.passenger">Buka Grab</button></div></div>');
         t += l.min;
       } else {
@@ -1693,31 +2370,33 @@
         html += step("ride", lc(l), clock(boardT), l.from,
           '<div class="st-card"><div class="row">' + badge(l.line, "sm", lc(l)) + '<span class="ttl">' + esc(modeLabel(l.line)) + " " + esc(l.line.code) + (l.night ? '<span class="night-tag">AMARI</span>' : "") + "</span></div>" +
           '<div class="dir">Arah <b>' + esc(l.headsign) + "</b></div>" +
-          (l.variant ? '<div class="alt">' + esc(l.variant) + "</div>" : "") +
-          (l.fareNote ? '<div class="alt">Tarif: ' + esc(l.fareNote) + "</div>" : "") +
-          (liveOk(l.line) ? '<div class="live-eta" data-leg="' + i + '"><i class="live-dot"></i>Mencari posisi bus ' + esc(l.line.code) + "…</div>" : "") +
-          '<div class="meta"><span>' + (l.stops.length - 1) + " " + (RAIL[l.line.mode] ? "stasiun" : "halte") + "</span><span>±" + mins(l.min) + "</span><span>" + (l.farePaid === 0 && l.fare > 0 ? "sudah termasuk" : fareText(l.farePaid, l.farePaid)) + "</span><span>tunggu ±" + l.wait + " mnt</span></div>" +
+          (l.variant ? '<div class="alt">' + esc(T(l.variant)) + "</div>" : "") +
+          (l.fareNote ? '<div class="alt">' + tl("Tarif: ", "Fare: ") + esc(T(l.fareNote)) + "</div>" : "") +
+          (liveOk(l.line) ? '<div class="live-eta" data-leg="' + i + '"><i class="live-dot"></i>' + tl("Mencari posisi bus ", "Finding bus ") + esc(l.line.code) + "…</div>" : "") +
+          '<div class="meta"><span>' + stopWord(l.stops.length - 1, RAIL[l.line.mode]) + "</span><span>±" + mins(l.min) + "</span><span>" + (l.farePaid === 0 && l.fare > 0 ? tl("sudah termasuk", "already paid") : fareText(l.farePaid, l.farePaid)) + "</span><span>" + tl("tunggu ±", "wait ±") + mins(l.wait) + "</span></div>" +
           (alts ? '<div class="alt">Bisa juga naik ' + alts + "</div>" : "") +
           (inner.length ? '<ul class="st-stops" hidden>' + inner.map(function (s) { return "<li>" + esc(s.n) + "</li>"; }).join("") + "</ul>" : "") +
-          '<div class="st-foot">' + (inner.length ? '<button class="st-toggle" data-tog="' + inner.length + '">Lihat ' + inner.length + " pemberhentian</button>" : "") +
-          '<button class="st-toggle" data-line="' + l.line.id + '">Info rute ' + esc(l.line.code) + "</button></div></div>");
+          '<div class="st-foot">' + (inner.length ? '<button class="st-toggle" data-tog="' + inner.length + '">' + showStopsText(inner.length) + "</button>" : "") +
+          '<button class="st-toggle" data-line="' + l.line.id + '">' + tl("Info rute ", "Route info ") + esc(l.line.code) + "</button></div></div>");
         t += l.min;
         html += step("ride", lc(l), clock(addMin(dep, t)), l.to, '<div class="st-desc">Turun di sini</div>');
       }
     });
     html += step("dest", "#38BDF8", clock(addMin(dep, it.min)), S.to.name, '<div class="st-desc">Sampai tujuan</div>');
     html += "</div>";
-    html += '<div class="btn-row"><button class="btn-sec" id="btnShare2">Bagikan rute (gambar)</button></div>';
-    html += '<p class="disclaim">Jadwal tidak real-time. Cek pengumuman operator untuk gangguan atau perubahan rute.</p>';
-    var body = $("#tripBody"); body.innerHTML = html; body.scrollTop = 0;
+    html += '<div class="trip-foot"><button class="btn-sec" id="btnShare2" type="button">Bagikan rute (gambar)</button>' +
+      '<button class="btn-sec" id="btnReportStop" type="button">Laporkan halte/rute salah</button>' +
+      '<p class="disclaim">Jadwal tidak real-time. Cek pengumuman operator untuk gangguan atau perubahan rute.</p></div>';
+    var body = $("#tripBody"); body.innerHTML = tr(html); body.scrollTop = 0;
+    $("#btnReportStop").addEventListener("click", reportStopIssue);
     $$("[data-tog]", body).forEach(function (b) {
-      b.addEventListener("click", function () { var ul = b.closest(".st-card").querySelector(".st-stops"); ul.hidden = !ul.hidden; b.textContent = ul.hidden ? "Lihat " + b.dataset.tog + " pemberhentian" : "Sembunyikan pemberhentian"; });
+      b.addEventListener("click", function () { var ul = b.closest(".st-card").querySelector(".st-stops"); ul.hidden = !ul.hidden; b.textContent = ul.hidden ? showStopsText(+b.dataset.tog) : tl("Sembunyikan pemberhentian", "Hide stops"); });
     });
     $$("[data-app]", body).forEach(function (b) { b.addEventListener("click", function () { openApp(b.dataset.app); }); });
     $$("[data-line]", body).forEach(function (b) { b.addEventListener("click", function () { openLine(planner.byId[b.dataset.line], 0); }); });
     $("#btnShare2").addEventListener("click", function () { shareTrip(it); });
     if ($("#btnGuide")) $("#btnGuide").addEventListener("click", function () {
-      if (S.guide && S.guide.it === it) { toast("Pendampingan sudah berjalan — lihat kartu biru di bawah"); return; }
+      if (S.guide && S.guide.it === it) { toast(tl("Pendampingan sudah berjalan — lihat kartu biru di bawah", "Guidance is already running — see the blue card below")); return; }
       if (S.guide) stopGuide();
       startGuide(it);
     });
@@ -1737,15 +2416,16 @@
             var b = tripBoard.buses[k];
             if (LumiLive.norm(b.code) !== LumiLive.norm(x.l.line.code)) return;
             // ETA presisi dari ID halte; sebelum ID-nya siap, pakai pencocokan nama/koordinat.
-            var e = x.fromId ? LumiLive.etaFor(b, x.fromId, x.toId) : etaTo(b, x.l.from, x.l.to, x.l.fromP, x.l.toP);
+            var feed = x.fromId ? LumiLive.etaFor(b, x.fromId, x.toId) : etaTo(b, x.l.from, x.l.to, x.l.fromP, x.l.toP);
+            var e = busEta(b, x.l.line, x.l.stops[0].p, feed);
             if (e != null && (!best || e < best.e)) best = { e: e, b: b };
           });
           var st = LumiLive.state();
           el.classList.toggle("on", !!best);
-          el.innerHTML = '<i class="live-dot"></i>' + (best ? "Bus " + esc(x.l.line.code) + " berikutnya tiba di " + esc(x.l.from) + " <b>" + fmtEta(best.e) + "</b> <span>(" + esc(best.b.key) + ")</span>" :
-            st === "connected" ? "Belum ada bus " + esc(x.l.line.code) + " menuju " + esc(x.l.from) + " yang terpantau" :
-            /error|reconnecting/.test(st) ? "Data armada belum bisa dihubungi. " + liveStatusText(st, 0) + ' <button class="st-toggle" data-tjapp>Buka aplikasi TJ</button>' :
-            "Menghubungkan ke data armada…");
+          el.innerHTML = '<i class="live-dot"></i>' + (best ? tl("Bus " + esc(x.l.line.code) + " berikutnya tiba di " + esc(x.l.from) + " ", "Next " + esc(x.l.line.code) + " bus reaches " + esc(x.l.from) + " ") + "<b>" + fmtEta(best.e) + "</b> <span>(" + esc(best.b.key) + ")</span>" :
+            st === "connected" ? tl("Belum ada bus " + esc(x.l.line.code) + " menuju " + esc(x.l.from) + " yang terpantau", "No " + esc(x.l.line.code) + " bus heading to " + esc(x.l.from) + " spotted yet") :
+            /error|reconnecting/.test(st) ? tl("Data armada belum bisa dihubungi. ", "Can't reach the fleet feed yet. ") + T(liveStatusText(st, 0)) + ' <button class="st-toggle" data-tjapp>' + tl("Buka aplikasi TJ", "Open the TJ app") + "</button>" :
+            tl("Menghubungkan ke data armada…", "Connecting to the fleet feed…"));
           bindTjApp(el);
           if (best) {
             // "Bus makin dekat": beri tahu saat melewati 10 / 5 / 2 menit dan saat tiba.
@@ -1776,20 +2456,21 @@
         if (real < l.km * 1.25 + 0.05) return;                 // tidak jauh beda: biarkan
         var el = $('[data-walk="' + i + '"]', body); if (!el || el.querySelector(".walk-real")) return;
         var mn = Math.round(real / 4.5 * 60);
-        el.insertAdjacentHTML("beforeend", '<span class="walk-real">Lewat jalan sebenarnya ±' + km(real) + " (±" + mn + " mnt) — harus memutar</span>");
+        el.insertAdjacentHTML("beforeend", '<span class="walk-real">' + tl("Lewat jalan sebenarnya ±", "Along actual streets ±") + km(real) + " (±" + mins(mn) + ")" + tl(" — harus memutar", " — a detour is needed") + "</span>");
       });
     });
   }
   /* ------------------------------------------------------- bagikan rute sebagai gambar */
   var ICO_SHARE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" fill="currentColor"/><circle cx="18" cy="6" r="2.5" fill="currentColor"/><circle cx="18" cy="18" r="2.5" fill="currentColor"/><path d="m8 11 8-4M8 13l8 4" stroke="currentColor" stroke-width="2"/></svg>';
   function tripText(it) {
-    var lines = ["Rute " + S.from.name + " → " + S.to.name + " (±" + mins(it.min) + ", " + fareText(it.fareLo, it.fareHi) + ")"];
+    var lines = [tl("Rute ", "Route ") + S.from.name + " → " + S.to.name + " (±" + mins(it.min) + ", " + fareText(it.fareLo, it.fareHi) + ")"];
     it.legs.forEach(function (l) {
-      if (l.type === "ride") lines.push("• Naik " + modeLabel(l.line) + " " + l.line.code + " dari " + l.from + " arah " + l.headsign + ", turun di " + l.to + " (" + (l.stops.length - 1) + " pemberhentian)");
-      else if (l.type === "ojol") lines.push("• Ojol " + km(l.km) + (l.label ? " ke " + l.label : ""));
-      else if (l.km > 0.1) lines.push("• Jalan kaki " + km(l.km) + (l.type === "transfer" ? " ke " + l.to : ""));
+      var ns = l.stops ? l.stops.length - 1 : 0;
+      if (l.type === "ride") lines.push(tl("• Naik ", "• Take ") + modeLabel(l.line) + " " + l.line.code + tl(" dari ", " from ") + l.from + tl(" arah ", " towards ") + l.headsign + tl(", turun di ", ", get off at ") + l.to + " (" + ns + tl(" pemberhentian)", ns === 1 ? " stop)" : " stops)"));
+      else if (l.type === "ojol") lines.push(tl("• Ojol ", "• Ride-hail ") + km(l.km) + (l.label ? tl(" ke ", " to ") + l.label : ""));
+      else if (l.km > 0.1) lines.push(tl("• Jalan kaki ", "• Walk ") + km(l.km) + (l.type === "transfer" ? tl(" ke ", " to ") + l.to : ""));
     });
-    lines.push("Direncanakan dengan Lumi Transportation");
+    lines.push(tl("Direncanakan dengan Lumi Transport", "Planned with Lumi Transport"));
     return lines.join("\n");
   }
   function rr(ctx, x, y, w, h, r) {
@@ -1807,31 +2488,31 @@
   }
   function tripImage(it) {
     var W = 1080, P = 64, F = '"PJS", system-ui, sans-serif';
-    var dep = S.dep || new Date();
+    var dep = S.dep || nowWib();
     var c = document.createElement("canvas"), ctx = c.getContext("2d");
     // susun langkah dulu untuk menghitung tinggi
     var steps = [], t = 0;
-    steps.push({ kind: "end", color: "#1565D8", time: clock(dep), title: S.from.name, sub: "Berangkat" });
+    steps.push({ kind: "end", color: "#1565D8", time: clock(dep), title: S.from.name, sub: tl("Berangkat", "Depart") });
     it.legs.forEach(function (l, i) {
       if (l.type === "walk" || l.type === "transfer") {
         if (l.km < 0.03) { t += l.min; return; }
         var dest = l.type === "transfer" ? l.to : (i === it.legs.length - 1 ? S.to.name : l.label);
-        steps.push({ kind: "walk", color: "#89A2B8", title: (l.type === "transfer" && l.km < 0.05 ? "Pindah di stasiun/halte yang sama" : "Jalan kaki " + km(l.km) + " (±" + mins(l.min) + ")"), sub: dest ? "ke " + dest : "" });
+        steps.push({ kind: "walk", color: "#89A2B8", title: (l.type === "transfer" && l.km < 0.05 ? tl("Pindah di stasiun/halte yang sama", "Change at the same station/stop") : tl("Jalan kaki ", "Walk ") + km(l.km) + " (±" + mins(l.min) + ")"), sub: dest ? tl("ke ", "to ") + dest : "" });
         t += l.min;
       } else if (l.type === "ojol") {
-        steps.push({ kind: "ride", color: "#00AA13", badge: l.kind === "car" ? "Mobil" : "Ojol", title: "Naik ojol " + (l.kind === "car" ? "mobil" : "motor") + " " + km(l.km), sub: "±" + mins(l.min) + " · " + fareText(l.fare.lo, l.fare.hi) + (l.label ? " · turun di " + l.label : "") });
+        steps.push({ kind: "ride", color: "#00AA13", badge: l.kind === "car" ? tl("Mobil", "Car") : tl("Ojol", "Bike"), title: (l.kind === "car" ? tl("Naik ojol mobil ", "Ride-hail car ") : tl("Naik ojol motor ", "Ride-hail bike ")) + km(l.km), sub: "±" + mins(l.min) + " · " + fareText(l.fare.lo, l.fare.hi) + (l.label ? tl(" · turun di ", " · drop-off at ") + l.label : "") });
         t += l.min;
       } else {
         t += l.wait;
         steps.push({ kind: "ride", color: lc(l), badge: l.line.code, time: clock(addMin(dep, t)),
-          title: "Naik " + modeLabel(l.line) + " " + l.line.code + (l.variant ? (/Tol/.test(l.variant) ? " (via Tol)" : " (varian)") : ""),
-          sub: "Dari " + l.from + " arah " + l.headsign,
-          sub2: (l.stops.length - 1) + " " + (RAIL[l.line.mode] ? "stasiun" : "halte") + " · ±" + mins(l.min) + " · " + (l.farePaid === 0 && l.fare > 0 ? "tanpa bayar lagi" : fareText(l.farePaid, l.farePaid)) });
+          title: tl("Naik ", "Take ") + modeLabel(l.line) + " " + l.line.code + (l.variant ? (/Tol/.test(l.variant) ? tl(" (via Tol)", " (via toll road)") : tl(" (varian)", " (variant)")) : ""),
+          sub: tl("Dari ", "From ") + l.from + tl(" arah ", " towards ") + l.headsign,
+          sub2: stopWord(l.stops.length - 1, RAIL[l.line.mode]) + " · ±" + mins(l.min) + " · " + (l.farePaid === 0 && l.fare > 0 ? tl("tanpa bayar lagi", "no extra fare") : fareText(l.farePaid, l.farePaid)) });
         t += l.min;
-        steps.push({ kind: "stop", color: lc(l), time: clock(addMin(dep, t)), title: l.to, sub: "Turun di sini" });
+        steps.push({ kind: "stop", color: lc(l), time: clock(addMin(dep, t)), title: l.to, sub: tl("Turun di sini", "Get off here") });
       }
     });
-    steps.push({ kind: "dest", color: "#38BDF8", time: clock(addMin(dep, it.min)), title: S.to.name, sub: "Sampai tujuan" });
+    steps.push({ kind: "dest", color: "#38BDF8", time: clock(addMin(dep, it.min)), title: S.to.name, sub: tl("Sampai tujuan", "Arrived at destination") });
     // ukur
     ctx.font = "600 34px " + F;
     var textW = W - P * 2 - 150;
@@ -1859,8 +2540,8 @@
     ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(78, 80, 11, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.moveTo(80, 18); ctx.lineTo(83.5, 27); ctx.lineTo(92, 30.5); ctx.lineTo(83.5, 34); ctx.lineTo(80, 43); ctx.lineTo(76.5, 34); ctx.lineTo(68, 30.5); ctx.lineTo(76.5, 27); ctx.closePath(); ctx.fill();
     ctx.restore();
-    ctx.fillStyle = "#fff"; ctx.font = "800 52px " + F; ctx.fillText("Lumi Transportation", P + 140, 112);
-    ctx.font = "500 30px " + F; ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillText("Rute perjalanan · " + dayWord(dep) + clock(dep), P + 140, 158);
+    ctx.fillStyle = "#fff"; ctx.font = "800 52px " + F; ctx.fillText("Lumi Transport", P + 140, 112);
+    ctx.font = "500 30px " + F; ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillText(tl("Rute perjalanan · ", "Trip route · ") + dayWord(dep) + clock(dep), P + 140, 158);
     // kartu ringkasan
     var y = headH - 40;
     ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(14,72,150,.18)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 12;
@@ -1870,11 +2551,11 @@
     od.forEach(function (ln, k) { ctx.fillText(ln, P + 10, y + 64 + k * 44); });
     var yy = y + 64 + od.length * 44 + 70;
     ctx.font = "800 84px " + F; ctx.fillStyle = "#0F2740";
-    var tm = it.min < 60 ? it.min + " mnt" : Math.floor(it.min / 60) + " j " + (it.min % 60) + " mnt";
+    var tm = mins(it.min);
     ctx.fillText(tm, P + 10, yy);
     ctx.textAlign = "right"; ctx.font = "800 48px " + F; ctx.fillText(fareText(it.fareLo, it.fareHi), W - P - 10, yy - 30);
     ctx.font = "500 30px " + F; ctx.fillStyle = "#527089";
-    ctx.fillText((it.transfers ? it.transfers + "× pindah" : "Tanpa pindah") + " · tiba ±" + clock(addMin(dep, it.min)), W - P - 10, yy + 12);
+    ctx.fillText((it.transfers ? transfersText(it.transfers) : tl("Tanpa pindah", "No transfers")) + tl(" · tiba ±", " · arrive ±") + clock(addMin(dep, it.min)), W - P - 10, yy + 12);
     ctx.textAlign = "left";
     // strip
     var sx = P + 10, sw = W - P * 2 - 20, sy = yy + 40, rides = it.legs.filter(function (l) { return l.type !== "walk" && l.type !== "transfer"; });
@@ -1884,7 +2565,7 @@
       w = Math.min(w, sx + sw - gx);
       ctx.fillStyle = l.type === "ojol" ? "#00AA13" : lc(l); rr(ctx, gx, sy, w, 54, 16); ctx.fill();
       ctx.fillStyle = l.type === "ojol" ? "#fff" : textColor(lc(l)); ctx.font = "800 28px " + F; ctx.textAlign = "center";
-      ctx.fillText(l.type === "ojol" ? "Ojol" : l.line.code, gx + w / 2, sy + 37); ctx.textAlign = "left";
+      ctx.fillText(l.type === "ojol" ? tl("Ojol", "Ride") : l.line.code, gx + w / 2, sy + 37); ctx.textAlign = "left";
       gx += w + 10;
     });
     // langkah
@@ -1938,9 +2619,9 @@
     });
     // kaki
     ctx.fillStyle = "#D5E5F2"; ctx.fillRect(P, H - footH, W - P * 2, 2);
-    ctx.fillStyle = "#1565D8"; ctx.font = "800 32px " + F; ctx.fillText("✦ Lumi Transportation", P, H - footH + 62);
+    ctx.fillStyle = "#1565D8"; ctx.font = "800 32px " + F; ctx.fillText("✦ Lumi Transport", P, H - footH + 62);
     ctx.fillStyle = "#89A2B8"; ctx.font = "500 26px " + F;
-    ctx.fillText("Waktu & tarif perkiraan · cek info operator", P, H - footH + 104);
+    ctx.fillText(tl("Waktu & tarif perkiraan · cek info operator", "Times & fares are estimates · check operator info"), P, H - footH + 104);
     return c.toDataURL("image/png");
   }
   function shareTrip(it) {
@@ -1949,7 +2630,7 @@
     var go = function () {
       var url;
       try { url = tripImage(it); } catch (e) { url = null; }
-      var text = "Rute " + S.from.name + " → " + S.to.name + " · dibuat dengan Lumi Transportation";
+      var text = tl("Rute ", "Route ") + S.from.name + " → " + S.to.name + tl(" · dibuat dengan Lumi Transport", " · made with Lumi Transport");
       if (url && NATIVE && NATIVE.shareImage) { NATIVE.shareImage(url, text); return; }
       if (url && navigator.canShare) {
         fetch(url).then(function (r) { return r.blob(); }).then(function (b) {
@@ -1961,7 +2642,7 @@
       }
       if (url) { download(url); return; }
       var tx = tripText(it);
-      if (NATIVE) NATIVE.share(tx); else { try { navigator.clipboard.writeText(tx); toast("Rute disalin"); } catch (e) { toast(tx); } }
+      if (NATIVE) NATIVE.share(tx); else { try { navigator.clipboard.writeText(tx); toast(tl("Rute disalin", "Route copied")); } catch (e) { toast(tx); } }
     };
     function download(url) { var a = document.createElement("a"); a.href = url; a.download = "rute-lumi.png"; document.body.appendChild(a); a.click(); a.remove(); toast("Gambar rute diunduh"); }
     toast("Membuat gambar rute…");
@@ -1969,14 +2650,32 @@
     ready.then(go, go);
   }
   window.__lumiTripImage = function (i) { return tripImage(S.results[i]); };   // untuk pengujian
-  window.__lumiOpenTrip = function (it, f, t) { if (f) S.from = f; if (t) S.to = t; S.dep = S.dep || new Date(); S.results = [colorize(it)]; openTrip(it); };   // untuk pengujian
+  window.__lumiOpenTrip = function (it, f, t) { if (f) S.from = f; if (t) S.to = t; S.dep = S.dep || nowWib(); S.results = [colorize(it)]; openTrip(it); };   // untuk pengujian
+
+  /* Pintasan dari app shortcut (tekan lama ikon) dan ubin Quick Settings. */
+  window.__lumiShortcut = function (name) {
+    try {
+      if (name === "history") {
+        setTab("info");
+        openSettings();
+        setTimeout(function () { var c = $("#settingsBody"); if (c) c.scrollTop = c.scrollHeight; }, 220);
+      } else {
+        var ss = $("#sheetSettings"); if (ss) ss.hidden = true;
+        setTab("plan");
+        setTimeout(function () {
+          var f = name === "home" ? $("#inTo") : $("#inFrom");
+          if (f) { f.focus(); f.select(); }
+        }, 160);
+      }
+    } catch (e) { lumiLog(e); }
+  };
   $("#btnShare").addEventListener("click", function () { shareTrip(S.openTrip); });
   $$("[data-close]").forEach(function (b) { b.addEventListener("click", function () { b.closest(".sheet").hidden = true; }); });
 
   /* ------------------------------------------------------- daftar rute */
   var FILTERS = [
     ["all", "Semua"], ["TJ", "Transjakarta"], ["TJNB", "TJ non-BRT"], ["KRL", "KRL"], ["MRT", "MRT"], ["LRT", "LRT"],
-    ["MIKRO", "Mikrotrans"], ["ROYAL", "Royaltrans & Jabodetabek"], ["KABANDARA", "KA Bandara"], ["WHOOSH", "Whoosh"]
+    ["MIKRO", "Mikrotrans"], ["ROYAL", "Royaltrans & Jabodetabek"], ["KABANDARA", tl("KA Bandara", "Airport Rail")], ["WHOOSH", "Whoosh"]
   ];
   function filterOk(l, f) {
     if (f === "all") return true;
@@ -2023,7 +2722,7 @@
   /* Label arah: "Arah <tujuan>"; untuk pola memutar pakai titik baliknya. */
   function dirName(d) {
     var a = d.s[0].n, b = d.s[d.s.length - 1].n;
-    return a === b && d.s.length > 3 ? d.s[turnIndex(d)].n + " (memutar)" : b;
+    return a === b && d.s.length > 3 ? d.s[turnIndex(d)].n + tl(" (memutar)", " (loop)") : b;
   }
   function is24(l) { return l.hours && l.hours.length === 1 && l.hours[0][0] === 0 && l.hours[0][1] >= 1440; }
   function renderLines() {
@@ -2038,7 +2737,7 @@
       if (g && g !== lastG) { html += '<div class="l-group">' + esc(g) + "</div>"; lastG = g; }
       var d = l.dirs[0];
       html += '<button class="l-item" data-id="' + l.id + '">' + badge(l) + '<div class="l-main"><div class="l-name"><span class="l-nm">' + ends(l) + "</span>" + (is24(l) ? '<span class="l-24">24 jam</span>' : "") +
-        '</div><div class="l-sub">' + esc(modeLabel(l)) + (d && d.s.length ? " · " + d.s.length + " " + (RAIL[l.mode] ? "stasiun" : "halte") : "") + '</div></div></button>';
+        '</div><div class="l-sub">' + esc(modeLabel(l)) + (d && d.s.length ? " · " + stopWord(d.s.length, RAIL[l.mode]) : "") + '</div></div></button>';
     });
     $("#lineList").innerHTML = html;
     $$("#lineList .l-item").forEach(function (b) { b.addEventListener("click", function () { openLine(planner.byId[b.dataset.id], 0); }); });
@@ -2063,14 +2762,14 @@
   }
   var ICO_CLOCK = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   function hoursBox(line) {
-    return '<div class="hours">' + ICO_CLOCK + "<div><b>Jam operasional</b>" + esc(line.hoursText || "-") +
+    return '<div class="hours">' + ICO_CLOCK + "<div><b>" + tl("Jam operasional", "Operating hours") + "</b>" + esc(T(line.hoursText || "-")) +
       (line.mode === "TJ" || line.mode === "MIKRO" ? "" : "") + "</div></div>";
   }
   function paintLine() {
     var line = S.openLineObj, d = line.dirs[S.lineDir];
     $("#lineMap").hidden = !!line.noStops;
     if (line.noStops) {
-      $("#lineBody").innerHTML = hoursBox(line) + '<div class="nostops"><b>' + esc(line.code) + " · " + esc(line.name) + "</b>" + esc(line.note) +
+      $("#lineBody").innerHTML = hoursBox(line) + '<div class="nostops"><b>' + esc(line.code) + " · " + esc(line.name) + "</b>" + esc(T(line.note)) +
         '<div class="btn-row"><button class="btn-sec" id="btnOfficial">Buka peta rute di transjakarta.co.id</button></div></div>';
       $("#btnOfficial").addEventListener("click", function () { openUrl("https://transjakarta.co.id/rute"); });
       return;
@@ -2090,25 +2789,27 @@
     }, 60);
     var html = "";
     if (line.dirs.length > 1) {
-      var labels = line.dirs.map(function (dd) { return "Arah " + dirName(dd); });
+      var labels = line.dirs.map(function (dd) { return tl("Arah ", "Towards ") + (dd.h === "Arah balik" && dd.s.length < 2 ? T(dd.h) : dirName(dd)); });
       html += '<div class="dir-toggle">' + line.dirs.map(function (dd, i) {
         var dup = !dd.v && labels.filter(function (x, j) { return x === labels[i] && !line.dirs[j].v; }).length > 1;
-        var sub = dd.v ? (dd.vs || (/Tol/.test(dd.v) ? "via Tol" : "pola lain")) : dup ? "dari " + dd.s[0].n : "";
+        var sub = dd.v ? T(dd.vs || (/Tol/.test(dd.v) ? "via Tol" : "pola lain")) : dup ? tl("dari ", "from ") + dd.s[0].n : "";
         return '<button data-dir="' + i + '" class="' + (i === S.lineDir ? "is-on" : "") + (dd.v ? " is-var" : "") + '">' + esc(labels[i]) +
           (sub ? '<small class="dv">' + esc(sub) + "</small>" : "") + "</button>";
       }).join("") + "</div>";
     }
-    if (d.v) html += '<div class="warn">' + esc(d.v) + "</div>";
+    if (d.v) html += '<div class="warn">' + esc(T(d.v)) + "</div>";
     html += hoursBox(line);
     if (liveOk(line)) html += '<div class="live-card" id="lineLive"><div class="live-h"><b>Posisi bus langsung</b><span class="live-status" id="lineLiveSt">Menghubungkan…</span></div><ul class="bus-list" id="lineLiveList"></ul></div>';
-    html += '<p class="line-note">' + esc(line.note || "") + " " + d.s.length + " " + (RAIL[line.mode] ? "stasiun" : "halte") + ". Ketuk " + (RAIL[line.mode] ? "stasiun" : "halte") + " untuk memakainya sebagai asal atau tujuan.</p>";
+    html += '<p class="line-note">' + esc(T(line.note || "")) + " " + stopWord(d.s.length, RAIL[line.mode]) + ". " +
+      (RAIL[line.mode] ? tl("Ketuk stasiun untuk memakainya sebagai asal atau tujuan.", "Tap a station to use it as your origin or destination.")
+        : tl("Ketuk halte untuk memakainya sebagai asal atau tujuan.", "Tap a stop to use it as your origin or destination.")) + "</p>";
     html += '<ol class="stops" style="--c:' + line.color + '">';
     d.s.forEach(function (s, k) {
       var conns = planner.connections(line, s.p);
       var major = conns.filter(function (c) { return RAIL[c.mode] || (c.mode === "TJ" && c.brt); });
       var other = conns.length - major.length;
       var connH = major.slice(0, 8).map(function (c) { return badge(c, "xs"); }).join("") +
-        (other > 0 ? '<span class="s-num">+' + other + " rute lain</span>" : "");
+        (other > 0 ? '<span class="s-num">+' + other + tl(" rute lain", other === 1 ? " other route" : " other routes") + "</span>" : "");
       html += '<li class="stop' + (k === 0 || k === d.s.length - 1 ? " term" : "") + '"><div class="rail"><i class="pin"></i></div><div class="s-body">' +
         '<div class="s-name">' + esc(s.n) + '<span class="s-num">' + (k + 1) + "</span></div>" +
         (connH ? '<div class="s-conn">' + connH + "</div>" : "") +
@@ -2116,7 +2817,7 @@
         "</div></li>";
     });
     html += "</ol>";
-    var body = $("#lineBody"); body.innerHTML = html; body.scrollTop = 0;
+    var body = $("#lineBody"); body.innerHTML = tr(html); body.scrollTop = 0;
     $$(".stop", body).forEach(function (li) {
       li.addEventListener("click", function (e) {
         if (e.target.closest("button")) return;
@@ -2137,11 +2838,11 @@
         $("#lineLiveSt").textContent = liveStatusText(LumiLive.state(), bs.length);
         $("#lineLiveList").innerHTML = bs.length ? bs.slice(0, 12).map(function (b) {
           var ns = nextStop(b);
-          return '<li data-bus="' + esc(b.key) + '"><span class="bus-dot" style="--c:' + line.color + '"></span><div><b>Menuju ' + esc(b.head || "-") + "</b><span>" +
-            (ns ? "Berikutnya " + esc(ns.name) + " · " + fmtEta(ns.eta) : "Bus " + esc(b.key)) + "</span></div><em>" + esc(b.key) + "</em></li>";
-        }).join("") : '<li class="muted">' + (LumiLive.state() === "connected" ? "Belum ada bus " + esc(line.code) + " yang mengirim posisi. Mungkin di luar jam operasi." :
-          /error|reconnecting/.test(LumiLive.state()) ? "Belum bisa terhubung ke data armada." + (LumiLive.lastError() ? " (" + esc(LumiLive.lastError()) + ")" : "") + ' <button class="st-toggle" data-tjapp>Buka aplikasi TJ</button>' :
-          "Menghubungkan ke data armada…") + "</li>";
+          return '<li data-bus="' + esc(b.key) + '"><span class="bus-dot" style="--c:' + line.color + '"></span><div><b>' + tl("Menuju ", "Towards ") + esc(b.head || "-") + "</b><span>" +
+            (ns ? tl("Berikutnya ", "Next ") + esc(ns.name) + " · " + fmtEta(ns.eta) : "Bus " + esc(b.key)) + "</span></div><em>" + esc(b.key) + "</em></li>";
+        }).join("") : '<li class="muted">' + (LumiLive.state() === "connected" ? tl("Belum ada bus " + esc(line.code) + " yang mengirim posisi. Mungkin di luar jam operasi.", "No " + esc(line.code) + " bus is reporting its position yet. It may be outside operating hours.") :
+          /error|reconnecting/.test(LumiLive.state()) ? tl("Belum bisa terhubung ke data armada.", "Can't connect to the fleet feed yet.") + (LumiLive.lastError() ? " (" + esc(LumiLive.lastError()) + ")" : "") + ' <button class="st-toggle" data-tjapp>' + tl("Buka aplikasi TJ", "Open the TJ app") + "</button>" :
+          tl("Menghubungkan ke data armada…", "Connecting to the fleet feed…")) + "</li>";
         bindTjApp($("#lineLiveList"));
         $$("[data-bus]", $("#lineLiveList")).forEach(function (li) {
           li.addEventListener("click", function () { var b = lineBoard.buses[li.dataset.bus]; if (b) { lineMap.setView([b.lat, b.lon], 16); $("#lineBody").scrollTop = 0; } });
@@ -2165,7 +2866,7 @@
   /* ------------------------------------------------------- info tarif */
   function renderInfo() {
     function card(title, color, rows, note) {
-      return '<div class="info-card"><h3><i class="mode-swatch" style="background:' + color + ';width:8px;height:18px;border-radius:4px;display:inline-block"></i>' + title + "</h3>" +
+      return '<div class="info-card"><h3><i class="info-swatch" style="background:' + color + '"></i><span>' + title + "</span></h3>" +
         rows.map(function (r) { return '<div class="fare-row"><span>' + r[0] + "</span><span>" + r[1] + "</span></div>"; }).join("") + (note ? "<p>" + note + "</p>" : "") + "</div>";
     }
     var c = DATA.meta.counts;
@@ -2175,33 +2876,104 @@
       ["Mikrotrans JAK36, JAK47, JAK52, JAK75", "24 jam"], ["Mikrotrans lainnya", "05.00–22.00"],
       ["Royaltrans & Transjabodetabek", "±05.00–21.00"], ["KRL Commuter Line", "±04.00–24.00"],
       ["MRT Jakarta", "05.00–24.00"], ["LRT Jakarta", "05.30–00.20"], ["LRT Jabodebek", "±05.00–23.00"],
-      ["KA Bandara", "±05.00–23.00"], ["Whoosh", "±06.00–21.30"], ["Ojol", "24 jam"]],
+      [tl("KA Bandara", "Airport Rail"), "±05.00–23.00"], ["Whoosh", "±06.00–21.30"], [tl("Ojol", "Ride-hailing"), "24 jam"]],
       "Saat kamu memilih jam berangkat, Lumi hanya memakai moda yang beroperasi pada jam itu. Jadwal bisa berubah saat libur nasional.");
-    html += card("Transjakarta", "#C1272D", [["BRT, non-BRT & Transjabodetabek (mis. T31, P11, SH1)", "Rp3.500"], ["Pukul 05.00–07.00", "Rp2.000"],
-      ["Pindah rute tanpa keluar halte", "Gratis"], ["Turun di luar halte lalu naik lagi", "Bayar lagi (tap ulang)"], ["SH2 Blok M – Bandara Soetta (sejak 1 Sep 2026)", "Rp15.000"],
-      ["Hub Connector HC2 PIK 2 – Dukuh Atas", "Rp20.000"], ["Royaltrans", "Rp20.000"], ["Mikrotrans (JakLingko)", "Gratis"]],
-      "Bayar pakai kartu uang elektronik atau aplikasi JakLingko/TJ:IKA. Pemprov DKI mengumumkan penyesuaian tarif Transjakarta mulai 1 Januari 2027; besarannya belum diumumkan.");
-    html += card("KRL Commuter Line", "#E2231A", [["25 km pertama", "Rp3.000"], ["Tiap 10 km berikutnya", "+Rp1.000"]], "Tidak naik pada 2026. Kartu Multi Trip, uang elektronik, atau QR di aplikasi Access by KAI.");
-    html += card("MRT Jakarta", "#0069B4", [["1 stasiun (mis. Lebak Bulus – Fatmawati)", "Rp4.000"], ["Tiap stasiun berikutnya", "+Rp1.000"], ["Lebak Bulus – Blok M", "Rp8.000"], ["Maksimum (mis. Lebak Bulus – Bundaran HI)", "Rp14.000"]]);
-    html += card("LRT", "#2C9E8E", [["LRT Jakarta, termasuk Velodrome – Manggarai (flat)", "Rp5.000"], ["LRT Jabodebek, 1 km pertama", "Rp5.000"], ["LRT Jabodebek, per km berikutnya", "+Rp700"],
-      ["LRT Jabodebek, jam sibuk (Sen–Jum 06.00–08.59 & 16.00–19.59)", "maks. Rp20.000"], ["LRT Jabodebek, di luar jam sibuk, Sabtu, Minggu & libur", "maks. Rp10.000"]],
-      "Pemprov DKI menyebut tarif baru LRT Jakarta akan segera ditetapkan; sampai itu tetap flat Rp5.000.");
-    html += card("KA Bandara & Whoosh", "#0F5E9C", [["KA Bandara Manggarai / BNI City / Duri – Soetta", "Rp70.000"], ["KA Bandara Rawa Buaya / Batu Ceper – Soetta", "Rp35.000"], ["KA Bandara Manggarai – BNI City", "Rp10.000"], ["Whoosh Halim – Tegalluar/Padalarang", "mulai Rp250.000"]],
-      "Whoosh memakai tarif dinamis (bergantung kelas, hari, dan jam); Lumi memakai tarif terendah Rp250.000.");
-    html += card("Ojol (estimasi)", "#00AA13", [["Motor per km (zona Jabodetabek)", "Rp2.550–2.800"], ["Motor minimum (4 km pertama)", "Rp10.200–11.200"], ["Mobil per km (perkiraan)", "Rp4.000–6.000"], ["Biaya jasa aplikasi", "±Rp2.000–5.000"]],
-      "Batas tarif motor mengacu pada KP Menhub 564/2022 (masih berlaku; Perpres 27/2026 menetapkan potongan aplikasi 8% dan tarif baru akan diatur Kemenhub). Harga akhir ditentukan aplikasi dan bisa naik saat jam sibuk atau hujan.");
+    // Angka tarif dari data/fares.json (R8); catatan berbahasa ganda ada di fares.notes.
+    var F = E.fares(), note = function (k) { var n = (F.notes || {})[k]; return n ? tl(n.id, n.en) : ""; };
+    var range2 = function (a) { return rp(a[0]) + "–" + rp(a[1]).replace("Rp", ""); };
+    var prem = function (re) { var p = F.tj.premium.filter(function (x) { return x[0] === re; })[0]; return p ? rp(p[1]) : "–"; };
+    html += card("Transjakarta", "#C1272D", [["BRT, non-BRT & Transjabodetabek (mis. T31, P11, SH1)", rp(F.tj.base)], ["Pukul 05.00–07.00", rp(F.tj.morning)],
+      ["Pindah rute tanpa keluar halte", "Gratis"], ["Turun di luar halte lalu naik lagi", "Bayar lagi (tap ulang)"], ["SH2 Blok M – Bandara Soetta (sejak 1 Sep 2026)", prem("^SH2$")],
+      ["Hub Connector HC2 PIK 2 – Dukuh Atas", prem("^HC\\d")], ["Royaltrans", rp(F.tj.royal)], ["Mikrotrans (JakLingko)", F.tj.mikro ? rp(F.tj.mikro) : "Gratis"]],
+      note("tj"));
+    html += card("KRL Commuter Line", "#E2231A", [["25 km pertama", rp(F.krl.base)], ["Tiap 10 km berikutnya", "+" + rp(F.krl.step)]], note("krl"));
+    html += card("MRT Jakarta", "#0069B4", [["1 stasiun (mis. Lebak Bulus – Fatmawati)", rp(F.mrt.base + F.mrt.perStop)], ["Tiap stasiun berikutnya", "+" + rp(F.mrt.perStop)],
+      ["Lebak Bulus – Blok M", rp(Math.min(F.mrt.max, F.mrt.base + 5 * F.mrt.perStop))], ["Maksimum (mis. Lebak Bulus – Bundaran HI)", rp(F.mrt.max)]]);
+    html += card("LRT", "#2C9E8E", [["LRT Jakarta, termasuk Velodrome – Manggarai (flat)", rp(F.lrt.flat)], ["LRT Jabodebek, 1 km pertama", rp(F.lrtj.base)], ["LRT Jabodebek, per km berikutnya", "+" + rp(F.lrtj.perKm)],
+      ["LRT Jabodebek, jam sibuk (Sen–Jum 06.00–08.59 & 16.00–19.59)", tl("maks. ", "max. ") + rp(F.lrtj.max)], ["LRT Jabodebek, di luar jam sibuk, Sabtu, Minggu & libur", tl("maks. ", "max. ") + rp(F.lrtj.offPeakMax)]],
+      note("lrt"));
+    html += card("KA Bandara & Whoosh", "#0F5E9C", [["KA Bandara Manggarai / BNI City / Duri – Soetta", rp(F.kaBandara.airportFar)], ["KA Bandara Rawa Buaya / Batu Ceper – Soetta", rp(F.kaBandara.airportNear)], ["KA Bandara Manggarai – BNI City", rp(F.kaBandara.city)], ["Whoosh Halim – Tegalluar/Padalarang", tl("mulai ", "from ") + rp(F.whoosh.from)]],
+      note("rail"));
+    html += card("Ojol (estimasi)", "#00AA13", [["Motor per km (zona Jabodetabek)", range2(F.ojol.motor.perKm)], ["Motor minimum (4 km pertama)", range2(F.ojol.motor.min)], ["Mobil per km (perkiraan)", range2(F.ojol.car.perKm)], ["Biaya jasa aplikasi", "±" + range2([F.ojol.motor.fee[0], F.ojol.car.fee[1]])]],
+      note("ojol"));
+    html += '<p class="info-upd">' + tl("Tarif diperbarui ", "Fares updated ") + esc(F.updated) + "</p>";
     html += '<div class="info-card src"><h3>Sumber data rute</h3><ul>' +
       "<li>Daftar & kode rute Transjakarta: <a data-url=\"https://transjakarta.co.id/rute\">transjakarta.co.id/rute</a> (diakses 10 Okt 2026).</li>" +
-      (ROUTE_SRC.kind === "gtfs" ? "<li><b>Aktif:</b> GTFS resmi Transjakarta diunduh " + esc(ROUTE_SRC.date) + " (" + ROUTE_SRC.count + " rute).</li>" : "") +
+      (ROUTE_SRC.kind === "gtfs" ? "<li><b>Aktif:</b> " + (ROUTE_SRC.bundled ? tl("GTFS resmi Transjakarta " + esc(ROUTE_SRC.date) + ", bawaan aplikasi (" + ROUTE_SRC.count + " rute).", "official Transjakarta GTFS of " + esc(ROUTE_SRC.date) + ", built into the app (" + ROUTE_SRC.count + " routes).") : tl("GTFS resmi Transjakarta diunduh " + esc(ROUTE_SRC.date) + " (" + ROUTE_SRC.count + " rute).", "official Transjakarta GTFS downloaded " + esc(ROUTE_SRC.date) + " (" + ROUTE_SRC.count + " routes).")) + "</li>" : "") +
       "<li>Halte & rute BRT Transjakarta: GTFS resmi Transjakarta (unduhan 26 Jan 2024) via <a data-url=\"https://github.com/altilunium/BRT-tj\">altilunium/BRT-tj</a>.</li>" +
       "<li>Rute non-BRT, Mikrotrans, Royaltrans: GTFS Transjakarta 2021 via <a data-url=\"https://github.com/akherlan/transjakartagtfs\">akherlan/transjakartagtfs</a> — sebagian rute mungkin sudah berubah.</li>" +
       "<li>Koordinat stasiun KA: data sarana prasarana Kemenhub via <a data-url=\"https://github.com/Rebornian48/map-visualizer\">Rebornian48/map-visualizer</a>.</li>" +
       "<li>Urutan stasiun KRL, MRT, LRT, KA Bandara: Wikipedia & pengumuman operator (2026).</li>" +
-      "<li>Peta: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors. Alamat: Google Maps (dibagikan ke Lumi). Jarak jalan untuk ojol: OSRM.</li></ul>" +
-      "<p>Data mencakup " + (c.TJ || 0) + " rute Transjakarta, " + (c.MIKRO || 0) + " Mikrotrans, " + (c.ROYAL || 0) + " Royaltrans, " + (c.KRL || 0) + " lintas KRL, MRT, " + ((c.LRT || 0) + (c.LRTJ || 0)) + " lintas LRT, KA Bandara, dan Whoosh.</p></div>";
-    html += '<div class="info-card"><h3>Tentang Lumi</h3><p>Lumi Transportation v2.3. Perencana rute bekerja offline di ponsel; internet hanya dipakai untuk peta, pencarian alamat, dan jarak jalan untuk estimasi ojol.</p></div>';
-    $("#infoBody").innerHTML = html;
+      "<li>Peta: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors; pilihan Google Maps memakai kunci internal aplikasi Google Maps. Alamat: saran Google Places (kunci internal) dengan cadangan Photon/OSM. Jarak jalan untuk ojol: OSRM.</li></ul>" +
+      "<p>" + tl("Data mencakup " + (c.TJ || 0) + " rute Transjakarta, " + (c.MIKRO || 0) + " Mikrotrans, " + (c.ROYAL || 0) + " Royaltrans, " + (c.KRL || 0) + " lintas KRL, MRT, " + ((c.LRT || 0) + (c.LRTJ || 0)) + " lintas LRT, KA Bandara, dan Whoosh.",
+        "The data covers " + (c.TJ || 0) + " Transjakarta routes, " + (c.MIKRO || 0) + " Mikrotrans, " + (c.ROYAL || 0) + " Royaltrans, " + (c.KRL || 0) + " KRL lines, MRT, " + ((c.LRT || 0) + (c.LRTJ || 0)) + " LRT lines, Airport Rail and Whoosh.") + "</p></div>";
+    $("#infoBody").innerHTML = tr(html);
     $$("#infoBody [data-url]").forEach(function (a) { a.addEventListener("click", function () { NATIVE ? NATIVE.openUrl(a.dataset.url) : window.open(a.dataset.url); }); });
+  }
+
+  /* Kartu Tentang (dipindah ke Pengaturan). */
+  function aboutCardHTML() {
+    return '<div class="set-card" id="aboutCard"><h3>Tentang Lumi</h3>' +
+      '<p><b>Lumi Transport</b> v' + esc(appVersion()) + ". " + tl("Perencana rute bekerja offline di ponsel; internet hanya dipakai untuk peta, pencarian alamat, dan jarak jalan untuk estimasi ojol.",
+        "Route planning works offline on the phone; the internet is only used for maps, address search and road distances for ride-hailing estimates.") + "</p>" +
+      '<p>Lisensi <a data-url="https://github.com/VAMvicky/LumiTransport/blob/main/LICENSE">GPL-3.0</a> · <a data-url="https://github.com/VAMvicky/LumiTransport">Repo GitHub</a></p>' +
+      '<p><button type="button" class="about-btn" id="btnUpdate">Cek update</button><button type="button" class="about-btn" id="btnReport">Laporkan masalah</button></p></div>';
+  }
+
+  /* ------------------------------------------------------- tentang, update, laporan */
+  function appVersion() {
+    try { if (NATIVE && NATIVE.versionName) { var v = NATIVE.versionName(); if (v && v !== "0") return v; } } catch (e) { lumiLog(e); }
+    return "2.1";
+  }
+  function openExt(url) { if (NATIVE && NATIVE.openUrl) NATIVE.openUrl(url); else window.open(url); }
+
+  function checkUpdate() {
+    var btn = $("#btnUpdate");
+    if (btn) { btn.disabled = true; btn.textContent = "Memeriksa…"; }
+    var done = function () { if (btn) { btn.disabled = false; btn.textContent = tl("Cek update", "Check for updates"); } };
+    http("https://api.github.com/repos/VAMvicky/LumiTransport/releases/latest", 12000).then(function (r) {
+      var tag = (r && r.tag_name) || "";
+      var cur = "v" + appVersion();
+      if (!tag) { toast("Belum ada rilis untuk dibandingkan"); return; }
+      if (tag === cur) { toast(tl("Lumi sudah versi terbaru (", "Lumi is up to date (") + cur + ")"); return; }
+      toast(tl("Versi baru tersedia: ", "New version available: ") + tag);
+      setTimeout(function () { openExt("https://github.com/VAMvicky/LumiTransport/releases/latest"); }, 900);
+    }).catch(function () { toast("Tidak bisa memeriksa update (offline?)"); }).then(done);
+  }
+
+  function reportStopIssue() {
+    var it = S.openTrip, v = appVersion();
+    var lines = [], seen = {};
+    if (it && it.legs) it.legs.forEach(function (l) {
+      if (l.type === "ride" && l.line && !seen[l.line.code]) { seen[l.line.code] = 1; lines.push(l.line.code); }
+    });
+    var body = tl("### Halte / rute yang salah\n\n", "### Wrong stop / route\n\n") +
+      tl("- Dari: ", "- From: ") + (S.from ? S.from.name + " (" + ((S.from.p || []).join(", ")) + ")" : "-") + "\n" +
+      tl("- Ke: ", "- To: ") + (S.to ? S.to.name + " (" + ((S.to.p || []).join(", ")) + ")" : "-") + "\n" +
+      (lines.length ? tl("- Rute: ", "- Routes: ") + lines.join(" · ") + "\n" : "") +
+      tl("\n### Apa yang salah\n\n(halte tidak ada / urutan salah / tarif salah / lainnya)\n\n", "\n### What is wrong\n\n(missing stop / wrong order / wrong fare / other)\n\n") +
+      tl("### Lingkungan\n", "### Environment\n") + "- Lumi Transport v" + v + "\n- " + (navigator.userAgent || "") + "\n";
+    openExt("https://github.com/VAMvicky/LumiTransport/issues/new?title=" + encodeURIComponent("[halte/rute] ") + "&body=" + encodeURIComponent(body));
+  }
+
+  function reportIssue() {
+    var v = appVersion();
+    var body = tl("### Apa yang terjadi\n\n\n### Langkah mengulang\n1. \n2. \n\n### Lingkungan\n", "### What happened\n\n\n### Steps to reproduce\n1. \n2. \n\n### Environment\n") + "- Lumi Transport v" + v + "\n- " + (navigator.userAgent || "") + "\n";
+    // R5: lampirkan galat terakhir (aplikasi web + crash Android) supaya laporan bisa ditindaklanjuti.
+    var pad2 = function (n) { return (n < 10 ? "0" : "") + n; };
+    var errs = (window.lumiErrors ? lumiErrors() : []).slice(-12);
+    if (errs.length) {
+      body += "\n<details><summary>" + tl("Galat terakhir", "Recent errors") + " (" + errs.length + ")</summary>\n\n```\n" + errs.map(function (x) {
+        var d = wibOf(x.t); return pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + (x.n > 1 ? " ×" + x.n : "") + " " + x.m + (x.a ? "  @" + x.a : "");
+      }).join("\n") + "\n```\n</details>\n";
+    }
+    var crash = ""; try { crash = NATIVE && NATIVE.lastCrash ? NATIVE.lastCrash() : ""; } catch (e) { lumiLog(e); }
+    if (crash) body += "\n<details><summary>" + tl("Crash terakhir (Android)", "Last crash (Android)") + "</summary>\n\n```\n" + crash.slice(0, 2500) + "\n```\n</details>\n";
+    var url = "https://github.com/VAMvicky/LumiTransport/issues/new?title=" + encodeURIComponent("[v" + v + "] ") + "&body=";
+    var enc = encodeURIComponent(body);
+    if (enc.length > 7000) enc = encodeURIComponent(body.slice(0, 3000) + "\n…");   // batas panjang URL GitHub
+    openExt(url + enc);
+    try { if (crash && NATIVE.clearCrash) NATIVE.clearCrash(); } catch (e) { lumiLog(e); }
   }
 
   /* ------------------------------------------------------- pilih titik di peta */
@@ -2210,13 +2982,13 @@
     o = o || {};
     pickWhich = which;
     var sh = $("#sheetPick"); sh.hidden = false;
-    $("#pickTitle").textContent = o.title || (which === "from" ? "Pilih titik asal" : "Pilih titik tujuan");
+    $("#pickTitle").textContent = o.title || (which === "from" ? tl("Pilih titik asal", "Pick the origin point") : tl("Pilih titik tujuan", "Pick the destination point"));
     $("#pickSaveChk").checked = !!o.save; $("#pickName").hidden = !o.save; $("#pickName").value = o.name || "";
     var start = o.center || (S[which] && S[which].p) || (S[which === "from" ? "to" : "from"] || {}).p || JKT;
     var zoom = o.zoom || (S[which] ? 17 : 13);
     if (!pickMap) {
       pickMap = makeMap($("#pickMap"));
-      pickMap.on("movestart", function () { $("#pickAddr").textContent = "Melepas pin…"; });
+      pickMap.on("movestart", function () { $("#pickAddr").textContent = tl("Melepas pin…", "Dropping pin…"); });
       pickMap.on("moveend", function () {
         clearTimeout(pickRevT);
         var c = pickMap.getCenter(), p = [+c.lat.toFixed(6), +c.lng.toFixed(6)];
@@ -2234,16 +3006,16 @@
   }
   $("#pickSaveChk").addEventListener("change", function () { $("#pickName").hidden = !this.checked; if (this.checked) $("#pickName").focus(); });
   $("#pickMe").addEventListener("click", function () {
-    toast("Mencari lokasi…");
+    toast(tl("Mencari lokasi…", "Finding location…"));
     locate().then(function (o) { pickMap.setView([o.lat, o.lon], 18); }).catch(function (e) { toast(e.message); });
   });
   $("#pickOk").addEventListener("click", function () {
     var c = pickMap.getCenter(), p = [+c.lat.toFixed(6), +c.lng.toFixed(6)];
     var custom = $("#pickName").value.trim();
-    var name = custom || pickLabel || ("Titik " + p[0].toFixed(5) + ", " + p[1].toFixed(5));
+    var name = custom || pickLabel || (tl("Titik ", "Point ") + p[0].toFixed(5) + ", " + p[1].toFixed(5));
     if ($("#pickSaveChk").checked) {
-      if (!custom) { toast("Isi nama tempat untuk menyimpan"); $("#pickName").focus(); return; }
-      savePlace({ name: custom, sub: pickLabel || "Tempat tersimpan", p: p }); toast("Tersimpan: " + custom);
+      if (!custom) { toast(tl("Isi nama tempat untuk menyimpan", "Enter a place name to save it")); $("#pickName").focus(); return; }
+      savePlace({ name: custom, sub: pickLabel || tl("Tempat tersimpan", "Saved place"), p: p }); toast(tl("Tersimpan: ", "Saved: ") + custom);
     }
     $("#sheetPick").hidden = true;
     setPoint(pickWhich, { name: name, p: p });
@@ -2253,12 +3025,15 @@
   /* ------------------------------------------------------- pembaruan data rute (GTFS resmi) */
   var gtfsBusy = false;
   window.__lumiGtfs = function (state, msg, changes) {
-    $$(".gtfs-status").forEach(function (el) { el.textContent = state === "error" ? "Gagal: " + msg : state === "done" ? "Selesai. Memuat ulang…" : msg; });
+    $$(".gtfs-status").forEach(function (el) { el.textContent = state === "error" ? tl("Gagal: ", "Failed: ") + msg : state === "done" ? tl("Selesai. Memuat ulang…", "Done. Reloading…") : msg; });
     if (state === "done") {
       store("gtfsDate", msg);
-      if (changes > 0) toast(changes + " rute Transjakarta berubah — lihat di beranda");
-      var busyUser = !$("#results").hidden || !$("#sheetTrip").hidden || !!S.guide;
-      if (busyUser) { if (!changes) toast("Data rute resmi sudah diperbarui — berlaku saat aplikasi dibuka ulang"); gtfsBusy = false; }
+      if (changes > 0) toast(changes + tl(" rute Transjakarta berubah — lihat di beranda", changes === 1 ? " Transjakarta route changed — see the home screen" : " Transjakarta routes changed — see the home screen"));
+      // Jangan muat ulang saat pengguna sedang memakai layar lain — termasuk layar sambutan:
+      // muat ulang membuat beranda tampil sekilas lalu sambutan muncul lagi (berkedip).
+      var onboarding = !!$("#onboard");
+      var busyUser = onboarding || !$("#results").hidden || !$("#sheetTrip").hidden || !!S.guide;
+      if (busyUser) { if (!changes && !onboarding) toast("Data rute resmi sudah diperbarui — berlaku saat aplikasi dibuka ulang"); gtfsBusy = false; }
       else setTimeout(function () { location.reload(); }, 800);
     }
     if (state === "error") { gtfsBusy = false; $$(".gtfs-btn").forEach(function (b) { b.disabled = false; }); }
@@ -2273,7 +3048,8 @@
   function gtfsCardHTML(compact) {
     var updated = ROUTE_SRC.kind === "gtfs";
     return '<div class="gtfs-card"><b>' + (updated ? "Data rute: GTFS resmi Transjakarta" : "Perbarui rute Transjakarta") + "</b>" +
-      "<p>" + (updated ? "Diunduh " + esc(ROUTE_SRC.date) + " · " + ROUTE_SRC.count + " rute. Lumi memeriksa data resmi setiap hari dan memberi tahu bila ada rute yang berubah." :
+      "<p>" + (updated ? tl((ROUTE_SRC.bundled ? "Bawaan aplikasi, data " : "Diunduh ") + esc(ROUTE_SRC.date) + " · " + ROUTE_SRC.count + " rute. Lumi memeriksa data resmi secara berkala dan memberi tahu bila ada rute yang berubah.",
+          (ROUTE_SRC.bundled ? "Built into the app, data of " : "Downloaded ") + esc(ROUTE_SRC.date) + " · " + ROUTE_SRC.count + " routes. Lumi checks the official data regularly and tells you when a route changes.") :
         "Data bawaan memakai halte BRT 2024 dan rute non-BRT 2021, sehingga sebagian rute (mis. 9H, T31, P11) belum ada/sesuai. Lumi mengunduh GTFS resmi Transjakarta otomatis; tekan tombol di bawah bila belum berhasil.") + "</p>" +
       '<button class="btn-go gtfs-btn">' + (updated ? "Perbarui lagi" : "Unduh data rute resmi") + '</button><div class="gtfs-status"></div></div>';
   }
@@ -2302,17 +3078,72 @@
     var c = cfg(), places = savedPlaces();
     function st(k) { return status && status[0] === k ? '<div class="set-status ' + status[1] + '">' + esc(status[2]) + "</div>" : ""; }
     var cur = mapStyleKey();
-    var html = gtfsCardHTML() + changesHistoryHTML() + '<div class="set-card"><h3>Peta</h3><p>Gratis tanpa API key: <b>OpenFreeMap</b> (data OpenStreetMap). Tajam di semua zoom dan halus saat digeser.</p>' +
+    var html = gtfsCardHTML() + changesHistoryHTML() + '<div class="set-card"><h3>Peta</h3><p>' +
+      tl("Bawaan gratis tanpa API key: <b>OpenFreeMap</b> (data OpenStreetMap). Pilihan <b>Google Maps</b> memakai kunci internal aplikasi Google Maps.",
+        "The default is free with no API key: <b>OpenFreeMap</b> (OpenStreetMap data). The <b>Google Maps</b> option uses Google Maps' internal key.") + "</p>" +
       '<label class="set-field"><span>Gaya peta</span><select id="setMap">' + Object.keys(MAPSTYLES).map(function (k) {
         return '<option value="' + k + '"' + (k === cur ? " selected" : "") + ">" + esc(MAPSTYLES[k].name) + "</option>";
       }).join("") + "</select></label>" + (glOk() ? "" : '<p style="margin:6px 0 0">Perangkat ini tidak mendukung WebGL, jadi peta memakai OpenStreetMap standar.</p>') +
       st("map") + "</div>";
-    html += '<div class="set-card"><h3>Alamat lewat Google Maps</h3><p>Ketuk kolom <b>Dari</b> atau <b>Ke</b> → <b>Cari di Google Maps</b>. Pilih tempatnya di Google Maps, ketuk <b>Bagikan</b>, lalu pilih <b>Lumi Transportation</b>. Lokasi otomatis terisi dan tersimpan di bawah ini.</p></div>';
+    html += '<div class="set-card"><h3>Mencari alamat</h3><p>' + tl("Ketik di kolom <b>Dari</b> atau <b>Ke</b> — saran alamat diambil langsung dari <b>Google Places</b> memakai kunci internal aplikasi Google Maps (paket + sertifikat Google ditiru). Ketuk baris pertama bila ingin mencari di aplikasi Google Maps lalu <b>Bagikan</b> ke <b>Lumi Transport</b>.",
+      "Type in the <b>From</b> or <b>To</b> field — suggestions come straight from <b>Google Places</b> using Google Maps' own internal key (package + certificate are spoofed). Tap the first row to search inside Google Maps and <b>Share</b> the place back to <b>Lumi Transport</b>.") + "</p>" +
+      '<label class="set-row"><span>' + tl("Saran alamat dari Google", "Address suggestions from Google") + '</span><input type="checkbox" id="setGsearch"' + (c.gsearch ? " checked" : "") + "></label>" +
+      (window.LumiGoogle && LumiGoogle.isDown() ? '<p style="margin:6px 0 0">' + tl("Google menolak kunci ini (" + LumiGoogle.reason() + "). Saran alamat jatuh ke Photon/OpenStreetMap.",
+        "Google rejected this key (" + LumiGoogle.reason() + "). Suggestions fall back to Photon/OpenStreetMap.") + "</p>" : "") +
+      st("search") + "</div>";
     html += '<div class="set-card"><h3>Tempat tersimpan</h3><p>Tempat yang pernah kamu bagikan dari Google Maps. Muncul saat mengetik di kolom Dari/Ke.</p>' +
       (places.length ? places.map(function (pl, i) {
         return '<div class="place-row"><span class="sg-ico saved">' + ICO_STAR + '</span><div class="pm"><b>' + esc(pl.name) + "</b><span>" + esc(pl.sub || (pl.p[0].toFixed(5) + ", " + pl.p[1].toFixed(5))) + '</span></div><button data-del="' + i + '">Hapus</button></div>';
-      }).join("") : '<p style="margin:0">Belum ada tempat tersimpan.</p>') + "</div>";
-    $("#settingsBody").innerHTML = html;
+      }).join("") : '<p>Belum ada tempat tersimpan.</p>') + "</div>";
+    html += historyCardHTML();
+    html += favCardHTML();
+    html += backupCardHTML();
+    html += accessCardHTML();
+    html += langCardHTML();
+    html += aboutCardHTML();
+    $("#settingsBody").innerHTML = tr(html);
+    var aboutUp = $("#btnUpdate"), aboutRep = $("#btnReport");
+    if (aboutUp) aboutUp.addEventListener("click", checkUpdate);
+    if (aboutRep) aboutRep.addEventListener("click", reportIssue);
+    $$("#settingsBody [data-url]").forEach(function (a) { a.addEventListener("click", function () { openExt(a.dataset.url); }); });
+    var langSel = $("#setLang");
+    if (langSel) langSel.addEventListener("change", function () {
+      var c = cfg(); c.lang = this.value === "en" ? "en" : "id"; store("cfg", c);
+      try { NATIVE && NATIVE.setLang && NATIVE.setLang(c.lang); } catch (e) { lumiLog(e); }
+      // Muat ulang halaman supaya semua layar (termasuk yang sudah dirender) ikut berganti bahasa.
+      try {
+        sessionStorage.setItem("lumi:reopen", "lang");
+        // B9: rute yang sedang dicari ikut dipulihkan setelah muat ulang.
+        sessionStorage.setItem("lumi:reopenPlan", JSON.stringify({ from: S.from, to: S.to, time: S.time, results: !$("#results").hidden }));
+      } catch (e) { lumiLog(e); }
+      location.reload();
+    });
+    var btnBackup = $("#btnBackup"), btnRestore = $("#btnRestore");
+    if (btnBackup) btnBackup.addEventListener("click", doBackup);
+    if (btnRestore) btnRestore.addEventListener("click", doRestore);
+    var accBox = $("#setAccess");
+    if (accBox) accBox.addEventListener("change", function () {
+      var c = cfg(); c.accessible = !!this.checked; store("cfg", c); applyAccessible();
+      renderSettings(["access", "ok", this.checked ? "Mode aksesibel aktif." : "Mode aksesibel dimatikan."]);
+    });
+    var voiceBox = $("#setVoice");
+    if (voiceBox) voiceBox.addEventListener("change", function () {
+      var c = cfg(); c.voice = !!this.checked; store("cfg", c);
+      if (!this.checked) { try { NATIVE && NATIVE.stopSpeak && NATIVE.stopSpeak(); } catch (e) { lumiLog(e); } }
+      renderSettings(["voice", "ok", this.checked ? "Panduan suara aktif." : "Panduan suara dimatikan."]);
+    });
+    var gsearchBox = $("#setGsearch");
+    if (gsearchBox) gsearchBox.addEventListener("change", function () {
+      var c = cfg(); c.gsearch = !!this.checked; store("cfg", c);
+      if (this.checked) { if (window.LumiGoogle) LumiGoogle.reset(); }
+      renderSettings(["search", "ok", this.checked ? tl("Saran alamat Google aktif.", "Google address suggestions on.") : tl("Saran alamat Google dimatikan.", "Google address suggestions off.")]);
+    });
+    var clearTrips = $("#btnClearTrips");
+    if (clearTrips) clearTrips.addEventListener("click", function () { store("trips", []); renderSettings(["trips", "ok", "Riwayat perjalanan dihapus."]); });
+    var saveFavBtn = $("#btnSaveFav");
+    if (saveFavBtn) saveFavBtn.addEventListener("click", saveFav);
+    $$("[data-fav]", $("#settingsBody")).forEach(function (b) { b.addEventListener("click", function () { useFav(+b.dataset.fav); }); });
+    $$("[data-favdel]", $("#settingsBody")).forEach(function (b) { b.addEventListener("click", function () { delFav(+b.dataset.favdel); }); });
     $$(".gtfs-btn", $("#settingsBody")).forEach(function (b) { b.addEventListener("click", startGtfsUpdate); });
     bindChangeLinks($("#settingsBody"));
     $$("[data-show]", $("#settingsBody")).forEach(function (b) {
@@ -2321,21 +3152,36 @@
     $("#setMap").addEventListener("change", function () {
       var c = cfg(); c.basemap = this.value; store("cfg", c);
       applyBasemap();
-      renderSettings(["map", "ok", "Gaya peta diganti: " + MAPSTYLES[this.value].name + "."]);
+      renderSettings(["map", "ok", tl("Gaya peta diganti: ", "Map style changed: ") + T(MAPSTYLES[this.value].name) + "."]);
+      if (this.value === "google" && window.LumiGoogle && LumiGoogle.isDown()) toast(tl("Kunci Google ditolak — peta bisa tetap kosong.", "Google key rejected — the map may stay blank."));
     });
     $$("[data-del]", $("#settingsBody")).forEach(function (b) { b.addEventListener("click", function () { deletePlace(+b.dataset.del); renderSettings(); }); });
   }
   $("#btnSettings").addEventListener("click", openSettings);
 
-  /* Perbarui daftar koreksi titik halte/stasiun (OpenStreetMap) dari GitHub, paling sering tiap 3 hari. */
-  (function refreshStopFix() {
-    var last = 0; try { last = +localStorage.getItem("lumi:stopfixAt") || 0; } catch (e) { }
+  /* Perbarui koreksi titik halte (OpenStreetMap) dan tarif dari GitHub, paling sering tiap 3 hari.
+   * Isi diperiksa (ukuran, bentuk, rentang) sebelum disimpan; dipakai sejak aplikasi dibuka berikutnya. */
+  (function refreshRemoteData() {
+    var last = 0; try { last = +localStorage.getItem("lumi:stopfixAt") || 0; } catch (e) { lumiLog(e); }
     if (Date.now() - last < 3 * 864e5) return;
+    var BASE = "https://raw.githubusercontent.com/VAMvicky/LumiTransport/main/data/";
+    function fetchJson(name, maxBytes) {
+      return http(BASE + name, 20000, null, true).then(function (r) {
+        if (r.status !== 200) throw new Error(name + ": HTTP " + r.status);
+        if (!r.body || r.body.length > maxBytes) throw new Error(name + ": ukuran tidak wajar");
+        return JSON.parse(r.body);
+      });
+    }
     setTimeout(function () {
-      http("https://raw.githubusercontent.com/VAMvicky/LumiTransport/main/data/stop_fix.json", 20000).then(function (j) {
-        try { localStorage.setItem("lumi:stopfixAt", String(Date.now())); } catch (e) { }
-        if (j && j.v === 2 && j.fix) { try { localStorage.setItem("lumi:stopfix", JSON.stringify(j)); } catch (e) { } }
-      }).catch(function () { });
+      try { localStorage.setItem("lumi:stopfixAt", String(Date.now())); } catch (e) { lumiLog(e); }
+      fetchJson("stop_fix.json", 3000000).then(function (j) {
+        if (!validStopFix(j)) throw new Error("stop_fix.json tidak valid");
+        try { localStorage.setItem("lumi:stopfix", JSON.stringify(j)); } catch (e) { lumiLog(e); }
+      }).catch(function (e) { lumiLog(e, "stopfix"); });
+      fetchJson("fares.json", 100000).then(function (f) {
+        if (!validFares(f)) throw new Error("fares.json tidak valid");
+        try { localStorage.setItem("lumi:fares", JSON.stringify(f)); } catch (e) { lumiLog(e); }
+      }).catch(function (e) { lumiLog(e, "fares"); });
     }, 8000);
   })();
 
@@ -2345,10 +3191,10 @@
     if (!text) return;
     var urlM = text.match(/https?:\/\/\S+/);
     var lines = text.replace(/https?:\/\/\S+/g, "").split(/\n+/).map(function (x) { return x.trim().replace(/^["“]|["”]$/g, ""); }).filter(Boolean);
-    var name = lines[0] || "Lokasi dari Google Maps";
+    var name = lines[0] || tl("Lokasi dari Google Maps", "Location from Google Maps");
     var sh = $("#sheetShare"); sh.hidden = false;
     $("#shareIco").innerHTML = ICO_STAR;
-    $("#shareName").textContent = name; $("#shareSub").textContent = "Membaca lokasi dari tautan…";
+    $("#shareName").textContent = name; $("#shareSub").textContent = tl("Membaca lokasi dari tautan…", "Reading location from the link…");
     $("#shareFrom").disabled = $("#shareTo").disabled = true;
     var direct = parseCoords(text);
     // Aplikasi menambahkan "ll=lat,lon" di akhir URL hanya bila koordinat TEMPAT ditemukan.
@@ -2362,26 +3208,26 @@
       if (!lines.length && r.url) { var nm0 = placeNameFromUrl(r.url); if (nm0) { name = nm0; $("#shareName").textContent = nm0; } }
       if (target && r.p) {                       // lokasi tempat terbaca tepat → langsung dipakai
         sh.hidden = true; $$(".sheet").forEach(function (x) { x.hidden = true; }); setTab("plan");
-        var sub0 = lines.slice(1).join(", ") || "Dari Google Maps";
+        var sub0 = lines.slice(1).join(", ") || tl("Dari Google Maps", "From Google Maps");
         savePlace({ name: name, sub: sub0, p: r.p });
         S.shareTarget = null; store("shareTarget", null);
         setPoint(target, { name: name, p: r.p });
-        toast("Lokasi dari Google Maps: " + name);
+        toast(tl("Lokasi dari Google Maps: ", "Location from Google Maps: ") + name);
         afterPick(target);
         return;
       }
       if (target && !r.p) {
         sh.hidden = true; setTab("plan"); S.shareTarget = null; store("shareTarget", null);
-        openPicker(target, { name: name, save: true, title: "Letakkan pin di " + name, center: S.myPos || JKT, zoom: 15 });
-        $("#pickAddr").textContent = "Koordinat tidak terbaca dari tautan — geser pin ke lokasinya";
+        openPicker(target, { name: name, save: true, title: tl("Letakkan pin di ", "Place the pin at ") + name, center: S.myPos || JKT, zoom: 15 });
+        $("#pickAddr").textContent = tl("Koordinat tidak terbaca dari tautan — geser pin ke lokasinya", "Couldn't read coordinates from the link — drag the pin to the place");
         return;
       }
       if (!r.p) {
-        $("#shareSub").textContent = "Koordinat tidak terbaca dari tautan. Pilih titiknya di peta (nama sudah terisi).";
+        $("#shareSub").textContent = tl("Koordinat tidak terbaca dari tautan. Pilih titiknya di peta (nama sudah terisi).", "Couldn't read coordinates from the link. Pick the point on the map (the name is already filled in).");
         $("#shareFrom").disabled = $("#shareTo").disabled = false;
         var pickFor = function (which) {
           sh.hidden = true; setTab("plan");
-          openPicker(which, { name: name, save: true, title: "Letakkan pin di " + name, center: S.myPos || JKT, zoom: 15 });
+          openPicker(which, { name: name, save: true, title: tl("Letakkan pin di ", "Place the pin at ") + name, center: S.myPos || JKT, zoom: 15 });
         };
         $("#shareFrom").onclick = function () { pickFor("from"); };
         $("#shareTo").onclick = function () { pickFor("to"); };
@@ -2405,9 +3251,11 @@
 
   /* ------------------------------------------------------- tombol kembali */
   window.lumiBack = function () {
+    if ($("#onboard")) return false;   // layar sambutan belum selesai: tombol kembali menutup aplikasi, tidak melewatinya
     if ($("#gpsAsk")) { var w0 = gpsWait; gpsWait = null; closeGpsAsk(); if (w0) w0.reject(new Error("GPS belum aktif")); return true; }
     if (!$("#sheetTime").hidden) { $("#sheetTime").hidden = true; return true; }
     if (!$("#sheetShare").hidden) { $("#sheetShare").hidden = true; return true; }
+    if ($("#sheetStop") && !$("#sheetStop").hidden) { $("#sheetStop").hidden = true; return true; }
     // Tutup lembar yang paling atas (yang terakhir dibuka), mis. Info rute di atas Pengaturan.
     var open = $$("#app > .sheet").filter(function (x) { return !x.hidden; });
     if (open.length) { open[open.length - 1].hidden = true; return true; }
@@ -2418,7 +3266,7 @@
   };
 
   /* ------------------------------------------------------- layar sambutan (pertama kali dibuka) */
-  var OB_LOGO = '<svg viewBox="0 0 108 108" aria-hidden="true"><defs><linearGradient id="obg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7FCBF7"/><stop offset=".5" stop-color="#5CA9EE"/><stop offset="1" stop-color="#3A7BE4"/></linearGradient></defs>' +
+  var OB_LOGO = '<img src="img/icon.png" alt="Lumi Transport">';
     '<circle cx="54" cy="54" r="52" fill="url(#obg)"/><path d="M42,38 L42,60 Q42,70 52,70 L68,70" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
     '<circle cx="42" cy="38" r="7" fill="#1565D8" stroke="#fff" stroke-width="5"/><circle cx="68" cy="70" r="13" fill="#fff" fill-opacity=".33"/><circle cx="68" cy="70" r="8" fill="#fff"/>' +
     '<path d="M70,30 L72.6,36.4 L79,39 L72.6,41.6 L70,48 L67.4,41.6 L61,39 L67.4,36.4 Z" fill="#fff"/></svg>';
@@ -2431,27 +3279,30 @@
     ok: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#34C27A"/><path d="m7.5 12.3 3 3 6-6.3" fill="none" stroke="#0B2545" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
   function permState() {
-    try { if (NATIVE && NATIVE.permState) return JSON.parse(NATIVE.permState()); } catch (e) { }
+    try { if (NATIVE && NATIVE.permState) return JSON.parse(NATIVE.permState()); } catch (e) { lumiLog(e); }
     return { loc: false, notif: false, battery: false, oem: true, browser: true };
   }
   function showOnboarding(step) {
     var ob = $("#onboard");
     if (!ob) { ob = document.createElement("div"); ob.id = "onboard"; ob.className = "ob"; $("#app").appendChild(ob); }
     if (step === 1) {
-      ob.innerHTML = '<div class="ob-top"><div class="ob-hero">' + OB_LOGO + '</div><h1 class="ob-title">Lumi Transportation</h1>' +
+      ob.innerHTML = '<div class="ob-top"><div class="ob-hero">' + OB_LOGO + '</div><h1 class="ob-title">Lumi Transport</h1>' +
         '<p class="ob-lead">Semua transportasi Jabodetabek dalam satu rute: Transjakarta, Mikrotrans, KRL, MRT, LRT, sampai ojol.</p></div>' +
         '<ul class="ob-feats">' +
         '<li><span class="ob-ico">' + OB_ICO.route + '</span><div><b>Semua kombinasi rute</b><span>Tercepat, termurah, atau minim transit, lengkap dengan tarif dan waktu tiba.</span></div></li>' +
         '<li><span class="ob-ico">' + OB_ICO.nav + '</span><div><b>Pendampingan GPS</b><span>Tahu posisimu, sisa pemberhentian, dan diingatkan saat harus turun.</span></div></li>' +
-        '<li><span class="ob-ico">' + OB_ICO.bell + '</span><div><b>Rute selalu terbaru</b><span>Data resmi Transjakarta dicek tiap jam, kamu diberi tahu bila ada rute berubah.</span></div></li>' +
+        '<li><span class="ob-ico">' + OB_ICO.bell + '</span><div><b>Rute selalu terbaru</b><span>Data resmi Transjakarta dicek berkala, kamu diberi tahu bila ada rute berubah.</span></div></li>' +
         '</ul><div class="ob-bottom"><button class="ob-cta" id="obNext" type="button">Mulai</button>' +
         '<p class="ob-foot">Alamat dicari lewat Google Maps lalu dibagikan ke Lumi. Lokasimu hanya disimpan di HP ini.</p></div>';
       $("#obNext").addEventListener("click", function () { store("onboarded", 1); showOnboarding(2); });
       return;
     }
     var p = permState();
+    // Lokasi, notifikasi, dan latar belakang wajib diizinkan sebelum masuk ke layar utama.
+    // "Mulai otomatis" (OEM) tidak bisa dideteksi, jadi tetap opsional.
+    var allOk = !!(p.loc && p.notif && p.battery) || !!p.browser;
     function item(key, ico, title, desc, ok, opt) {
-      return '<button class="ob-item' + (ok ? " ok" : "") + (opt ? " opt" : "") + '" data-perm="' + key + '" type="button">' +
+      return '<button class="ob-item' + (ok ? " ok" : "") + (opt ? " opt" : "") + '" data-perm="' + key + '" type="button" aria-pressed="' + !!ok + '">' +
         '<span class="ob-ico">' + (ok ? OB_ICO.ok : ico) + '</span><div><b>' + title + (opt ? '<i class="ob-opt">opsional</i>' : "") + "</b>" +
         '<span class="' + (ok ? "ob-ok" : "") + '">' + (ok ? "✓ Sudah diizinkan" : desc) + "</span></div></button>";
     }
@@ -2464,7 +3315,8 @@
       (p.oem ? '<div class="ob-oem"><div class="ob-oem-h"><b>Xiaomi, Oppo, Vivo, Realme, Infinix</b><i class="ob-opt">opsional</i></div>' +
         '<span>Aktifkan “Mulai otomatis” agar Lumi tidak ditutup oleh HP.</span>' +
         '<button class="ob-oem-btn" id="obAuto" type="button">Buka pengaturan Mulai otomatis</button></div>' : "") +
-      '</div><div class="ob-bottom"><button class="ob-cta" id="obDone" type="button">Mulai cari rute</button></div>';
+      '</div><div class="ob-bottom"><button class="ob-cta' + (allOk ? "" : " is-locked") + '" id="obDone" type="button" aria-disabled="' + !allOk + '">Mulai cari rute</button>' +
+      '<p class="ob-foot" id="obNeed"' + (allOk ? " hidden" : "") + '>Izinkan ketiga akses di atas dulu untuk melanjutkan.</p></div>';
     $$("[data-perm]", ob).forEach(function (b) {
       b.addEventListener("click", function () {
         if (b.classList.contains("ok")) return;
@@ -2473,21 +3325,55 @@
       });
     });
     if ($("#obAuto")) $("#obAuto").addEventListener("click", function () { if (NATIVE && NATIVE.openAutostart) NATIVE.openAutostart(); else toast("Hanya di aplikasi Android"); });
-    $("#obDone").addEventListener("click", function () { store("onboarded", 2); ob.remove(); });
+    $("#obDone").addEventListener("click", function () {
+      var q = permState();
+      if (!(q.loc && q.notif && q.battery) && !q.browser) {
+        // Status izin bisa berubah tanpa layar ini dirender ulang; selalu cek ulang saat diketuk.
+        showOnboarding(2);
+        var first = $("[data-perm]:not(.ok)", $("#onboard"));
+        if (first) { first.classList.add("is-shake"); setTimeout(function () { first.classList.remove("is-shake"); }, 600); }
+        toast("Izinkan lokasi, notifikasi, dan latar belakang dulu");
+        return;
+      }
+      store("onboarded", 2); ob.remove();
+    });
   }
   window.__lumiPerm = function () { if ($("#onboard") && $("#obDone")) showOnboarding(2); };
   var obStage = store("onboarded");
   if (obStage !== 2) showOnboarding(obStage === 1 ? 2 : 1);
+  document.documentElement.classList.remove("ob-pending");
 
+  var inStopEl = $('#inStop');
+  if (inStopEl) inStopEl.addEventListener('input', function () { renderStops(this.value); });
+  applyAccessible();
+  applyLang();
+  // Setelah ganti bahasa (halaman dimuat ulang), kembali ke kartu Bahasa di Pengaturan.
+  try {
+    if (sessionStorage.getItem("lumi:reopen") === "lang") {
+      sessionStorage.removeItem("lumi:reopen");
+      var rp0 = JSON.parse(sessionStorage.getItem("lumi:reopenPlan") || "null");
+      sessionStorage.removeItem("lumi:reopenPlan");
+      if (rp0) {
+        if (rp0.time) S.time = rp0.time;
+        if (rp0.from) setPoint("from", rp0.from);
+        if (rp0.to) setPoint("to", rp0.to);
+        if (rp0.results && S.from && S.to) setTimeout(runPlan, 50);
+      }
+      if (store("onboarded") === 2) {
+        openSettings();
+        setTimeout(function () { var sel = $("#setLang"); if (sel) sel.closest(".set-card").scrollIntoView({ block: "center" }); toast(tl("Bahasa disetel ke Indonesia.", "Language set to English.")); }, 120);
+      }
+    }
+  } catch (e) { lumiLog(e); }
   syncTimeChip();
   renderIntro();
   renderGtfsBanner();
-  try { var pend = NATIVE && NATIVE.takeShared && NATIVE.takeShared(); if (pend) window.lumiShared(pend); } catch (e) { }
+  try { var pend = NATIVE && NATIVE.takeShared && NATIVE.takeShared(); if (pend) window.lumiShared(pend); } catch (e) { lumiLog(e); }
   // Pendampingan yang masih berjalan (mis. setelah aplikasi dibuka ulang dari notifikasi).
   try {
     var gs = NATIVE && NATIVE.guideState && NATIVE.guideState();
     if (gs) { compass(true); var sg0 = store("guide"); S.guide = sg0 ? { title: sg0.title, names: sg0.names } : { names: [] }; var st0 = JSON.parse(gs); renderGuide(st0.title ? st0 : { title: "Pendampingan berjalan", text: "Menunggu posisi GPS…", stopsLeft: -1, metersLeft: -1 }); }
     else store("guide", null);
-  } catch (e) { }
-  try { var op = NATIVE && NATIVE.takeOpen && NATIVE.takeOpen(); if (op) window.lumiOpen(op); } catch (e) { }
+  } catch (e) { lumiLog(e); }
+  try { var op = NATIVE && NATIVE.takeOpen && NATIVE.takeOpen(); if (op) window.lumiOpen(op); } catch (e) { lumiLog(e); }
 })();

@@ -85,7 +85,7 @@ public class LiveSocket {
     }
 
     private void runLoop() {
-        String reason = "tertutup";
+        String reason = Lang.t("tertutup", "closed");
         try {
             URI u = new URI(url);
             boolean tls = "wss".equalsIgnoreCase(u.getScheme());
@@ -121,14 +121,14 @@ public class LiveSocket {
             out.flush();
             String status = readHeaders(in);
             if (status == null || !status.contains(" 101")) {
-                reason = "server menolak: " + (status == null ? "tanpa jawaban" : status.trim());
+                reason = Lang.t("server menolak: ", "server refused: ") + (status == null ? Lang.t("tanpa jawaban", "no response") : status.trim());
                 return;
             }
             listener.onOpen();
             ByteArrayOutputStream msg = new ByteArrayOutputStream();
             while (!closed) {
                 int b0 = in.read();
-                if (b0 < 0) { reason = "koneksi diputus server"; break; }
+                if (b0 < 0) { reason = Lang.t("koneksi diputus server", "connection dropped by server"); break; }
                 int b1 = in.read();
                 if (b1 < 0) break;
                 int op = b0 & 0x0F;
@@ -138,14 +138,14 @@ public class LiveSocket {
                 else if (len == 127) { len = 0; for (int i = 0; i < 8; i++) len = (len << 8) | (in.read() & 0xFF); }
                 byte[] mask = null;
                 if ((b1 & 0x80) != 0) { mask = new byte[4]; readFully(in, mask); }
-                if (len > 8 * 1024 * 1024) { reason = "frame terlalu besar"; break; }
+                if (len > 8 * 1024 * 1024) { reason = Lang.t("frame terlalu besar", "frame too large"); break; }
                 byte[] payload = new byte[(int) len];
                 readFully(in, payload);
                 if (mask != null) for (int i = 0; i < payload.length; i++) payload[i] ^= mask[i & 3];
                 if (op == 0x8) {
                     int code = payload.length >= 2 ? ((payload[0] & 0xFF) << 8) | (payload[1] & 0xFF) : 0;
                     String txt = payload.length > 2 ? new String(payload, 2, payload.length - 2, "UTF-8") : "";
-                    reason = "server menutup koneksi" + (code > 0 ? " (kode " + code + (txt.isEmpty() ? "" : ": " + txt) + ")" : "");
+                    reason = Lang.t("server menutup koneksi", "server closed the connection") + (code > 0 ? Lang.t(" (kode ", " (code ") + code + (txt.isEmpty() ? "" : ": " + txt) + ")" : "");
                     break;
                 }
                 if (op == 0x9) { sendFrame(0xA, payload); continue; }

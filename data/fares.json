@@ -1,0 +1,119 @@
+{
+ "v": 1,
+ "_": "Satu sumber tarif Lumi (R8). Ubah angka di sini, bukan di kode. build_data.py menyalinnya ke data.js; aplikasi juga mengambil versi terbaru dari repo dan memakainya bila 'updated' lebih baru.",
+ "updated": "2026-10-29",
+ "tj": {
+  "base": 3500,
+  "morning": 2000,
+  "morningFrom": 300,
+  "morningTo": 420,
+  "free": [
+   "GR4",
+   "GR5"
+  ],
+  "premium": [
+   [
+    "^SH2$",
+    15000
+   ],
+   [
+    "^HC\\d",
+    20000
+   ]
+  ],
+  "royal": 20000,
+  "jabodetabek": 3500,
+  "mikro": 0
+ },
+ "krl": {
+  "base": 3000,
+  "baseKm": 25,
+  "stepKm": 10,
+  "step": 1000
+ },
+ "mrt": {
+  "base": 3000,
+  "perStop": 1000,
+  "max": 14000,
+  "perKmEst": 700
+ },
+ "lrt": {
+  "flat": 5000
+ },
+ "lrtj": {
+  "base": 5000,
+  "perKm": 700,
+  "max": 20000,
+  "offPeakMax": 10000,
+  "peak": [
+   [
+    360,
+    540
+   ],
+   [
+    960,
+    1200
+   ]
+  ]
+ },
+ "kaBandara": {
+  "airportFar": 70000,
+  "airportNear": 35000,
+  "city": 10000
+ },
+ "whoosh": {
+  "from": 250000
+ },
+ "ojol": {
+  "motor": {
+   "perKm": [
+    2550,
+    2800
+   ],
+   "min": [
+    10200,
+    11200
+   ],
+   "fee": [
+    2000,
+    4000
+   ]
+  },
+  "car": {
+   "perKm": [
+    4000,
+    6000
+   ],
+   "min": [
+    15000,
+    20000
+   ],
+   "fee": [
+    3000,
+    5000
+   ]
+  }
+ },
+ "notes": {
+  "tj": {
+   "id": "Bayar pakai kartu uang elektronik atau aplikasi JakLingko/TJ:IKA. Pemprov DKI mengumumkan penyesuaian tarif Transjakarta mulai 1 Januari 2027; besarannya belum diumumkan.",
+   "en": "Pay with an e-money card or the JakLingko/TJ:IKA app. The Jakarta government has announced a Transjakarta fare adjustment from 1 January 2027; the new amount hasn't been announced yet."
+  },
+  "krl": {
+   "id": "Tidak naik pada 2026. Kartu Multi Trip, uang elektronik, atau QR di aplikasi Access by KAI.",
+   "en": "No increase in 2026. Multi Trip Card, e-money, or QR in the Access by KAI app."
+  },
+  "lrt": {
+   "id": "Pemprov DKI menyebut tarif baru LRT Jakarta akan segera ditetapkan; sampai itu tetap flat Rp5.000.",
+   "en": "The Jakarta government says a new LRT Jakarta fare will be set soon; until then it stays a flat Rp5,000."
+  },
+  "rail": {
+   "id": "Whoosh memakai tarif dinamis (bergantung kelas, hari, dan jam); Lumi memakai tarif terendah Rp250.000.",
+   "en": "Whoosh uses dynamic pricing (by class, day and time); Lumi uses the lowest fare, Rp250,000."
+  },
+  "ojol": {
+   "id": "Batas tarif motor mengacu pada KP Menhub 564/2022 (masih berlaku; Perpres 27/2026 menetapkan potongan aplikasi 8% dan tarif baru akan diatur Kemenhub). Harga akhir ditentukan aplikasi dan bisa naik saat jam sibuk atau hujan.",
+   "en": "Bike fare limits follow Transport Ministerial Decree 564/2022 (still in force; Presidential Regulation 27/2026 sets an 8% app commission and new fares will be set by the ministry). Final prices are set by the apps and can rise at peak times or in rain."
+  }
+ }
+}

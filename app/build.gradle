@@ -1,33 +1,84 @@
-lugins {
-    id "com.android.application"
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+// Satu sumber versi: release-notes/CURRENT (dihitung juga oleh tools/version.sh).
+def currentVersion = { ->
+    new File(rootProject.projectDir, "release-notes/CURRENT").text.trim().replaceFirst("^v", "")
+}
+def versionCodeOf = { ->
+    def p = currentVersion().split("\\.")
+    int major = p.length > 0 ? (p[0] as int) : 0
+    int minor = p.length > 1 ? (p[1] as int) : 0
+    int patch = p.length > 2 ? (p[2] as int) : 0
+    return major * 10000 + minor * 100 + patch
 }
 
 android {
     namespace "id.lumi.transport"
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "id.lumi.transport"
-        minSdk 24
-        targetSdk 34
-        versionCode 40
-        versionName "2.4"
+        minSdk 26
+        targetSdk 35
+        versionCode versionCodeOf()
+        versionName currentVersion()
+    }
+
+    signingConfigs {
+        release {
+            def ksPath = System.getenv("KEYSTORE")
+            if (ksPath != null && new File(ksPath).exists()) {
+                storeFile file(ksPath)
+                storePassword System.getenv("KS_PASS")
+                keyAlias(System.getenv("KS_ALIAS") ?: "lumi")
+                keyPassword(System.getenv("KS_PASS"))
+            }
+        }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
-            // Ganti dengan signingConfig milikmu sebelum rilis ke Play Store.
-            signingConfig signingConfigs.debug
+            // R8 + resource shrinking: dibutuhkan supaya APK tidak membawa kode/aset mati.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+
+            def ksPath = System.getenv("KEYSTORE")
+            if (ksPath != null && new File(ksPath).exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
     }
+
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
+
     androidResources {
         noCompress "woff2"
     }
+
+    // R3: lint dijalankan di CI (lintRelease) dan menggagalkan build untuk temuan BARU.
+    // Temuan lama dicatat di lint-baseline.xml; kurangi isinya sedikit demi sedikit.
+    lint {
+        checkReleaseBuilds false          // lint jalan sebagai langkah CI tersendiri, bukan di tiap assemble
+        abortOnError true
+        warningsAsErrors true             // peringatan baru pun menggagalkan CI
+        baseline = file("lint-baseline.xml")
+        textReport true
+        textOutput file("build/reports/lint-results-release.txt")
+        fatal "NewApi", "MissingPermission", "JavascriptInterface", "AddJavascriptInterface"
+        disable "GradleDependency", "OldTargetApi", "NewerVersionAvailable", "AndroidGradlePluginVersion"
+    }
+}
+
+dependencies {
+    implementation libs.androidx.profileinstaller
 }
 
 // Bangun ulang data rute sebelum build (butuh python3).
@@ -36,4 +87,3 @@ tasks.register("buildRouteData", Exec) {
     commandLine "python3", "tools/build_data.py"
 }
 preBuild.dependsOn buildRouteData
-
