@@ -202,8 +202,8 @@
     "— sebagian rute mungkin sudah berubah.": "— some routes may have changed since.",
     "Koordinat stasiun KA: data sarana prasarana Kemenhub via": "Rail station coordinates: Ministry of Transport infrastructure data via",
     "Urutan stasiun KRL, MRT, LRT, KA Bandara: Wikipedia & pengumuman operator (2026).": "KRL, MRT, LRT and Airport Rail station order: Wikipedia & operator announcements (2026).",
-    "Peta: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors. Alamat: Google Maps (dibagikan ke Lumi). Jarak jalan untuk ojol: OSRM.":
-      "Map: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors. Addresses: Google Maps (shared to Lumi). Road distances for ride-hailing: OSRM.",
+    "Peta: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors; pilihan Google Maps memakai kunci internal aplikasi Google Maps. Alamat: saran Google Places (kunci internal) dengan cadangan Photon/OSM. Jarak jalan untuk ojol: OSRM.":
+      "Map: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors; the Google Maps option uses Google Maps' internal key. Addresses: Google Places suggestions (internal key) with a Photon/OSM fallback. Road distances for ride-hailing: OSRM.",
     "Aktif:": "Active:",
     // pengaturan
     "Data rute: GTFS resmi Transjakarta": "Route data: official Transjakarta GTFS", "Perbarui rute Transjakarta": "Update Transjakarta routes",

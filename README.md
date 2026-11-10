@@ -36,7 +36,7 @@
 | 🖼️ **Bagikan sebagai gambar** | Setiap rute bisa dibagikan sebagai **gambar rapi** ke WhatsApp, IG, atau mana saja. |
 | 💸 **Tarif yang benar** | Pindah di dalam halte = tidak bayar lagi. Turun di luar halte = tap ulang. Termasuk tarif SH2, Hub Connector, MRT per stasiun, KA Bandara. |
 | 🌙 **Sadar jam operasional** | Pukul 00.00? Lumi hanya memakai layanan 24 jam (AMARI koridor 1–14, JAK36/47/52/75) dan ojol. |
-| 📍 **Alamat dari Google Maps** | Cari tempat di Google Maps, ketuk **Bagikan → Lumi**. Koordinat tempat terbaca otomatis. |
+| 📍 **Alamat dari Google** | Saran alamat langsung dari Google Places saat mengetik, memakai **kunci API internal Google Maps** (paket & sertifikat Google ditiru). Koordinat terbaca otomatis. |
 | 🪶 **Super ringan & offline** | APK sekitar **350 KB**. Perhitungan rute berjalan **di HP**, tanpa server. |
 
 ---
@@ -126,7 +126,8 @@
 - **Dua bahasa**: Indonesia atau Inggris (Pengaturan → Bahasa). Seluruh aplikasi ikut berganti, termasuk hasil rute, gambar yang dibagikan, notifikasi, dan panduan suara
 - Info rute lengkap: cari rute (`9`, `13C`, `JAK.10`, `Bogor`, `MRT`), lihat urutan halte, arah, varian, jam operasional, dan rute sambungan di tiap halte
 - Nama trayek resmi (mis. **9N Pinang Ranti – Simpang Cawang**). Rute memutar dipecah menjadi dua arah, dan setiap varian diberi keterangan singkat: *via Tol*, *lewat Senen*, *tanpa ASEAN*, *mulai Bundaran Senayan*, *putar balik di Harmoni*
-- Peta **OpenFreeMap** (vektor, MapLibre GL) — gratis tanpa API key; pilihan gaya Liberty, Bright, Positron, atau OpenStreetMap standar
+- Peta **OpenFreeMap** (vektor, MapLibre GL) — gratis tanpa API key; pilihan gaya Liberty, Bright, Positron, atau OpenStreetMap standar, ditambah pilihan **Google Maps** (raster) memakai kunci internal Google
+- **Saran alamat dari Google Places** langsung di kolom Dari/Ke: kunci API internal Google Maps diambil dari APK Google Maps dan dipakai dengan meniru header paket + sertifikat Google (lihat [docs/google-api-keys.md](docs/google-api-keys.md))
 
 ---
 
@@ -265,7 +266,7 @@ Tarif adalah perkiraan berdasarkan aturan yang diumumkan (lihat [Tarif yang dipa
 - ✅ **Tanpa** iklan, analitik, atau pelacak
 - ✅ Lokasi dan tempat tersimpan hanya ada **di HP-mu**
 - ✅ Rute dihitung di HP; tidak ada server Lumi
-- ℹ️ Internet dipakai untuk: peta OpenFreeMap/OpenStreetMap, membaca tautan Google Maps, jarak jalan OSRM (estimasi ojol), GTFS resmi Transjakarta, dan umpan perubahan rute dari GitHub
+- ℹ️ Internet dipakai untuk: peta OpenFreeMap/OpenStreetMap, peta & saran alamat Google (memakai kunci internal Google Maps), membaca tautan Google Maps, jarak jalan OSRM (estimasi ojol), GTFS resmi Transjakarta, dan umpan perubahan rute dari GitHub
 
 ---
 
@@ -276,7 +277,8 @@ Tarif adalah perkiraan berdasarkan aturan yang diumumkan (lihat [Tarif yang dipa
 | Aplikasi | **Java** (Android SDK, tanpa library tambahan) + **WebView** |
 | Antarmuka | HTML, CSS, JavaScript murni, font Plus Jakarta Sans |
 | Titik halte & stasiun | GTFS resmi Transjakarta, diselaraskan dengan **OpenStreetMap** tiap minggu (`tools/osm_stops.py`, Overpass API) |
-| Peta | **Leaflet** + **MapLibre GL** (maplibre-gl-leaflet) dengan ubin vektor **OpenFreeMap** (OpenStreetMap); cadangan ubin OSM standar |
+| Peta | **Leaflet** + **MapLibre GL** (maplibre-gl-leaflet) dengan ubin vektor **OpenFreeMap** (OpenStreetMap); cadangan ubin OSM standar; pilihan ubin raster **Google Static Maps** |
+| Pencarian alamat | **Google Places** (Autocomplete → Details) memakai kunci API internal Google Maps + header `X-Android-Package`/`X-Android-Cert` tiruan; cadangan Photon/OpenStreetMap |
 | Mesin rute | Graf multimoda + Dijkstra + enumerasi kombinasi (`engine.js`), berjalan offline |
 | Data rute | GTFS resmi Transjakarta (diproses di HP oleh `GtfsImporter.java`) |
 | Latar belakang | Foreground service (pendampingan GPS), JobScheduler (cek rute berkala & harian) |
@@ -327,6 +329,21 @@ Atau buka folder ini di Android Studio. Butuh JDK 17, Android SDK 35, dan `pytho
 
 > 🔐 Build rilis ditandatangani dengan kunci yang disimpan di **GitHub Actions Secrets** (`LUMI_KEYSTORE_BASE64`, `LUMI_KEYSTORE_PASSWORD`, opsional `LUMI_KEY_ALIAS`). Kunci tidak pernah disimpan di repo. Tanpa secrets, workflow tetap mem-build APK (sebagai artifact, kunci debug) dan **menolak** menerbitkan rilis.
 
+### 🔑 Kunci Google (hasil reverse engineering)
+Lumi memakai **kunci API internal aplikasi Google Maps**, diambil dari APK Google Maps 26.44.06 dengan membongkar `resources.arsc`, `AndroidManifest.xml`, dan `classes*.dex`. Kuncinya dibatasi ke aplikasi Google, jadi setiap permintaan mengirim dua header tiruan:
+
+```
+X-Android-Package: com.google.android.apps.maps
+X-Android-Cert:    38918A453D07199354F8B19AF05EC6562CED5788
+```
+
+Tanpa header itu server menjawab `REQUEST_DENIED`. Dengan header itu saran alamat (Places Autocomplete/Details) dan petak peta (Static Maps) jalan dari aplikasi ini.
+
+- Kunci & sertifikat: [`GoogleKeys.java`](app/src/main/java/id/lumi/transport/GoogleKeys.java), dipakai `js/gmaps.js`
+- Header dipasang di `shouldInterceptRequest` (`MainActivity.java`) untuk petak peta lewat `<img>`, dan lewat `LumiNative.httpH` untuk permintaan JSON
+- Bukti, daftar endpoint yang terbuka/tertutup, dan cara mengambil ulang: [docs/google-api-keys.md](docs/google-api-keys.md)
+- Sakelar on/off ada di Pengaturan → Mencari alamat; bila Google mencabut kuncinya, saran alamat otomatis jatuh ke Photon/OpenStreetMap
+
 ### 🔔 Pemantau perubahan rute
 Workflow [`route-watch.yml`](.github/workflows/route-watch.yml) dijadwalkan tiap jam (dalam praktik GitHub menjalankannya beberapa kali sehari): mengunduh GTFS resmi, membandingkan ringkasan rute dengan `data/route_index.txt`, lalu menulis `data/route_changes.json` bila ada perubahan. Aplikasi membaca file kecil ini secara berkala lewat `raw.githubusercontent.com`.
 
@@ -348,7 +365,7 @@ Lumi Transport bisa berdiri berkat data terbuka, proyek open-source, dan layanan
 | Wikipedia & media (Kompas, detik, CNA, Bisnis, CNN Indonesia, Suara, IDN Times, dll.) | Perubahan rute (mis. koridor 9 via tol), tarif terbaru, dan jam operasional |
 
 ### 🗺️ Peta & lokasi
-[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [OSRM](https://project-osrm.org/) (jarak jalan untuk estimasi ojol) · [Google Maps](https://maps.google.com) (pencarian alamat lewat fitur Bagikan)
+[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [OSRM](https://project-osrm.org/) (jarak jalan untuk estimasi ojol) · [Google Maps](https://maps.google.com) (peta raster & saran alamat, memakai kunci internal hasil RE — [docs/google-api-keys.md](docs/google-api-keys.md))
 
 ### 📚 Library & aset
 [Leaflet](https://github.com/Leaflet/Leaflet) oleh Volodymyr Agafonkin dkk. · [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) oleh Tokotype (SIL OFL) · [Eclipse JDT ecj](https://github.com/eclipse-jdt/eclipse.jdt.core) · Android build tools (aapt2, d8, apksigner)

@@ -21,6 +21,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -140,6 +141,24 @@ public class MainActivity extends Activity {
                 if (url.startsWith("file:///android_asset/")) return false;
                 openExternal(url);
                 return true;
+            }
+
+            /**
+             * Petak peta Google dimuat lewat <img>, dan <img> tidak bisa memasang header sendiri.
+             * Jadi permintaan ke host Google Maps diambil alih di sini: kita GET sendiri dengan
+             * header penyamaran (GoogleKeys), lalu alirannya dikembalikan ke WebView.
+             * Gagal di tengah jalan → null, WebView memakai jalur normalnya.
+             */
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+                try {
+                    Uri u = req.getUrl();
+                    if (u == null || !GoogleKeys.isGoogleApiHost(u.getHost())) return null;
+                    if (!"GET".equalsIgnoreCase(req.getMethod())) return null;
+                    return googleFetch(u.toString());
+                } catch (Exception ignored) {
+                    return null;
+                }
             }
         });
         root = new android.widget.FrameLayout(this);
@@ -669,6 +688,34 @@ public class MainActivity extends Activity {
         while ((line = br.readLine()) != null) sb.append(line).append('\n');
         br.close();
         return sb.toString();
+    }
+
+    /**
+     * Ambil satu URL Google Maps dengan header penyamaran aplikasi Google Maps.
+     * Dipakai shouldInterceptRequest untuk petak peta (<img>) yang tidak bisa memasang header.
+     * Mengembalikan null bila gagal supaya WebView memakai jalur normalnya.
+     */
+    private WebResourceResponse googleFetch(String url) {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(9000);
+            c.setReadTimeout(15000);
+            c.setRequestProperty("User-Agent", UA);
+            c.setRequestProperty("Accept-Language", "id,en");
+            for (java.util.Map.Entry<String, String> e : GoogleKeys.headers().entrySet()) {
+                c.setRequestProperty(e.getKey(), e.getValue());
+            }
+            int code = c.getResponseCode();
+            if (code < 200 || code >= 300) { c.disconnect(); return null; }
+            String type = c.getContentType();
+            String mime = type == null ? "image/png" : type.split(";")[0].trim();
+            if (mime.isEmpty()) mime = "image/png";
+            return new WebResourceResponse(mime, "utf-8", c.getInputStream());
+        } catch (Exception e) {
+            if (c != null) c.disconnect();
+            return null;
+        }
     }
 
     // ------------------------------------------------------------ bridge

@@ -593,6 +593,9 @@
       }
     });
   }
+  /* Google Places/Static Maps memakai jembatan HTTP native: maps.googleapis.com tidak
+   * mengirim header CORS, jadi fetch dari file:// akan ditolak. */
+  if (window.LumiGoogle) LumiGoogle.bind(http);
   /* Ikuti redirect (untuk tautan pendek Google Maps), kembalikan URL akhir. */
   var resCb = {};
   window.__lumiResolved = function (id, url) { var cb = resCb[id]; delete resCb[id]; if (cb) cb(url); };
@@ -1638,9 +1641,10 @@
   };
 
   /* ------------------------------------------------------- pengaturan */
-  // Tidak ada layanan yang butuh API key: peta OpenFreeMap/OSM, alamat lewat Google Maps (Bagikan).
-  var DEFAULT_CFG = { basemap: "liberty", accessible: false, voice: false, lang: ((navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en") };
-  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1 };
+  // Bawaan tanpa API key (OpenFreeMap/OSM, Photon). Google Places & Static Maps opsional
+  // lewat kunci internal aplikasi Google Maps — lihat js/gmaps.js dan docs/google-api-keys.md.
+  var DEFAULT_CFG = { basemap: "liberty", gsearch: true, accessible: false, voice: false, lang: ((navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en") };
+  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, google: 1 };
   function cfg() {
     var c = store("cfg") || {};
     var o = {}; for (var k in DEFAULT_CFG) o[k] = c[k] === undefined ? DEFAULT_CFG[k] : c[k];
@@ -1773,7 +1777,7 @@
     if (S.from && S.to) runPlan();
   });
 
-  var sgTimer, sgSeq = 0;
+  var sgTimer, sgSeq = 0, gSeq = 0;
   /* Pencarian alamat OpenStreetMap (Photon). Gratis, tanpa API key. */
   var osmSeq = 0, osmPending = null;
   var ICO_PIN = '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.4" fill="currentColor"/></svg>';
@@ -1783,7 +1787,7 @@
     var ico;
     if (item.kind === "me") ico = '<span class="sg-ico place"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>';
     else if (item.kind === "saved") ico = '<span class="sg-ico saved">' + ICO_STAR + "</span>";
-    else if (item.kind === "gmaps") ico = '<span class="sg-ico gmaps">' + ICO_PIN + "</span>";
+    else if (item.kind === "gmaps" || item.kind === "gplace") ico = '<span class="sg-ico gmaps">' + ICO_PIN + "</span>";
     else if (item.kind === "link") ico = '<span class="sg-ico tool">' + ICO_LINK + "</span>";
     else ico = '<span class="sg-ico place">' + ICO_PIN + "</span>";
     return '<button class="sg-item' + (item.kind === "gmaps" ? " sg-primary" : "") + '" data-i="' + idx + '">' + ico + '<span class="sg-main"><div class="sg-name">' + esc(item.name) + '</div><div class="sg-sub">' + esc(item.sub || "") + "</div></span></button>";
@@ -1797,7 +1801,8 @@
       b.addEventListener("click", function () { pick(items[+b.dataset.i]); });
     });
   }
-  /* Semua alamat dicari di Google Maps. Di sini hanya ada: cari di Google Maps, lokasi saya,
+  /* Semua alamat dicari di Google Maps. Di sini ada: saran dari Google Places
+     (kalau kuncinya masih hidup), cari di Google Maps lewat Bagikan, lokasi saya,
      dan tempat yang sebelumnya sudah dibagikan dari Google Maps (tersimpan). */
   function showSuggest(q) {
     q = (q || "").trim();
@@ -1809,6 +1814,23 @@
     savedPlaces().filter(function (x) { return !q || x.name.toLowerCase().indexOf(lq) >= 0 || (x.sub || "").toLowerCase().indexOf(lq) >= 0; })
       .slice(0, 8).forEach(function (x) { rows.push({ name: x.name, sub: x.sub || "Dari Google Maps", p: x.p, kind: "saved" }); });
     paintSuggest(rows, "");
+    googleSuggest(q, rows);
+  }
+
+  /* Saran alamat langsung dari Google Places (kunci internal, lihat js/gmaps.js).
+     Diam saja bila kunci sudah tidak berlaku — baris lain tetap jalan. */
+  function googleSuggest(q, rows) {
+    if (!q || q.length < 3 || !cfg().gsearch || !window.LumiGoogle || LumiGoogle.isDown()) return;
+    var seq = ++gSeq;
+    var near = S.myPos || (S.field && S[S.field] && S[S.field].p) || JKT;
+    LumiGoogle.autocomplete(q, near).then(function (preds) {
+      if (seq !== gSeq || !preds.length) return;
+      var out = rows.slice();
+      preds.slice(0, 6).forEach(function (p, i) {
+        out.splice(1 + i, 0, { kind: "gplace", name: p.name, sub: p.sub, id: p.id });
+      });
+      paintSuggest(out, tl("Saran alamat: Google Maps", "Address suggestions: Google Maps"));
+    }).catch(function (e) { lumiLog(e, "gmap"); });
   }
 
   /* Ambil saran alamat dari Photon (OpenStreetMap), lalu sisipkan setelah baris pertama. */
@@ -1835,7 +1857,7 @@
       paintSuggest(rows, "Saran alamat: OpenStreetMap");
     }).catch(function () { /* offline / kuota habis: saran lama tetap tampil */ });
   }
-  function hideSuggest() { sgSeq++; osmPending = null; clearTimeout(sgTimer); $("#suggest").hidden = true; }
+  function hideSuggest() { sgSeq++; gSeq++; osmPending = null; clearTimeout(sgTimer); $("#suggest").hidden = true; }
   document.addEventListener("click", function (e) {
     if (!e.target.closest("#suggest") && !e.target.closest(".field")) hideSuggest();
   });
@@ -1850,8 +1872,23 @@
       window.lumiShared(item.url.trim());
       return;
     }
+    if (item.kind === "gplace") { pickGoogle(which, item); return; }
     setPoint(which, { name: item.name, p: item.p });
     afterPick(which);
+  }
+  /* place_id Google → koordinat lewat Place Details, lalu simpan seperti tempat biasa. */
+  function pickGoogle(which, item) {
+    var input = which === "from" ? inFrom : inTo;
+    input.value = tl("Mengambil lokasi…", "Reading location…");
+    LumiGoogle.details(item.id).then(function (d) {
+      setPoint(which, { name: d.name || item.name, p: d.p });
+      savePlace({ name: d.name || item.name, sub: d.sub, p: d.p });
+      afterPick(which);
+    }).catch(function (e) {
+      input.value = item.name;
+      lumiLog(e, "gmap");
+      toast(tl("Tempat tidak bisa dibaca — coba lagi", "Could not read that place — try again"));
+    });
   }
   function afterPick(which) {
     (which === "from" ? inFrom : inTo).blur();
@@ -2202,10 +2239,12 @@
     liberty: { name: "Liberty (berwarna)", gl: "https://tiles.openfreemap.org/styles/liberty" },
     bright: { name: "Bright (kontras)", gl: "https://tiles.openfreemap.org/styles/bright" },
     positron: { name: "Positron (terang, polos)", gl: "https://tiles.openfreemap.org/styles/positron" },
-    osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" }
+    osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" },
+    google: { name: "Google Maps (raster)", google: true }
   };
   var ATTR_OFM = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
   var ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
+  var ATTR_GOOGLE = 'Peta &copy; <a href="https://www.google.com/maps" target="_blank">Google</a>';
   var GL_OK = null;
   function glOk() {
     if (GL_OK !== null) return GL_OK;
@@ -2216,6 +2255,9 @@
   var GL_DOWN = false;   // R9: OpenFreeMap tidak menjawab → peta raster OSM sampai aplikasi dibuka ulang
   function baseLayer() {
     var st = MAPSTYLES[mapStyleKey()];
+    /* Peta Google: petak raster dari Static Maps, dimuat lewat <img> yang headernya
+     * dipasang shouldInterceptRequest (lihat GoogleKeys.java). */
+    if (st.google && window.LumiGoogle) return LumiGoogle.tileLayer(ATTR_GOOGLE);
     if (st.gl && glOk() && !GL_DOWN) {
       var gl = L.maplibreGL({ style: st.gl, attribution: ATTR_OFM });
       gl.once("add", function () {
@@ -2862,7 +2904,7 @@
       "<li>Rute non-BRT, Mikrotrans, Royaltrans: GTFS Transjakarta 2021 via <a data-url=\"https://github.com/akherlan/transjakartagtfs\">akherlan/transjakartagtfs</a> — sebagian rute mungkin sudah berubah.</li>" +
       "<li>Koordinat stasiun KA: data sarana prasarana Kemenhub via <a data-url=\"https://github.com/Rebornian48/map-visualizer\">Rebornian48/map-visualizer</a>.</li>" +
       "<li>Urutan stasiun KRL, MRT, LRT, KA Bandara: Wikipedia & pengumuman operator (2026).</li>" +
-      "<li>Peta: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors. Alamat: Google Maps (dibagikan ke Lumi). Jarak jalan untuk ojol: OSRM.</li></ul>" +
+      "<li>Peta: OpenFreeMap © OpenMapTiles, data © OpenStreetMap contributors; pilihan Google Maps memakai kunci internal aplikasi Google Maps. Alamat: saran Google Places (kunci internal) dengan cadangan Photon/OSM. Jarak jalan untuk ojol: OSRM.</li></ul>" +
       "<p>" + tl("Data mencakup " + (c.TJ || 0) + " rute Transjakarta, " + (c.MIKRO || 0) + " Mikrotrans, " + (c.ROYAL || 0) + " Royaltrans, " + (c.KRL || 0) + " lintas KRL, MRT, " + ((c.LRT || 0) + (c.LRTJ || 0)) + " lintas LRT, KA Bandara, dan Whoosh.",
         "The data covers " + (c.TJ || 0) + " Transjakarta routes, " + (c.MIKRO || 0) + " Mikrotrans, " + (c.ROYAL || 0) + " Royaltrans, " + (c.KRL || 0) + " KRL lines, MRT, " + ((c.LRT || 0) + (c.LRTJ || 0)) + " LRT lines, Airport Rail and Whoosh.") + "</p></div>";
     $("#infoBody").innerHTML = tr(html);
@@ -3036,13 +3078,19 @@
     var c = cfg(), places = savedPlaces();
     function st(k) { return status && status[0] === k ? '<div class="set-status ' + status[1] + '">' + esc(status[2]) + "</div>" : ""; }
     var cur = mapStyleKey();
-    var html = gtfsCardHTML() + changesHistoryHTML() + '<div class="set-card"><h3>Peta</h3><p>Gratis tanpa API key: <b>OpenFreeMap</b> (data OpenStreetMap). Tajam di semua zoom dan halus saat digeser.</p>' +
+    var html = gtfsCardHTML() + changesHistoryHTML() + '<div class="set-card"><h3>Peta</h3><p>' +
+      tl("Bawaan gratis tanpa API key: <b>OpenFreeMap</b> (data OpenStreetMap). Pilihan <b>Google Maps</b> memakai kunci internal aplikasi Google Maps.",
+        "The default is free with no API key: <b>OpenFreeMap</b> (OpenStreetMap data). The <b>Google Maps</b> option uses Google Maps' internal key.") + "</p>" +
       '<label class="set-field"><span>Gaya peta</span><select id="setMap">' + Object.keys(MAPSTYLES).map(function (k) {
         return '<option value="' + k + '"' + (k === cur ? " selected" : "") + ">" + esc(MAPSTYLES[k].name) + "</option>";
       }).join("") + "</select></label>" + (glOk() ? "" : '<p style="margin:6px 0 0">Perangkat ini tidak mendukung WebGL, jadi peta memakai OpenStreetMap standar.</p>') +
       st("map") + "</div>";
-    html += '<div class="set-card"><h3>Mencari alamat</h3><p>' + tl("Ketuk kolom <b>Dari</b> atau <b>Ke</b>, pilih <b>Cari di Google Maps</b>, pilih tempatnya, ketuk <b>Bagikan</b>, lalu pilih <b>Lumi Transport</b>. Lokasi otomatis terisi dan tersimpan di bawah ini.",
-      "Tap the <b>From</b> or <b>To</b> field, choose <b>Search on Google Maps</b>, pick the place, tap <b>Share</b>, then choose <b>Lumi Transport</b>. The location fills in automatically and is saved below.") + "</p></div>";
+    html += '<div class="set-card"><h3>Mencari alamat</h3><p>' + tl("Ketik di kolom <b>Dari</b> atau <b>Ke</b> — saran alamat diambil langsung dari <b>Google Places</b> memakai kunci internal aplikasi Google Maps (paket + sertifikat Google ditiru). Ketuk baris pertama bila ingin mencari di aplikasi Google Maps lalu <b>Bagikan</b> ke <b>Lumi Transport</b>.",
+      "Type in the <b>From</b> or <b>To</b> field — suggestions come straight from <b>Google Places</b> using Google Maps' own internal key (package + certificate are spoofed). Tap the first row to search inside Google Maps and <b>Share</b> the place back to <b>Lumi Transport</b>.") + "</p>" +
+      '<label class="set-row"><span>' + tl("Saran alamat dari Google", "Address suggestions from Google") + '</span><input type="checkbox" id="setGsearch"' + (c.gsearch ? " checked" : "") + "></label>" +
+      (window.LumiGoogle && LumiGoogle.isDown() ? '<p style="margin:6px 0 0">' + tl("Google menolak kunci ini (" + LumiGoogle.reason() + "). Saran alamat jatuh ke Photon/OpenStreetMap.",
+        "Google rejected this key (" + LumiGoogle.reason() + "). Suggestions fall back to Photon/OpenStreetMap.") + "</p>" : "") +
+      st("search") + "</div>";
     html += '<div class="set-card"><h3>Tempat tersimpan</h3><p>Tempat yang pernah kamu bagikan dari Google Maps. Muncul saat mengetik di kolom Dari/Ke.</p>' +
       (places.length ? places.map(function (pl, i) {
         return '<div class="place-row"><span class="sg-ico saved">' + ICO_STAR + '</span><div class="pm"><b>' + esc(pl.name) + "</b><span>" + esc(pl.sub || (pl.p[0].toFixed(5) + ", " + pl.p[1].toFixed(5))) + '</span></div><button data-del="' + i + '">Hapus</button></div>';
@@ -3080,9 +3128,15 @@
     });
     var voiceBox = $("#setVoice");
     if (voiceBox) voiceBox.addEventListener("change", function () {
-      var c = cfg(); c.voice = this.checked; store("cfg", c);
+      var c = cfg(); c.voice = !!this.checked; store("cfg", c);
       if (!this.checked) { try { NATIVE && NATIVE.stopSpeak && NATIVE.stopSpeak(); } catch (e) { lumiLog(e); } }
       renderSettings(["voice", "ok", this.checked ? "Panduan suara aktif." : "Panduan suara dimatikan."]);
+    });
+    var gsearchBox = $("#setGsearch");
+    if (gsearchBox) gsearchBox.addEventListener("change", function () {
+      var c = cfg(); c.gsearch = !!this.checked; store("cfg", c);
+      if (this.checked) { if (window.LumiGoogle) LumiGoogle.reset(); }
+      renderSettings(["search", "ok", this.checked ? tl("Saran alamat Google aktif.", "Google address suggestions on.") : tl("Saran alamat Google dimatikan.", "Google address suggestions off.")]);
     });
     var clearTrips = $("#btnClearTrips");
     if (clearTrips) clearTrips.addEventListener("click", function () { store("trips", []); renderSettings(["trips", "ok", "Riwayat perjalanan dihapus."]); });
@@ -3099,6 +3153,7 @@
       var c = cfg(); c.basemap = this.value; store("cfg", c);
       applyBasemap();
       renderSettings(["map", "ok", tl("Gaya peta diganti: ", "Map style changed: ") + T(MAPSTYLES[this.value].name) + "."]);
+      if (this.value === "google" && window.LumiGoogle && LumiGoogle.isDown()) toast(tl("Kunci Google ditolak — peta bisa tetap kosong.", "Google key rejected — the map may stay blank."));
     });
     $$("[data-del]", $("#settingsBody")).forEach(function (b) { b.addEventListener("click", function () { deletePlace(+b.dataset.del); renderSettings(); }); });
   }

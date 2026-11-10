@@ -10,6 +10,13 @@
 
 ---
 
+## ✦ v2.14.0 — 11 November 2026 / 11 November 2026
+
+- 🇮🇩 **Saran alamat langsung dari Google.** Kunci API internal aplikasi Google Maps (dari APK 26.44.06) dipakai dengan meniru header `X-Android-Package`/`X-Android-Cert`, jadi saran alamat muncul langsung saat mengetik di kolom Dari/Ke, lengkap dengan koordinat, dan tersimpan seperti biasa. Ada pilihan peta **Google Maps** (raster) di Pengaturan. Kalau Google mencabut kunci, semuanya otomatis kembali ke Photon/OpenStreetMap. Bukti lengkap di `docs/google-api-keys.md`. `versionCode` **21400**
+- 🇬🇧 **Address suggestions straight from Google.** Google Maps' internal API key (from APK 26.44.06) is used with spoofed `X-Android-Package`/`X-Android-Cert` headers, so suggestions appear while typing in From/To, coordinates included, and get saved as usual. Settings also offers a **Google Maps** raster basemap. If Google revokes the key, everything falls back to Photon/OpenStreetMap. Full evidence in `docs/google-api-keys.md`. `versionCode` **21400**
+
+---
+
 ## ✦ v2.13.4 — 10 November 2026 / 10 November 2026
 
 - 🇮🇩 Perapian hasil audit: GTFS resmi Transjakarta & koreksi titik OSM ikut di aplikasi (semua rute langsung lengkap), tarif satu sumber yang bisa diperbarui dari repo, data jarak jauh divalidasi, peta & layanan pihak ketiga punya cadangan, laporan bug melampirkan galat terakhir, sambutan & judul hasil tidak terjepit, ikon bertema. CI: hanya Gradle, lint, uji semua layar + terjemahan, action dikunci SHA. `versionCode` **21304**
