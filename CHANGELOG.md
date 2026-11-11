@@ -10,6 +10,13 @@
 
 ---
 
+## ✦ v2.18.1 — 11 November 2026 / 11 November 2026
+
+- 🇮🇩 **Perbaikan pendampingan & halte satu arah.** Pendampingan tidak lagi tertutup paksa saat dimulai: gaya notifikasi progres Android 16 ("Live Update") dihapus karena sebagian ROM (mis. HyperOS) gagal menampilkannya lalu sistem menutup aplikasi; notifikasi kini memakai batang progres biasa, dan semua tombol notifikasi punya ikon. Di halte satu arah (mis. "Pancoran Arah Barat"), bus disaring dari daftar sisa halte bus itu sendiri — bus yang hanya menyebut pasangannya ("… Arah Timur") dianggap arah sebaliknya — dan bila nama halte tidak ada di data rute, hanya satu arah terdekat yang dipakai. `versionCode` **21801**
+- 🇬🇧 **Guidance & one-way stop fixes.** Guidance no longer force-closes when it starts: the Android 16 progress notification style ("Live Update") was removed because some ROMs (e.g. HyperOS) fail to show it and the system then closes the app; the notification now uses a plain progress bar, and every notification button has an icon. At one-way stops (e.g. "Pancoran Arah Barat"), buses are filtered using the bus's own list of remaining stops — a bus that only lists the opposite stop ("… Arah Timur") is treated as going the other way — and when the stop name isn't in the route data, only the single nearest direction is used. `versionCode` **21801**
+
+---
+
 ## ✦ v2.18.0 — 11 November 2026 / 11 November 2026
 
 - 🇮🇩 **Update langsung & bus yang benar-benar searah.** **Cek & pasang update** kini mengunduh APK terbaru dari rilis GitHub lalu membuka pemasang Android (sekali izinkan "Instal aplikasi tak dikenal"). Di **halte satu arah** (mis. "Pancoran Arah Timur") dan di **detail rute per arah**, bus arah sebaliknya tidak lagi tampil — arah bus ditentukan dari tujuan bus, urutan sisa haltenya, lalu arah hadapnya. Perbaikan: **pendampingan dengan panduan suara tidak lagi menutup aplikasi** (notifikasi progres dibangun ulang tanpa gaya Live Update bila sistem menolaknya, suara tidak bisa lagi menghentikan layanan, mesin suara terdeteksi di Android 11+); **layar izin muat satu layar** tanpa digulir, juga dengan huruf besar; jarak bagian di lembar halte seragam. Dihapus: widget (Berangkat/Pulang dan Bus favorit) serta fitur "Laporkan masalah" / "Laporkan halte/rute salah" beserta catatan crash. `versionCode` **21800**

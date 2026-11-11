@@ -24,8 +24,6 @@
     <!-- Cek saldo kartu uang elektronik (opsional: aplikasi tetap terpasang di HP tanpa NFC) -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
-    <!-- v2.17: notifikasi progres pendampingan sebagai "Live Update" di Android 16+ (diabaikan versi lama) -->
-    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- v2.18: "Cek & pasang update" membuka pemasang Android untuk APK rilis terbaru -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 

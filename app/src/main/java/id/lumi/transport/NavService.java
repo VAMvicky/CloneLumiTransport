@@ -99,14 +99,18 @@ public class NavService extends Service {
      * batang progres. Dulu pengecualian di sini menutup aplikasi saat pendampingan dimulai.
      */
     private Notification build(String title, String text, GuideTracker.State st) {
-        for (int level = 2; level >= 0; level--) {
+        for (int level = 1; level >= 0; level--) {
             try { return buildAt(title, text, st, level); } catch (RuntimeException ignored) { }
         }
         return new Notification.Builder(this, CH_GUIDE).setSmallIcon(android.R.drawable.ic_menu_mylocation)
                 .setContentTitle(title).setOngoing(true).build();
     }
 
-    /** level 2 = progres + Live Update (API 36), 1 = batang progres biasa, 0 = teks saja. */
+    /**
+     * level 1 = dengan batang progres, 0 = teks saja.
+     * v2.18.1: gaya ProgressStyle/"Live Update" Android 16 dihapus. Sebagian ROM (mis. HyperOS) gagal
+     * menampilkannya dan sistem lalu menutup aplikasi ("Bad notification") — tidak bisa ditangkap dari kode.
+     */
     @SuppressWarnings("deprecation")
     private Notification buildAt(String title, String text, GuideTracker.State st, int level) {
         Notification.Builder b = new Notification.Builder(this, CH_GUIDE);
@@ -116,14 +120,12 @@ public class NavService extends Service {
                 .setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false)
                 .setColor(0xFF1565D8)
                 .setContentIntent(openApp())
-                .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, Lang.t("Berhenti", "Stop"), stopIntent()).build());
+                .addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel), Lang.t("Berhenti", "Stop"), stopIntent()).build());
         if (Build.VERSION.SDK_INT >= 28) b.setCategory(Notification.CATEGORY_NAVIGATION);
         GuideTracker t = tracker;
         if (level >= 1 && t != null && t.size() > 1) {
             // v2.17: notifikasi progres langsung. Semua versi: batang progres biasa.
-            // Android 16+: ProgressStyle bersegmen per ruas + "Live Update" di layar kunci / status bar.
             b.setProgress(t.size(), t.progress(), false);
-            if (level >= 2 && st != null && Build.VERSION.SDK_INT >= 36) LiveProgress.apply(b, t, st, title);
         }
         return b.build();
     }

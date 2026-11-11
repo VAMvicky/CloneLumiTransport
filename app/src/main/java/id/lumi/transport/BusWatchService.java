@@ -124,7 +124,7 @@ public class BusWatchService extends Service {
                 .setContentText(text).setStyle(new Notification.BigTextStyle().bigText(text))
                 .setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false).setColor(0xFF1565D8)
                 .setContentIntent(openPi())
-                .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, Lang.t("Berhenti", "Stop"), stopPi()).build());
+                .addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel), Lang.t("Berhenti", "Stop"), stopPi()).build());
         return b.build();
     }
 

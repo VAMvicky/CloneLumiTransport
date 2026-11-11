@@ -1064,7 +1064,11 @@
           if (bk >= 0) byDist.push({ dir: d, k: bk, next: d.s[bk + 1] || null, d: bd });
         });
         var minD = byDist.reduce(function (m, y) { return Math.min(m, y.d); }, 1);
-        stopDirs[LumiLive.norm(x.l.code)] = byName.length ? byName : byDist.filter(function (y) { return y.d <= minD + 0.015; });
+        // v2.18.1: halte satu arah tanpa nama yang cocok → hanya SATU arah terdekat (dulu dua arah bisa ikut).
+        var oneWayStop = /arah/.test(nmKey(stop.n));
+        stopDirs[LumiLive.norm(x.l.code)] = byName.length ? byName
+          : oneWayStop ? byDist.sort(function (a, b) { return a.d - b.d; }).slice(0, 1)
+          : byDist.filter(function (y) { return y.d <= minD + 0.015; });
       });
       var oneWay = stop && /arah/.test(nmKey(stop.n));
       var stopEta = function (b) {
@@ -1073,7 +1077,16 @@
         var be = busEnd(b, ln);
         // v2.18: halte satu arah tanpa arah rute yang dikenali / bus yang arahnya tidak bisa dipastikan: jangan ditebak.
         if (!ds || !ds.length) return oneWay ? null : busEta(b, ln, stop.p, etaTo(b, stop.n, null, stop.p));
-        if (oneWay && !be) return null;
+        if (oneWay) {
+          // v2.18.1: bukti terkuat = daftar sisa halte bus itu sendiri. Ada nama halte ini → searah;
+          // hanya ada pasangannya (mis. "… Arah Timur" saat memilih "… Arah Barat") → arah sebaliknya.
+          var sk = nmKey(stop.n), base = sk.replace(/arah[a-z]+$/, "");
+          var rest = (b.stops || []).filter(function (q) { return isFinite(+q.eta) && +q.eta >= 0; }).map(function (q) { return nmKey(q.name); });
+          var mine = rest.indexOf(sk) >= 0, other = rest.some(function (k) { return k !== sk && base && k.indexOf(base) === 0 && /arah/.test(k); });
+          if (other && !mine) return null;
+          if (!mine && !be) return null;
+          if (mine) be = null;                                     // bus menyebut halte ini: pasti searah
+        }
         var best = null;
         ds.forEach(function (x) {
           if (be && endKey(x.dir) !== be) return;               // bus arah sebaliknya

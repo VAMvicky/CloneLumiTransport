@@ -71,6 +71,10 @@
 
 ## ✨ Fitur
 
+**🆕 Baru di v2.18.1**
+- 🛠️ Pendampingan tidak lagi tertutup paksa saat dimulai (gaya notifikasi Live Update Android 16 dihapus karena ditolak sebagian ROM)
+- 🧭 Halte satu arah: bus arah sebaliknya kini disaring dari daftar sisa halte bus itu sendiri
+
 **🆕 Baru di v2.18**
 - ⬇️ **Update langsung dari aplikasi**: Pengaturan → Tentang → "Cek & pasang update" mengunduh APK terbaru dan membuka pemasang, tanpa membuka GitHub
 - 🧭 **Hanya bus searah**: di halte satu arah (mis. "Pancoran Arah Timur") dan di detail rute per arah, bus arah sebaliknya tidak lagi tampil — di daftar maupun di peta
@@ -81,7 +85,7 @@
 **🆕 Baru di v2.17**
 - 🗺️ **Peta offline Jabodetabek**: unduh sekali (Pengaturan → Peta offline), peta tetap tampil tanpa internet — dipakai otomatis saat sinyal hilang, atau pilih sebagai gaya peta
 - 🗣️ **Panduan suara dari layanan pendampingan**: langkah, sisa pemberhentian, dan "turun sekarang" dibacakan juga saat layar mati; suara navigasi menurunkan volume musik sejenak
-- 📊 **Notifikasi progres langsung**: batang progres perjalanan per ruas di notifikasi; di Android 16 tampil sebagai *Live Update* di layar kunci & status bar
+- 📊 **Notifikasi progres langsung**: batang progres perjalanan di notifikasi
 - ⚙️ **Preferensi rute**: batas jalan kaki, batas pindah, moda yang dihindari, sembunyikan ojol, urutan bawaan
 - 💰 **Rekap ongkos per bulan** di Riwayat, lengkap dengan rincian per moda
 - 💾 **Ekspor & impor data** ke satu berkas (favorit, riwayat, tempat, pengingat, preferensi) — pindah HP tanpa kehilangan apa pun

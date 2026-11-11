@@ -240,7 +240,7 @@ public final class Reminders {
             // Sistem tidak mengizinkan memulai pemantau otomatis (mis. alarm tidak tepat waktu): beri tombol.
             Intent w = new Intent(c, BusWatchService.class).putExtra("spec", bus.toString());
             PendingIntent wp = PendingIntent.getForegroundService(c, ("bus" + id).hashCode(), w, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            b.addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, Lang.t("Pantau bus", "Watch the bus"), wp).build());
+            b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(c, android.R.drawable.ic_dialog_info), Lang.t("Pantau bus", "Watch the bus"), wp).build());
         }
         try { nm.notify(NotifIds.reminder(id), b.build()); } catch (SecurityException ignored) { }
     }

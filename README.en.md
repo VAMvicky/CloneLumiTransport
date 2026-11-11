@@ -71,6 +71,10 @@
 
 ## ✨ Features
 
+**🆕 New in v2.18.1**
+- 🛠️ Guidance no longer force-closes when it starts (the Android 16 Live Update notification style was removed because some ROMs reject it)
+- 🧭 One-way stops: buses going the other way are now filtered using the bus's own list of remaining stops
+
 **🆕 New in v2.18**
 - ⬇️ **In-app updates**: Settings → About → "Check & install update" downloads the latest APK and opens the installer, no GitHub visit needed
 - 🧭 **Only buses going your way**: at one-way stops (e.g. "Pancoran Arah Timur") and in a route's per-direction view, buses going the other way are no longer shown — in the list or on the map
@@ -81,7 +85,7 @@
 **🆕 New in v2.17**
 - 🗺️ **Jabodetabek offline map**: download once (Settings → Offline map) and the map keeps working without internet — used automatically when you lose signal, or pick it as the map style
 - 🗣️ **Voice guidance from the guidance service**: steps, stops left and "get off now" are read out even with the screen off; navigation audio briefly lowers your music
-- 📊 **Live progress notification**: a per-leg trip progress bar in the notification; on Android 16 it shows as a *Live Update* on the lock screen & status bar
+- 📊 **Live progress notification**: a trip progress bar in the notification
 - ⚙️ **Route preferences**: longest walk, most transfers, modes to avoid, hide ride-hailing, default order
 - 💰 **Monthly spending summary** in History, split by mode
 - 💾 **Export & import** everything to one file (favourites, history, places, reminders, preferences) — switch phones without losing anything
