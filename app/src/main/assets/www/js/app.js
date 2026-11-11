@@ -175,8 +175,10 @@
     var need = ["tj", "krl", "mrt", "lrt", "lrtj", "kaBandara", "whoosh", "ojol"];
     for (var i = 0; i < need.length; i++) if (!f[need[i]] || typeof f[need[i]] !== "object") return false;
     var ok = true;
+    if (f.schedule !== undefined && !Array.isArray(f.schedule)) return false;
+    if ((f.schedule || []).some(function (x) { return !x || !/^\d{4}-\d{2}-\d{2}$/.test(String(x.from || "")) || !x.set || typeof x.set !== "object"; })) return false;
     (function walk(o, d) {
-      if (d > 5) { ok = false; return; }
+      if (d > 8) { ok = false; return; }
       for (var k in o) {
         var v = o[k];
         if (typeof v === "number") { if (!isFinite(v) || v < 0 || v > 1000000) ok = false; }
@@ -185,6 +187,7 @@
     })(f, 0);
     if (!ok || !Array.isArray(f.tj.free) || !Array.isArray(f.tj.premium) || !Array.isArray(f.lrtj.peak)) return false;
     try { f.tj.premium.forEach(function (p) { new RegExp(p[0]); }); } catch (e) { return false; }
+    try { (f.schedule || []).forEach(function (x) { ((x.set.tj || {}).premium || []).forEach(function (p) { new RegExp(p[0]); }); }); } catch (e) { return false; }
     return true;
   }
   /* Tarif terbaru dari repo (data/fares.json) menggantikan tarif bawaan bila lebih baru (R8). */
@@ -315,7 +318,14 @@
       (it.legs || []).forEach(function (l) {
         if (l.type === "ride" && l.line && !seen[l.line.mode]) { seen[l.line.mode] = 1; modes.push(MODES[l.line.mode] ? MODES[l.line.mode].label : l.line.mode); }
       });
-      list.unshift({ key: key, ts: now, from: S.from.name || "", to: S.to.name || "", mins: it.min || 0, fare: it.fareLo || 0, modes: modes.join(" + "),
+      // v2.17: ongkos per moda untuk rekap bulanan
+      var fm = {};
+      (it.legs || []).forEach(function (l) {
+        var k = l.type === "ride" && l.line ? l.line.mode : l.type === "ojol" ? "OJOL" : null;
+        var v = l.type === "ojol" ? (l.fare && l.fare.lo) || 0 : l.farePaid != null ? l.farePaid : l.fare || 0;
+        if (k && v > 0) fm[k] = (fm[k] || 0) + v;
+      });
+      list.unshift({ key: key, ts: now, from: S.from.name || "", to: S.to.name || "", mins: it.min || 0, fare: it.fareLo || 0, modes: modes.join(" + "), fm: fm,
         // v2.16: cukup untuk "Ulangi" perjalanan yang sama persis
         fromPt: ptOf(S.from), toPt: ptOf(S.to), sig: tripSig(it), summary: tripSummary(it) });
       store("trips", list.slice(0, 50));
@@ -338,6 +348,7 @@
     }).join("");
     return '<div class="set-card"><h3>Riwayat perjalanan</h3>' +
       "<p><b>" + n + tl(" perjalanan bulan ini", n === 1 ? " trip this month" : " trips this month") + "</b> · total <b>" + rp(total) + "</b></p>" +
+      recapHTML(list) +
       '<div class="hist-list">' + rows + "</div>" +
       '<button class="btn-sec" id="btnClearTrips" type="button">Hapus riwayat</button></div>';
   }
@@ -449,20 +460,26 @@
     return '<div class="set-card"><h3>Aksesibilitas</h3>' +
       '<label class="set-row"><span>Mode aksesibel</span><input type="checkbox" id="setAccess"' + (cfg().accessible ? " checked" : "") + '></label>' +
       '<label class="set-row"><span>Panduan suara</span><input type="checkbox" id="setVoice"' + (cfg().voice ? " checked" : "") + '></label>' +
-      '<p>Huruf lebih besar, tombol lebih tinggi, dan animasi dikurangi. Panduan suara membacakan langkah saat pendampingan berjalan.</p>' +
+      "<p>" + tl("Huruf lebih besar, tombol lebih tinggi, dan animasi dikurangi. Panduan suara membacakan langkah, sisa pemberhentian, dan peringatan turun selama pendampingan — juga saat layar mati atau aplikasi di belakang.",
+        "Larger text, taller buttons and fewer animations. Voice guidance reads out each step, the stops left and the get-off alerts during guidance — even with the screen off or the app in the background.") + "</p>" +
       "<p>" + tl("Mode aksesibel juga langsung menyalakan saringan \u201cRamah kursi roda\u201d di hasil rute dan menampilkan info lift/eskalator di tiap ruas.",
         "Accessible mode also turns on the \u201cWheelchair friendly\u201d filter in route results and shows lift/escalator info on each leg.") + "</p></div>";
   }
 
   /* ------------------------------------------------------- cadangkan & pulihkan */
-  var BACKUP_KEYS = ["cfg", "favs", "trips", "places", "recent", "onboarded", "guide", "remindLead"];
+  var BACKUP_KEYS = ["cfg", "favs", "trips", "places", "recent", "onboarded", "guide", "remindLead", "routePrefs"];
   function backupText() {
     var data = {};
     BACKUP_KEYS.forEach(function (k) {
       var v = store(k);
       if (v !== null && v !== undefined) data[k] = v;
     });
-    return JSON.stringify({ app: "LumiTransport", v: 1, ts: Date.now(), data: data });
+    // v2.17 (format 2): ditambah data native — pengingat berangkat, suara, bus di widget ETA.
+    var nat = {};
+    try { if (NATIVE && NATIVE.listReminders) nat.reminders = JSON.parse(NATIVE.listReminders()) || []; } catch (e) { lumiLog(e); }
+    try { if (NATIVE && NATIVE.etaWidgetList) nat.etaWidget = JSON.parse(NATIVE.etaWidgetList()) || []; } catch (e) { lumiLog(e); }
+    if (!NATIVE && store("reminders")) nat.reminders = store("reminders");
+    return JSON.stringify({ app: "LumiTransport", v: 2, ts: Date.now(), version: appVersion(), data: data, native: nat });
   }
   function doBackup() {
     var txt = backupText();
@@ -476,28 +493,18 @@
   function doRestore() {
     var ta = $("#restoreText");
     if (!ta) return;
-    var raw = (ta.value || "").trim();
-    var start = raw.indexOf("{");
-    if (start > 0) raw = raw.slice(start);
-    try {
-      var o = JSON.parse(raw);
-      if (!o || o.v !== 1 || !o.data) throw new Error("format");
-      var n = 0;
-      BACKUP_KEYS.forEach(function (k) {
-        if (o.data[k] !== undefined) { store(k, o.data[k]); n++; }
-      });
-      renderSettings(["backup", "ok", tl("Dipulihkan: " + n + " bagian data.", "Restored: " + n + " data sections.")]);
-      toast("Data dipulihkan");
-    } catch (e) {
-      toast("Teks cadangan tidak dikenali");
-    }
+    if (!restoreFrom(ta.value)) toast(tl("Teks cadangan tidak dikenali", "Backup text not recognised"));
   }
   function backupCardHTML() {
-    return '<div class="set-card"><h3>Cadangkan &amp; pulihkan</h3>' +
-      '<p>Cadangan berisi pengaturan, rute favorit, riwayat perjalanan, dan tempat tersimpan.</p>' +
-      '<button class="btn-sec" id="btnBackup" type="button">Cadangkan (bagikan)</button>' +
-      '<textarea id="restoreText" class="restore-box" placeholder="Tempel teks cadangan di sini, lalu ketuk Pulihkan"></textarea>' +
-      '<button class="btn-sec" id="btnRestore" type="button">Pulihkan dari teks</button></div>';
+    var file = !!(NATIVE ? NATIVE.exportFile : window.Blob);
+    return '<div class="set-card"><h3>' + tl("Ekspor &amp; impor data", "Export &amp; import data") + "</h3>" +
+      "<p>" + tl("Satu berkas berisi pengaturan, preferensi rute, rute favorit, riwayat & rekap ongkos, tempat tersimpan, pengingat berangkat, dan bus di widget ETA. Simpan di Drive atau kirim ke HP baru, lalu impor di sana.",
+        "One file with your settings, route preferences, favourite routes, trip history & spending, saved places, departure reminders and ETA-widget buses. Save it to Drive or send it to a new phone, then import it there.") + "</p>" +
+      (file ? '<div class="btn-row"><button class="btn-sec" id="btnExport" type="button">' + tl("Ekspor ke berkas", "Export to file") + '</button><button class="btn-sec" id="btnImport" type="button">' + tl("Impor dari berkas", "Import from file") + "</button></div>" : "") +
+      '<details class="restore-more"><summary>' + tl("Lewat teks (cara lama)", "As text (old way)") + "</summary>" +
+      '<button class="btn-sec" id="btnBackup" type="button">' + tl("Bagikan sebagai teks", "Share as text") + "</button>" +
+      '<textarea id="restoreText" class="restore-box" placeholder="' + tl("Tempel teks cadangan di sini, lalu ketuk Pulihkan", "Paste the backup text here, then tap Restore") + '"></textarea>' +
+      '<button class="btn-sec" id="btnRestore" type="button">' + tl("Pulihkan dari teks", "Restore from text") + "</button></details></div>";
   }
 
   /* ------------------------------------------------------- rute favorit */
@@ -1691,7 +1698,8 @@
     return km2 == null ? null : Math.round(km2 * 1000);
   }
   function renderGuide(st) {
-    if (st && cfg().voice && (st.text || st.title)) {
+    // v2.17: bila layanan pendampingan bisa membacakan sendiri (NATIVE.setVoice), halaman tidak ikut bicara.
+    if (st && cfg().voice && (st.text || st.title) && !(NATIVE && NATIVE.setVoice)) {
       var say = (st.title ? st.title + ". " : "") + (st.text || "");
       if (say !== S._voice) { S._voice = say; try { if (NATIVE && NATIVE.speak) NATIVE.speak(say); } catch (e) { lumiLog(e); } }
     }
@@ -1784,8 +1792,8 @@
   /* ------------------------------------------------------- pengaturan */
   // Bawaan tanpa API key (OpenFreeMap/OSM, Photon). Google Places & Static Maps opsional
   // lewat kunci internal aplikasi Google Maps — lihat js/gmaps.js dan docs/google-api-keys.md.
-  var DEFAULT_CFG = { basemap: "liberty", gsearch: true, accessible: false, voice: false, theme: "system", mapDark: true, lang: ((navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en") };
-  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, google: 1 };
+  var DEFAULT_CFG = { basemap: "liberty", gsearch: true, accessible: false, voice: false, theme: "system", mapDark: true, offlineAuto: true, lang: ((navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en") };
+  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, google: 1, offline: 1 };
   function cfg() {
     var c = store("cfg") || {};
     var o = {}; for (var k in DEFAULT_CFG) o[k] = c[k] === undefined ? DEFAULT_CFG[k] : c[k];
@@ -2177,6 +2185,8 @@
 
   function computePlan(roadK) {
     var t = targetDate();
+    // v2.17: tarif mengikuti tanggal perjalanan (perubahan tarif terjadwal di fares.json).
+    E.setFareDate(t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0"));
     if (S.time.mode !== "arr") return { dep: t, results: planner.plan(S.from.p, S.to.p, roadK, minOf(t), t.getDay()) };
     // "Tiba sebelum": cari dengan perkiraan jam berangkat, lalu ulangi dengan jam berangkat dari opsi tercepat.
     var guess = addMin(t, -Math.max(30, Math.round(E.hav(S.from.p, S.to.p) * 4 + 20)));
@@ -2217,7 +2227,7 @@
       var out = computePlan(null);
       if (seq !== planSeq) return;
       out.results.forEach(colorize);
-      S.results = out.results; S.dep = out.dep; S.arriveBy = out.arriveBy; S.showAll = false; S.filt = null;
+      S.results = out.results; S.dep = out.dep; S.arriveBy = out.arriveBy; S.showAll = false; S.filt = null; S.ignorePrefs = false;
       renderResults(out.results, out.dep);
       $("#tab-plan").scrollTop = 0;   // hanya pencarian baru yang kembali ke atas
       openWanted(out.results);        // v2.16: ulangi perjalanan favorit / riwayat / pengingat
@@ -2283,8 +2293,9 @@
     return it.legs.some(function (l) { return l.type === "ride" && f(l.line); });
   }
   function filterResults(results) {
-    var F = S.filt || (S.filt = { sort: "rec", modes: {}, access: !!cfg().accessible });
+    var F = S.filt || (S.filt = { sort: routePrefs().sort, modes: {}, access: !!cfg().accessible });
     var keys = Object.keys(F.modes).filter(function (k) { return F.modes[k]; });
+    results = applyPrefs(results);
     var out = results.filter(function (it) { return keys.every(function (k) { return itHas(it, k); }); });
     if (F.access) {
       // Ramah kursi roda: hanya opsi yang memenuhi; urut minim pindah → jalan kaki tersedikit → tercepat.
@@ -2308,7 +2319,7 @@
     return out;
   }
   function filterBar(results) {
-    var F = S.filt || (S.filt = { sort: "rec", modes: {}, access: !!cfg().accessible });
+    var F = S.filt || (S.filt = { sort: routePrefs().sort, modes: {}, access: !!cfg().accessible });
     var sorts = [["rec", "Rekomendasi"], ["fast", "Tercepat"], ["cheap", "Termurah"], ["few", "Minim transit"]];
     var h = '<div class="fbar" role="group" aria-label="Urutkan">' + sorts.map(function (x) {
       return '<button class="chip' + (F.sort === x[0] ? " on" : "") + '" data-sort="' + x[0] + '">' + x[1] + "</button>";
@@ -2331,7 +2342,7 @@
     var when = S.arriveBy ? tl("Tiba sebelum ", "Arrive by ") + dayWord(S.arriveBy) + clock(S.arriveBy) + tl(" · berangkat ±", " · leave ±") + clock(dep) : (S.time.mode === "now" ? tl("Berangkat sekarang, ", "Leaving now, ") : tl("Berangkat ", "Leaving ")) + dayWord(dep) + clock(dep);
     var html = '<div class="res-head"><h2>' + esc(S.from.name) + tl(" ke ", " to ") + esc(S.to.name) + '</h2><span class="res-acts"><button class="res-fav" id="btnFav" type="button">' + ICO_STAR + "<span>Simpan</span></button>" + '<button class="link" id="btnEdit">Ubah</button><button class="res-clear" id="btnClear" type="button" aria-label="Bersihkan dan kembali ke beranda"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>Bersihkan</button></span></div>' +
       '<div class="res-meta">' + when + " · " + (transit.length ? transit.length + tl(" pilihan transportasi umum + ojol", transit.length === 1 ? " public transport option + ride-hailing" : " public transport options + ride-hailing") : tl("pilihan ojol", "ride-hailing options")) + "</div>" +
-      filterBar(allResults);
+      filterBar(allResults) + prefNoteHTML();
     var fk = Object.keys(S.filt.modes).filter(function (k) { return S.filt.modes[k]; });
     if (S.filt.access && S.accessLoose && results.some(function (it) { return !it.direct; })) html += '<div class="warn">' +
       tl("Belum ada opsi yang sepenuhnya ramah kursi roda (jalan kaki jauh atau pindah > 2×). Di bawah ini yang jalan kakinya paling sedikit, tanpa Mikrotrans.",
@@ -2399,6 +2410,7 @@
         $("#tab-plan").scrollTop = top;
       });
     });
+    bindPrefNote(res, function () { var top = $("#tab-plan").scrollTop; renderResults(allResults, dep); $("#tab-plan").scrollTop = top; });
     $$(".it", res).forEach(function (el) {
       el.addEventListener("click", function (e) {
         var app = e.target.closest("[data-app]");
@@ -2420,7 +2432,8 @@
     bright: { name: "Bright (kontras)", gl: "https://tiles.openfreemap.org/styles/bright" },
     positron: { name: "Positron (terang, polos)", gl: "https://tiles.openfreemap.org/styles/positron" },
     osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" },
-    google: { name: "Google Maps (raster)", google: true }
+    google: { name: "Google Maps (raster)", google: true },
+    offline: { name: tl("Offline Jabodetabek (tersimpan di HP)", "Offline Jabodetabek (saved on phone)"), offline: true }
   };
   var ATTR_OFM = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
   var ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
@@ -2431,13 +2444,15 @@
     try { var c = document.createElement("canvas"); GL_OK = !!(window.maplibregl && L.maplibreGL && (c.getContext("webgl2") || c.getContext("webgl"))); } catch (e) { GL_OK = false; }
     return GL_OK;
   }
-  function mapStyleKey() { var b = cfg().basemap; return MAPSTYLES[b] ? b : "liberty"; }
+  function mapStyleKey() { var b = cfg().basemap; return MAPSTYLES[b] && (b !== "offline" || offlineReady()) ? b : "liberty"; }
   var GL_DOWN = false;   // R9: OpenFreeMap tidak menjawab → peta raster OSM sampai aplikasi dibuka ulang
   function baseLayer() {
     var st = MAPSTYLES[mapStyleKey()];
     /* Peta Google: petak raster dari Static Maps, dimuat lewat <img> yang headernya
      * dipasang shouldInterceptRequest (lihat GoogleKeys.java). */
     if (st.google && window.LumiGoogle) return LumiGoogle.tileLayer(ATTR_GOOGLE);
+    // v2.17: peta offline Jabodetabek — dipilih langsung, atau otomatis saat tanpa internet / server peta mati.
+    if (glOk() && offlineReady() && (st.offline || (cfg().offlineAuto !== false && (!navigator.onLine || GL_DOWN)))) return offlineLayer();
     if (st.gl && glOk() && !GL_DOWN) {
       var gl = L.maplibreGL({ style: st.gl, attribution: ATTR_OFM });
       gl.once("add", function () {
@@ -2583,7 +2598,8 @@
           (l.variant ? '<div class="alt">' + esc(T(l.variant)) + "</div>" : "") +
           (l.fareNote ? '<div class="alt">' + tl("Tarif: ", "Fare: ") + esc(T(l.fareNote)) + "</div>" : "") +
           (liveOk(l.line) ? '<div class="live-eta" data-leg="' + i + '"><i class="live-dot"></i>' + tl("Mencari posisi bus ", "Finding bus ") + esc(l.line.code) + "…</div>" +
-            (NATIVE && NATIVE.busWatchStart ? '<button class="bw-btn" type="button" data-bw="' + i + '"></button>' : "") : "") +
+            (NATIVE && NATIVE.busWatchStart ? '<button class="bw-btn" type="button" data-bw="' + i + '"></button>' : "") +
+            (NATIVE && NATIVE.etaWidgetToggle ? '<button class="bw-btn etaw-btn" type="button" data-etaw="' + i + '"></button>' : "") : "") +
           disruptionsFor(l.line).map(function (x) { return disruptionHTML(x, true); }).join("") +
           (S.filt && S.filt.access || cfg().accessible ? accessLegHTML(l) : "") +
           '<div class="meta"><span>' + stopWord(l.stops.length - 1, RAIL[l.line.mode]) + "</span><span>±" + mins(l.min) + "</span><span>" + (l.farePaid === 0 && l.fare > 0 ? tl("sudah termasuk", "already paid") : fareText(l.farePaid, l.farePaid)) + "</span><span>" + tl("tunggu ±", "wait ±") + mins(l.wait) + "</span></div>" +
@@ -2603,6 +2619,7 @@
     var body = $("#tripBody"); body.innerHTML = tr(html); body.scrollTop = 0;
     tripExtrasBind(it, body);
     bindBusWatch(it, body);
+    bindEtaWidget(it, body);
     $("#btnReportStop").addEventListener("click", reportStopIssue);
     $$("[data-tog]", body).forEach(function (b) {
       b.addEventListener("click", function () { var ul = b.closest(".st-card").querySelector(".st-stops"); ul.hidden = !ul.hidden; b.textContent = ul.hidden ? showStopsText(+b.dataset.tog) : tl("Sembunyikan pemberhentian", "Hide stops"); });
@@ -3099,7 +3116,8 @@
       [tl("KA Bandara", "Airport Rail"), "±05.00–23.00"], ["Whoosh", "±06.00–21.30"], [tl("Ojol", "Ride-hailing"), "24 jam"]],
       "Saat kamu memilih jam berangkat, Lumi hanya memakai moda yang beroperasi pada jam itu. Jadwal bisa berubah saat libur nasional.");
     // Angka tarif dari data/fares.json (R8); catatan berbahasa ganda ada di fares.notes.
-    var F = E.fares(), note = function (k) { var n = (F.notes || {})[k]; return n ? tl(n.id, n.en) : ""; };
+    var F = E.fares(E.ymdWib()), note = function (k) { var n = (F.notes || {})[k]; return n ? tl(n.id, n.en) : ""; };
+    html += upcomingFaresHTML();
     var range2 = function (a) { return rp(a[0]) + "–" + rp(a[1]).replace("Rp", ""); };
     var prem = function (re) { var p = F.tj.premium.filter(function (x) { return x[0] === re; })[0]; return p ? rp(p[1]) : "–"; };
     html += card("Transjakarta", "#C1272D", [["BRT, non-BRT & Transjabodetabek (mis. T31, P11, SH1)", rp(F.tj.base)], ["Pukul 05.00–07.00", rp(F.tj.morning)],
@@ -3302,10 +3320,11 @@
     var html = gtfsCardHTML() + changesHistoryHTML() + '<div class="set-card"><h3>Peta</h3><p>' +
       tl("Bawaan gratis tanpa API key: <b>OpenFreeMap</b> (data OpenStreetMap). Pilihan <b>Google Maps</b> memakai kunci internal aplikasi Google Maps.",
         "The default is free with no API key: <b>OpenFreeMap</b> (OpenStreetMap data). The <b>Google Maps</b> option uses Google Maps' internal key.") + "</p>" +
-      '<label class="set-field"><span>Gaya peta</span><select id="setMap">' + Object.keys(MAPSTYLES).map(function (k) {
+      '<label class="set-field"><span>Gaya peta</span><select id="setMap">' + Object.keys(MAPSTYLES).filter(function (k) { return k !== "offline" || offlineReady(); }).map(function (k) {
         return '<option value="' + k + '"' + (k === cur ? " selected" : "") + ">" + esc(MAPSTYLES[k].name) + "</option>";
       }).join("") + "</select></label>" + (glOk() ? "" : '<p style="margin:6px 0 0">Perangkat ini tidak mendukung WebGL, jadi peta memakai OpenStreetMap standar.</p>') +
       st("map") + "</div>";
+    html += offlineCardHTML();
     html += '<div class="set-card"><h3>Mencari alamat</h3><p>' + tl("Ketik di kolom <b>Dari</b> atau <b>Ke</b> — saran alamat diambil langsung dari <b>Google Places</b> memakai kunci internal aplikasi Google Maps (paket + sertifikat Google ditiru). Ketuk baris pertama bila ingin mencari di aplikasi Google Maps lalu <b>Bagikan</b> ke <b>Lumi Transport</b>.",
       "Type in the <b>From</b> or <b>To</b> field — suggestions come straight from <b>Google Places</b> using Google Maps' own internal key (package + certificate are spoofed). Tap the first row to search inside Google Maps and <b>Share</b> the place back to <b>Lumi Transport</b>.") + "</p>" +
       '<label class="set-row"><span>' + tl("Saran alamat dari Google", "Address suggestions from Google") + '</span><input type="checkbox" id="setGsearch"' + (c.gsearch ? " checked" : "") + "></label>" +
@@ -3318,6 +3337,7 @@
       }).join("") : '<p>Belum ada tempat tersimpan.</p>') + "</div>";
     html += historyCardHTML();
     html += favCardHTML();
+    html += prefsCardHTML() + st("prefs");
     html += remindersCardHTML() + st("rem");
     html += backupCardHTML();
     html += themeCardHTML();
@@ -3350,6 +3370,10 @@
     var btnBackup = $("#btnBackup"), btnRestore = $("#btnRestore");
     if (btnBackup) btnBackup.addEventListener("click", doBackup);
     if (btnRestore) btnRestore.addEventListener("click", doRestore);
+    if ($("#btnExport")) $("#btnExport").addEventListener("click", doExport);
+    if ($("#btnImport")) $("#btnImport").addEventListener("click", doImport);
+    bindPrefsCard($("#settingsBody"));
+    bindOfflineCard($("#settingsBody"));
     var accBox = $("#setAccess");
     if (accBox) accBox.addEventListener("change", function () {
       var c = cfg(); c.accessible = !!this.checked; store("cfg", c); applyAccessible();
@@ -3358,6 +3382,7 @@
     var voiceBox = $("#setVoice");
     if (voiceBox) voiceBox.addEventListener("change", function () {
       var c = cfg(); c.voice = !!this.checked; store("cfg", c);
+      syncVoice();
       if (!this.checked) { try { NATIVE && NATIVE.stopSpeak && NATIVE.stopSpeak(); } catch (e) { lumiLog(e); } }
       renderSettings(["voice", "ok", this.checked ? "Panduan suara aktif." : "Panduan suara dimatikan."]);
     });
@@ -4173,6 +4198,312 @@
   if (obStage !== 2) showOnboarding(obStage === 1 ? 2 : 1);
   document.documentElement.classList.remove("ob-pending");
 
+  /* =======================================================================================
+   * v2.17 — panduan suara native, ekspor/impor berkas, preferensi rute, rekap ongkos bulanan,
+   * widget ETA bus favorit, tarif dengan tanggal berlaku, dan peta offline Jabodetabek.
+   * ======================================================================================= */
+
+  /* ---------------------------------------------------------------- panduan suara (layanan native) */
+  function syncVoice() { try { if (NATIVE && NATIVE.setVoice) NATIVE.setVoice(!!cfg().voice); } catch (e) { lumiLog(e); } }
+
+  /* ---------------------------------------------------------------- ekspor & impor berkas */
+  function doExport() {
+    var name = "lumi-cadangan-" + E.ymdWib() + ".json", txt = backupText();
+    if (NATIVE && NATIVE.exportFile) { NATIVE.exportFile(name, txt); return; }
+    try {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([txt], { type: "application/json" })); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast(tl("Cadangan diunduh", "Backup downloaded"));
+    } catch (e) { lumiLog(e); toast(tl("Ekspor gagal", "Export failed")); }
+  }
+  window.__lumiExported = function (ok) {
+    toast(ok ? tl("Cadangan tersimpan ke berkas", "Backup saved to file") : tl("Ekspor dibatalkan", "Export cancelled"));
+  };
+  function doImport() {
+    if (NATIVE && NATIVE.importFile) { NATIVE.importFile(); return; }
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,text/plain";
+    inp.onchange = function () {
+      var f = inp.files && inp.files[0]; if (!f) return;
+      var r = new FileReader(); r.onload = function () { window.__lumiImport(String(r.result || "")); }; r.readAsText(f);
+    };
+    inp.click();
+  }
+  window.__lumiImport = function (text) {
+    if (text == null) { toast(tl("Impor dibatalkan", "Import cancelled")); return; }
+    if (!restoreFrom(text)) toast(tl("Berkas cadangan tidak dikenali", "Backup file not recognised"));
+  };
+  /* Pulihkan dari teks cadangan (format 1 lama atau format 2). true bila berhasil. */
+  function restoreFrom(raw) {
+    raw = String(raw || "").trim();
+    var start = raw.indexOf("{");
+    if (start > 0) raw = raw.slice(start);
+    var o;
+    try { o = JSON.parse(raw); } catch (e) { return false; }
+    if (!o || (o.v !== 1 && o.v !== 2) || !o.data || typeof o.data !== "object") return false;
+    var n = 0;
+    BACKUP_KEYS.forEach(function (k) { if (o.data[k] !== undefined) { store(k, o.data[k]); n++; } });
+    var nat = o.native || {};
+    if (Array.isArray(nat.reminders) && nat.reminders.length) {
+      var okR = 0;
+      nat.reminders.forEach(function (r) {
+        try {
+          if (NATIVE && NATIVE.setReminder) { var res = JSON.parse(NATIVE.setReminder(JSON.stringify(r)) || "{}"); if (res.ok) okR++; }
+          else okR++;
+        } catch (e) { lumiLog(e); }
+      });
+      if (!NATIVE) store("reminders", nat.reminders);
+      if (okR) n++;
+    }
+    if (Array.isArray(nat.etaWidget)) { try { NATIVE && NATIVE.etaWidgetSetList && NATIVE.etaWidgetSetList(JSON.stringify(nat.etaWidget.slice(0, 3))); n++; } catch (e) { lumiLog(e); } }
+    try { var c = cfg(); if (NATIVE && NATIVE.setLang) NATIVE.setLang(c.lang); } catch (e) { lumiLog(e); }
+    syncVoice(); syncWatched(); applyAccessible(); applyTheme(); applyBasemap();
+    renderSettings(["backup", "ok", tl("Dipulihkan: " + n + " bagian data.", "Restored: " + n + " data sections.")]);
+    toast(tl("Data dipulihkan", "Data restored"));
+    return true;
+  }
+
+  /* ---------------------------------------------------------------- preferensi rute */
+  var PREF_SORTS = [["rec", "Rekomendasi", "Recommended"], ["fast", "Tercepat", "Fastest"], ["cheap", "Termurah", "Cheapest"], ["few", "Minim transit", "Fewest transfers"]];
+  function routePrefs() {
+    var p = store("routePrefs") || {};
+    var avoid = {}; Object.keys(p.avoid || {}).forEach(function (k) { if (p.avoid[k]) avoid[k] = true; });
+    return { maxWalk: Math.max(0, +p.maxWalk || 0), maxTr: p.maxTr == null || isNaN(+p.maxTr) ? -1 : +p.maxTr, avoid: avoid, noOjol: !!p.noOjol,
+      sort: PREF_SORTS.some(function (x) { return x[0] === p.sort; }) ? p.sort : "rec" };
+  }
+  function prefsActive(p) { return p.maxWalk > 0 || p.maxTr >= 0 || p.noOjol || Object.keys(p.avoid).length > 0; }
+  function walkKm(it) { return it.legs.reduce(function (s, l) { return s + (l.type === "walk" || l.type === "transfer" ? l.km || 0 : 0); }, 0); }
+  function prefOk(it, p) {
+    if (hasOj(it)) return !p.noOjol;
+    if (p.maxWalk > 0 && walkKm(it) > p.maxWalk + 1e-9) return false;
+    if (p.maxTr >= 0 && it.transfers > p.maxTr) return false;
+    for (var k in p.avoid) if (k !== "OJOL" && itHas(it, k)) return false;
+    return true;
+  }
+  /* Opsi yang tidak sesuai preferensi disembunyikan; bila semua angkutan umum tersaring, preferensi dilonggarkan. */
+  function applyPrefs(results) {
+    var p = routePrefs();
+    S.prefHidden = 0; S.prefLoose = false;
+    if (S.ignorePrefs || !prefsActive(p)) return results;
+    var ok = results.filter(function (it) { return prefOk(it, p); });
+    var anyTransit = function (r) { return r.some(function (it) { return !hasOj(it); }); };
+    if (anyTransit(results) && !anyTransit(ok)) { S.prefLoose = true; return results; }
+    S.prefHidden = results.length - ok.length;
+    return ok;
+  }
+  function prefNoteHTML() {
+    var p = routePrefs();
+    if (!prefsActive(p)) return "";
+    if (S.ignorePrefs) return '<div class="pref-note">' + tl("Preferensi rute tidak dipakai untuk pencarian ini.", "Route preferences are off for this search.") +
+      ' <button class="link" type="button" data-prefon>' + tl("Pakai lagi", "Use them") + "</button></div>";
+    if (S.prefLoose) return '<div class="pref-note">' + tl("Tidak ada opsi yang sesuai semua preferensi rutemu — semua opsi ditampilkan.", "No option matches all your route preferences — showing everything.") + "</div>";
+    if (!S.prefHidden) return "";
+    return '<div class="pref-note">' + tl(S.prefHidden + " opsi disembunyikan sesuai preferensi rute.", S.prefHidden + (S.prefHidden === 1 ? " option hidden" : " options hidden") + " by your route preferences.") +
+      ' <button class="link" type="button" data-prefoff>' + tl("Tampilkan semua", "Show all") + "</button></div>";
+  }
+  function bindPrefNote(root, rerender) {
+    var off = $("[data-prefoff]", root), on = $("[data-prefon]", root);
+    if (off) off.addEventListener("click", function () { S.ignorePrefs = true; rerender(); });
+    if (on) on.addEventListener("click", function () { S.ignorePrefs = false; rerender(); });
+  }
+  function prefsCardHTML() {
+    var p = routePrefs();
+    var opt = function (v, cur, label) { return '<option value="' + v + '"' + (String(v) === String(cur) ? " selected" : "") + ">" + label + "</option>"; };
+    return '<div class="set-card" id="prefsCard"><h3>' + tl("Preferensi rute", "Route preferences") + "</h3>" +
+      "<p>" + tl("Dipakai di setiap pencarian. Opsi yang tidak sesuai disembunyikan, dan bisa ditampilkan lagi dari hasil.", "Applied to every search. Options that don't fit are hidden and can be shown again from the results.") + "</p>" +
+      '<label class="set-field"><span>' + tl("Jalan kaki paling jauh", "Longest walk") + '</span><select id="prefWalk">' +
+        opt(0, p.maxWalk, tl("Bebas", "Any")) + opt(0.5, p.maxWalk, "500 m") + opt(1, p.maxWalk, "1 km") + opt(2, p.maxWalk, "2 km") + "</select></label>" +
+      '<label class="set-field"><span>' + tl("Pindah paling banyak", "Most transfers") + '</span><select id="prefTr">' +
+        opt(-1, p.maxTr, tl("Bebas", "Any")) + opt(0, p.maxTr, tl("Tanpa pindah", "No transfers")) + opt(1, p.maxTr, "1×") + opt(2, p.maxTr, "2×") + "</select></label>" +
+      '<label class="set-field"><span>' + tl("Urutan bawaan", "Default order") + '</span><select id="prefSort">' +
+        PREF_SORTS.map(function (x) { return opt(x[0], p.sort, tl(x[1], x[2])); }).join("") + "</select></label>" +
+      '<div class="pref-avoid" role="group" aria-label="' + tl("Hindari moda", "Avoid modes") + '"><span class="fl">' + tl("Hindari", "Avoid") + "</span>" +
+        FMODES.filter(function (m) { return m[0] !== "OJOL"; }).map(function (m) {
+          return '<button type="button" class="chip mode' + (p.avoid[m[0]] ? " on" : "") + '" data-avoid="' + m[0] + '" aria-pressed="' + !!p.avoid[m[0]] + '">' + m[1] + "</button>";
+        }).join("") + "</div>" +
+      '<label class="set-row"><span>' + tl("Sembunyikan opsi ojol", "Hide ride-hailing options") + '</span><input type="checkbox" id="prefNoOjol"' + (p.noOjol ? " checked" : "") + "></label>" +
+      (prefsActive(p) ? '<button class="btn-sec" id="prefReset" type="button">' + tl("Atur ulang preferensi", "Reset preferences") + "</button>" : "") + "</div>";
+  }
+  function bindPrefsCard(root) {
+    if (!$("#prefsCard", root)) return;
+    var save = function (mut, msg) {
+      var p = store("routePrefs") || {}; mut(p); store("routePrefs", p);
+      var keep = $("#settingsBody").scrollTop;
+      renderSettings(["prefs", "ok", msg || tl("Preferensi rute disimpan.", "Route preferences saved.")]);
+      $("#settingsBody").scrollTop = keep;
+      if (S.results && !$("#results").hidden) { S.filt = null; renderResults(S.results, S.dep); }
+    };
+    $("#prefWalk", root).addEventListener("change", function () { var v = +this.value; save(function (p) { p.maxWalk = v; }); });
+    $("#prefTr", root).addEventListener("change", function () { var v = +this.value; save(function (p) { p.maxTr = v; }); });
+    $("#prefSort", root).addEventListener("change", function () { var v = this.value; save(function (p) { p.sort = v; }); });
+    $("#prefNoOjol", root).addEventListener("change", function () { var v = !!this.checked; save(function (p) { p.noOjol = v; }); });
+    $$("[data-avoid]", root).forEach(function (b) {
+      b.addEventListener("click", function () { var k = b.dataset.avoid; save(function (p) { p.avoid = p.avoid || {}; p.avoid[k] = !p.avoid[k]; }); });
+    });
+    var rs = $("#prefReset", root);
+    if (rs) rs.addEventListener("click", function () { save(function (p) { Object.keys(p).forEach(function (k) { delete p[k]; }); }, tl("Preferensi rute diatur ulang.", "Route preferences reset.")); });
+  }
+
+  /* ---------------------------------------------------------------- rekap ongkos per bulan */
+  var MONTHS = [["Jan", "Jan"], ["Feb", "Feb"], ["Mar", "Mar"], ["Apr", "Apr"], ["Mei", "May"], ["Jun", "Jun"], ["Jul", "Jul"], ["Agu", "Aug"], ["Sep", "Sep"], ["Okt", "Oct"], ["Nov", "Nov"], ["Des", "Dec"]];
+  function modeName(k) { return k === "OJOL" ? tl("Ojol", "Ride-hail") : MODES[k] ? MODES[k].label : k; }
+  function recapHTML(list) {
+    var by = {};
+    list.forEach(function (t) {
+      var d = wibOf(t.ts || 0), k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      var m = by[k] || (by[k] = { y: d.getFullYear(), m: d.getMonth(), n: 0, total: 0, mins: 0, fm: {}, rest: 0 });
+      m.n++; m.total += t.fare || 0; m.mins += t.mins || 0;
+      var sum = 0;
+      Object.keys(t.fm || {}).forEach(function (x) { m.fm[x] = (m.fm[x] || 0) + t.fm[x]; sum += t.fm[x]; });
+      if ((t.fare || 0) > sum) m.rest += (t.fare || 0) - sum;   // perjalanan lama tanpa rincian per moda
+    });
+    var keys = Object.keys(by).sort().reverse().slice(0, 6);
+    if (!keys.length) return "";
+    var max = Math.max.apply(null, keys.map(function (k) { return by[k].total; }).concat([1]));
+    var cur = by[keys[0]];
+    var parts = Object.keys(cur.fm).sort(function (a, b) { return cur.fm[b] - cur.fm[a]; });
+    var html = '<div class="recap"><div class="recap-h">' + tl("Rekap ongkos per bulan", "Monthly spending") + "</div>" +
+      keys.map(function (k) {
+        var m = by[k], w = Math.max(2, Math.round(m.total / max * 100));
+        return '<div class="recap-row"><span class="recap-m">' + tl(MONTHS[m.m][0], MONTHS[m.m][1]) + " " + String(m.y).slice(2) + '</span><span class="recap-bar"><i style="width:' + w + '%"></i></span>' +
+          '<span class="recap-v tnum">' + rp(m.total) + '</span><span class="recap-n">' + m.n + "×</span></div>";
+      }).join("");
+    html += '<p class="recap-sub">' + tl("Rata-rata " + rp(Math.round(cur.total / cur.n)) + " per perjalanan · ±" + mins(Math.round(cur.mins / cur.n)) + " per perjalanan",
+      "Average " + rp(Math.round(cur.total / cur.n)) + " per trip · ±" + mins(Math.round(cur.mins / cur.n)) + " per trip") + "</p>";
+    if (parts.length) html += '<div class="recap-modes">' + parts.map(function (x) {
+      return '<span class="chip">' + esc(modeName(x)) + " " + rp(cur.fm[x]) + "</span>";
+    }).join("") + (cur.rest > 0 ? '<span class="chip">' + tl("lainnya ", "other ") + rp(cur.rest) + "</span>" : "") + "</div>";
+    return html + "</div>";
+  }
+
+  /* ---------------------------------------------------------------- widget ETA bus favorit */
+  var ICO_WIDGET = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="13.5" width="17" height="7" rx="1.6" fill="currentColor"/></svg>';
+  function etaKey(spec) { return LumiLive.norm(spec.code) + "|" + (spec.stop ? spec.stop.name : ""); }
+  function etaPinned() {
+    var o = {};
+    try { (JSON.parse(NATIVE.etaWidgetList() || "[]") || []).forEach(function (x) { o[etaKey(x)] = 1; }); } catch (e) { lumiLog(e); }
+    return o;
+  }
+  function bindEtaWidget(it, body) {
+    if (!NATIVE || !NATIVE.etaWidgetToggle) return;
+    var paint = function () {
+      var pinned = etaPinned();
+      $$("[data-etaw]", body).forEach(function (b) {
+        var l = it.legs[+b.dataset.etaw], on = !!(l && l.fromP && l.toP) && !!pinned[etaKey(busSpec(l))];
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on);
+        b.innerHTML = ICO_WIDGET + "<span>" + (on ? tl("Ada di widget ETA · ketuk untuk melepas", "On the ETA widget · tap to remove")
+          : tl("Pasang di widget ETA (layar utama)", "Add to the ETA widget (home screen)")) + "</span>";
+      });
+    };
+    $$("[data-etaw]", body).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var l = it.legs[+b.dataset.etaw]; if (!l || !l.fromP || !l.toP) return;
+        var on = false;
+        try { on = !!NATIVE.etaWidgetToggle(JSON.stringify(busSpec(l))); } catch (e) { lumiLog(e); }
+        if (on) {
+          var placed = false; try { placed = !!(NATIVE.etaWidgetPlaced && NATIVE.etaWidgetPlaced()); } catch (e) { lumiLog(e); }
+          var pin = false; if (!placed) { try { pin = !!(NATIVE.etaWidgetPin && NATIVE.etaWidgetPin()); } catch (e) { lumiLog(e); } }
+          toast(placed ? tl("Bus " + l.line.code + " dipasang di widget ETA", "Bus " + l.line.code + " added to the ETA widget")
+            : pin ? tl("Pilih “Tambahkan” untuk menaruh widget di layar utama", "Choose “Add” to put the widget on your home screen")
+            : tl("Tersimpan. Tambahkan widget “Lumi · ETA bus” dari menu widget layar utama.", "Saved. Add the “Lumi · ETA bus” widget from your home screen's widget menu."));
+        } else toast(tl("Dilepas dari widget ETA", "Removed from the ETA widget"));
+        paint();
+      });
+    });
+    paint();
+  }
+
+  /* ---------------------------------------------------------------- tarif dengan tanggal berlaku */
+  function upcomingFaresHTML() {
+    var up = E.upcomingFares ? E.upcomingFares(E.ymdWib()) : [];
+    if (!up.length) return "";
+    return up.map(function (x) {
+      var n = x.note ? tl(x.note.id || "", x.note.en || x.note.id || "") : tl("Tarif baru berlaku otomatis di hasil rute mulai tanggal ini.", "New fares apply automatically to route results from this date.");
+      return '<div class="warn"><b>' + tl("Mulai ", "From ") + esc(fmtDate(x.from)) + ":</b> " + esc(n) + "</div>";
+    }).join("");
+  }
+
+  /* ---------------------------------------------------------------- peta offline Jabodetabek */
+  var OFF = { st: null, proto: false };
+  function offlineState() {
+    if (!NATIVE || !NATIVE.offlineMapState) return null;
+    if (!OFF.st) { try { OFF.st = JSON.parse(NATIVE.offlineMapState() || "null"); } catch (e) { lumiLog(e); } }
+    return OFF.st;
+  }
+  function offlineReady() { var s = offlineState(); return !!(s && s.ready); }
+  /* Protokol "lumioff://": diteruskan ke https://lumi-offline.local yang dilayani native (OfflineMap.java).
+     Dijalankan di thread utama halaman, jadi permintaan selalu lewat shouldInterceptRequest. */
+  function offlineProtocol() {
+    if (OFF.proto || !window.maplibregl || !maplibregl.addProtocol) return;
+    OFF.proto = true;
+    maplibregl.addProtocol("lumioff", function (params, ac) {
+      var url = "https://lumi-offline.local/" + String(params.url).replace(/^lumioff:\/\//, "");
+      return fetch(url, { signal: ac && ac.signal }).then(function (r) {
+        if (r.status === 204) return { data: params.type === "json" ? {} : new ArrayBuffer(0) };
+        if (!r.ok) throw new Error("offline " + r.status);
+        return params.type === "json" ? r.json().then(function (d) { return { data: d }; }) : r.arrayBuffer().then(function (b) { return { data: b }; });
+      });
+    });
+  }
+  function offlineLayer() {
+    offlineProtocol();
+    return L.maplibreGL({ style: "lumioff://style.json", attribution: ATTR_OFM + " · " + tl("offline", "offline") });
+  }
+  function fmtMB(b) { return (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace(".", EN ? "." : ",") + " MB"; }
+  function offlineCardHTML() {
+    if (!NATIVE || !NATIVE.offlineMapState) return "";
+    var s = offlineState() || {};
+    var h = '<div class="set-card" id="offCard"><h3>' + tl("Peta offline Jabodetabek", "Jabodetabek offline map") + "</h3>";
+    if (s.downloading) {
+      h += "<p>" + tl("Mengunduh peta… ", "Downloading the map… ") + Math.max(0, s.progress | 0) + "%</p>" +
+        '<div class="off-bar"><i style="width:' + Math.max(2, s.progress | 0) + '%"></i></div>';
+    } else if (s.ready) {
+      h += "<p>" + tl("Tersimpan di HP · ", "Saved on this phone · ") + fmtMB(s.bytes || 0) + (s.date ? tl(" · data OpenStreetMap ", " · OpenStreetMap data of ") + esc(fmtDate(s.date)) : "") + "</p>" +
+        '<label class="set-row"><span>' + tl("Pakai otomatis saat tanpa internet", "Use automatically when offline") + '</span><input type="checkbox" id="offAuto"' + (cfg().offlineAuto !== false ? " checked" : "") + "></label>" +
+        "<p>" + tl("Pilih juga “Offline Jabodetabek” di Gaya peta agar selalu dipakai (hemat kuota).", "You can also pick “Offline Jabodetabek” as the map style to always use it (saves data).") + "</p>" +
+        '<div class="btn-row"><button class="btn-sec" id="offUpdate" type="button">' + tl("Perbarui", "Update") + '</button><button class="btn-sec" id="offDel" type="button">' + tl("Hapus peta", "Delete map") + "</button></div>";
+    } else {
+      h += "<p>" + tl("Unduh sekali (±50–120 MB, sebaiknya lewat Wi-Fi) agar peta Jakarta, Bogor, Depok, Tangerang, dan Bekasi tetap tampil tanpa internet — di terowongan, kereta bawah tanah, atau saat kuota habis.",
+        "Download once (±50–120 MB, Wi-Fi recommended) so the map of Jakarta, Bogor, Depok, Tangerang and Bekasi keeps working without internet — in tunnels, underground or when your data runs out.") + "</p>" +
+        '<button class="btn-sec" id="offDl" type="button">' + tl("Unduh peta offline", "Download offline map") + "</button>";
+    }
+    if (s.error && !s.downloading) h += '<div class="set-status err">' + tl("Gagal: ", "Failed: ") + esc(s.error) + "</div>";
+    return h + "</div>";
+  }
+  function bindOfflineCard(root) {
+    var card = $("#offCard", root); if (!card) return;
+    var dl = function () { OFF.st = null; try { NATIVE.offlineMapDownload(); } catch (e) { lumiLog(e); } OFF.st = { downloading: true, progress: 0 }; repaintOfflineCard(); };
+    if ($("#offDl", card)) $("#offDl", card).addEventListener("click", dl);
+    if ($("#offUpdate", card)) $("#offUpdate", card).addEventListener("click", dl);
+    if ($("#offDel", card)) $("#offDel", card).addEventListener("click", function () {
+      try { NATIVE.offlineMapDelete(); } catch (e) { lumiLog(e); }
+      OFF.st = null;
+      if (cfg().basemap === "offline") { var c = cfg(); c.basemap = "liberty"; store("cfg", c); }
+      applyBasemap(); renderSettings(["map", "ok", tl("Peta offline dihapus.", "Offline map deleted.")]);
+    });
+    if ($("#offAuto", card)) $("#offAuto", card).addEventListener("change", function () { var c = cfg(); c.offlineAuto = !!this.checked; store("cfg", c); applyBasemap(); });
+  }
+  function repaintOfflineCard() {
+    var card = $("#offCard"); if (!card) return;
+    var tmp = document.createElement("div"); tmp.innerHTML = tr(offlineCardHTML());
+    var fresh = tmp.firstChild; if (!fresh) return;
+    card.replaceWith(fresh); bindOfflineCard(fresh.parentNode);
+  }
+  window.__lumiOfflineMap = function (st) {
+    var was = offlineReady();
+    OFF.st = st || null;
+    repaintOfflineCard();
+    if (st && st.ready && !st.downloading && !was) {
+      toast(tl("Peta offline Jabodetabek siap dipakai", "Jabodetabek offline map is ready"));
+      if (!$("#sheetSettings").hidden) renderSettings(["map", "ok", tl("Peta offline siap. Pilih “Offline Jabodetabek” di Gaya peta, atau biarkan dipakai otomatis saat tanpa internet.", "Offline map ready. Pick “Offline Jabodetabek” as the map style, or let it switch on automatically when offline.")]);
+      if (!navigator.onLine) applyBasemap();
+    }
+  };
+  /* Sambungan internet hilang/kembali: ganti peta dasar bila peta offline dipakai otomatis. */
+  window.addEventListener("offline", function () { if (offlineReady() && cfg().offlineAuto !== false && mapStyleKey() !== "offline") applyBasemap(); });
+  window.addEventListener("online", function () { if (offlineReady() && cfg().offlineAuto !== false && mapStyleKey() !== "offline") { GL_DOWN = false; applyBasemap(); } });
+
   var inStopEl = $('#inStop');
   if (inStopEl) inStopEl.addEventListener('input', function () { renderStops(this.value); });
   applyAccessible();
@@ -4200,6 +4531,7 @@
   if ($("#nfcHome") && NATIVE && nfcState() !== "none") { $("#nfcHome").innerHTML = nfcEntryHTML(); bindNfcEntry($("#nfcHome")); }
   renderIntro();
   setTimeout(syncWatched, 1500);
+  syncVoice();
   renderGtfsBanner();
   try { var pend = NATIVE && NATIVE.takeShared && NATIVE.takeShared(); if (pend) window.lumiShared(pend); } catch (e) { lumiLog(e); }
   // Pendampingan yang masih berjalan (mis. setelah aplikasi dibuka ulang dari notifikasi).

@@ -16,6 +16,7 @@ final class LumiTts {
 
     private LumiTts() { }
 
+    /** Diucapkan sekarang (menggantikan antrean): peringatan turun tidak boleh menunggu kalimat sebelumnya. */
     static synchronized void speak(final Context ctx, final String text) {
         if (text == null || text.trim().isEmpty()) return;
         if (tts == null) {
@@ -25,6 +26,12 @@ final class LumiTts {
                     if (status != TextToSpeech.SUCCESS) return;
                     synchronized (LumiTts.class) {
                         applyLang();
+                        // v2.17: suara navigasi (menurunkan volume musik sejenak, bukan ikut volume media).
+                        try {
+                            tts.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                                    .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build());
+                        } catch (Exception ignored) { }
                         ready = true;
                         if (pending != null) {
                             String p = pending; pending = null;

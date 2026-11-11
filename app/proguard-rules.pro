@@ -21,6 +21,9 @@
 -keep class id.lumi.transport.LumiWidgetProvider { *; }
 -keep class id.lumi.transport.BusWatchService { *; }
 -keep class id.lumi.transport.Disruptions$Job { *; }
+# v2.17: widget ETA bus favorit
+-keep class id.lumi.transport.EtaWidget { *; }
+-keep class id.lumi.transport.EtaWidget$Job { *; }
 
 # Dipakai lintas-thread dan lewat callback native.
 -keep class id.lumi.transport.LiveSocket { *; }

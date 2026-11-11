@@ -71,5 +71,32 @@ check(cheap(P.plan(ca, cb, null, 360, 2)) < cheap(P.plan(ca, cb, null, 480, 2)),
 check(P.searchLines("9")[0] && P.searchLines("9")[0].code === "9", "cari rute \"9\": hasil pertama harus rute 9");
 check(P.searchStops("dukuh").length > 0, "cari halte \"dukuh\": harus ada hasil");
 
+// v2.17: tarif dengan tanggal berlaku (fares.schedule)
+{
+  const base = JSON.parse(JSON.stringify(data.fares));
+  base.schedule = [
+    { from: "2027-01-01", set: { tj: { base: 4500, premium: [["^SH2$", 18000]] } }, note: { id: "Tarif baru", en: "New fare" } },
+    { from: "2027-06-01", set: { krl: { base: 3500 } } },
+    { from: "bukan-tanggal", set: { tj: { base: 1 } } }
+  ];
+  const P2 = new E.Planner(Object.assign({}, data, { fares: base }));
+  E.setFareDate("2026-12-31");
+  check(E.fares().tj.base === data.fares.tj.base, "tarif 31 Des 2026 harus tarif lama");
+  E.setFareDate("2027-01-01");
+  check(E.fares().tj.base === 4500, "tarif 1 Jan 2027 harus tarif baru");
+  check(E.fares().tj.morning === data.fares.tj.morning, "kunci yang tidak diubah tetap (tarif pagi)");
+  check(E.fares().tj.premium.length === 1 && E.fares().tj.premium[0][1] === 18000, "larik diganti utuh");
+  check(E.fares().krl.base === data.fares.krl.base, "perubahan Juni belum berlaku di Januari");
+  check(E.fares("2027-07-01").krl.base === 3500 && E.fares("2027-07-01").tj.base === 4500, "dua perubahan bertumpuk berurutan");
+  check(E.upcomingFares("2026-11-11").length === 2 && E.upcomingFares("2027-02-01").length === 1, "daftar perubahan yang akan datang");
+  const [sn, sa, sb] = cases[5];
+  E.setFareDate("2026-12-31"); const oldFare = cheap(P2.plan(sa, sb, null, 480, 2));
+  E.setFareDate("2027-01-02"); const newFare = cheap(P2.plan(sa, sb, null, 480, 2));
+  check(newFare > oldFare, `${sn}: tarif TJ setelah 1 Jan 2027 (${newFare}) harus lebih mahal dari sebelumnya (${oldFare})`);
+  E.setFareDate(null);
+  check(/^\d{4}-\d{2}-\d{2}$/.test(E.ymdWib()), "ymdWib berbentuk yyyy-mm-dd");
+  check(E.ymdWib(Date.UTC(2026, 11, 31, 17, 30)) === "2027-01-01", "ymdWib memakai WIB (UTC+7)");
+}
+
 if (fails) { console.error(`\n${fails} pemeriksaan gagal`); process.exit(1); }
 console.log("\nSemua pemeriksaan mesin rute lulus");

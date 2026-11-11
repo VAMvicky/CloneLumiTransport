@@ -41,9 +41,13 @@ public class LiveSocket {
     static String norm(String c) { return c == null ? "" : c.toUpperCase(java.util.Locale.US).replace(".", "").replace("-", "").replace(" ", ""); }
 
     /** Pecah aliran byte MQTT menjadi paket; buang PUBLISH rute yang tidak diminta. */
-    private void deliver(byte[] data) {
+    /** Sisa paket MQTT yang belum utuh tidak boleh menumpuk tanpa batas (aliran rusak) — B-10. */
+    static final int MAX_PENDING = 1024 * 1024;
+
+    private void deliver(byte[] data) throws IOException {
         bytesIn += data.length;
         mq.write(data, 0, data.length);
+        if (mq.size() > MAX_PENDING) { mq.reset(); throw new IOException("aliran MQTT tidak sah"); }
         byte[] b = mq.toByteArray();
         int pos = 0;
         ByteArrayOutputStream keep = new ByteArrayOutputStream();
@@ -133,9 +137,7 @@ public class LiveSocket {
                 if (b1 < 0) break;
                 int op = b0 & 0x0F;
                 boolean fin = (b0 & 0x80) != 0;
-                long len = b1 & 0x7F;
-                if (len == 126) len = ((in.read() & 0xFF) << 8) | (in.read() & 0xFF);
-                else if (len == 127) { len = 0; for (int i = 0; i < 8; i++) len = (len << 8) | (in.read() & 0xFF); }
+                long len = payloadLength(in, b1);
                 byte[] mask = null;
                 if ((b1 & 0x80) != 0) { mask = new byte[4]; readFully(in, mask); }
                 if (len > 8 * 1024 * 1024) { reason = Lang.t("frame terlalu besar", "frame too large"); break; }
@@ -152,6 +154,7 @@ public class LiveSocket {
                 if (op == 0xA) continue;
                 if (op == 0x1 || op == 0x2 || op == 0x0) {
                     msg.write(payload);
+                    if (msg.size() > 8 * 1024 * 1024) { reason = Lang.t("pesan terlalu besar", "message too large"); break; }
                     if (fin) { deliver(msg.toByteArray()); msg.reset(); }
                 }
             }
@@ -164,7 +167,25 @@ public class LiveSocket {
         }
     }
 
-    private static void readFully(InputStream in, byte[] b) throws IOException {
+    /**
+     * Panjang payload frame dari byte kedua header. v2.17 (B-10): byte panjang tambahan dibaca dengan
+     * readFully, jadi EOF di tengah header menjadi IOException (dulu -1 & 0xFF terbaca sebagai 255).
+     */
+    static long payloadLength(InputStream in, int b1) throws IOException {
+        long len = b1 & 0x7F;
+        if (len == 126) {
+            byte[] x = new byte[2]; readFully(in, x);
+            len = ((x[0] & 0xFF) << 8) | (x[1] & 0xFF);
+        } else if (len == 127) {
+            byte[] x = new byte[8]; readFully(in, x);
+            len = 0;
+            for (int i = 0; i < 8; i++) len = (len << 8) | (x[i] & 0xFF);
+            if (len < 0) throw new IOException("panjang frame tidak sah");
+        }
+        return len;
+    }
+
+    static void readFully(InputStream in, byte[] b) throws IOException {
         int off = 0;
         while (off < b.length) {
             int n = in.read(b, off, b.length - off);

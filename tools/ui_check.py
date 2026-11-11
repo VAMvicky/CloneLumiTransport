@@ -50,7 +50,17 @@ STUB = r"""
     listReminders: () => JSON.stringify(st.rem || []), getReminder: (id) => { const r = (st.rem || []).find(x => x.id === id); return r ? JSON.stringify(r) : null; },
     removeReminder: (id) => { st.rem = (st.rem || []).filter(x => x.id !== id); }, exactAlarmOk: () => false, openExactAlarmSettings: () => { st.exactAsked = true; },
     busWatchStart: (j) => { st.busWatch = JSON.parse(j); return true; }, busWatchStop: () => { st.busWatch = null; }, busWatchActive: () => st.busWatch ? st.busWatch.code : "",
-    setWatchedLines: (j) => { st.watched = JSON.parse(j); }, nfcState: () => st.nfc || "off", nfcStart: () => { st.nfcOn = true; }, nfcStop: () => { st.nfcOn = false; }
+    setWatchedLines: (j) => { st.watched = JSON.parse(j); }, nfcState: () => st.nfc || "off", nfcStart: () => { st.nfcOn = true; }, nfcStop: () => { st.nfcOn = false; },
+    // v2.17
+    setVoice: (on) => { st.voice = on; }, exportFile: (n, t) => { st.exported = { name: n, text: t }; cb(() => __lumiExported(true)); },
+    importFile: () => cb(() => __lumiImport(st.importText || null)),
+    etaWidgetList: () => JSON.stringify(st.eta || []), etaWidgetPlaced: () => !!st.etaPlaced, etaWidgetPin: () => { st.etaPinAsked = true; return true; },
+    etaWidgetToggle: (j) => { const x = JSON.parse(j), k = x.code + "|" + x.stop.name; st.eta = st.eta || []; const had = st.eta.some(e => e.code + "|" + e.stop.name === k);
+      st.eta = had ? st.eta.filter(e => e.code + "|" + e.stop.name !== k) : st.eta.concat([x]); return !had; },
+    etaWidgetSetList: (j) => { st.eta = JSON.parse(j); },
+    offlineMapState: () => JSON.stringify(st.off || { ready: false, downloading: false, progress: -1 }),
+    offlineMapDownload: () => { st.off = { downloading: true, progress: 0 }; cb(() => __lumiOfflineMap({ downloading: true, progress: 45 })); },
+    offlineMapDelete: () => { st.off = null; }
   };
   try { localStorage.setItem('lumi:debug', '1'); } catch (e) { }
 })();
@@ -110,7 +120,8 @@ async def main():
         await pg.evaluate("""() => {
           const s = (k, v) => localStorage.setItem('lumi:' + k, JSON.stringify(v));
           s('favs', [{key: 'a|b', from: {name: 'Monas', p: [-6.1754, 106.8272]}, to: {name: 'Blok M', p: [-6.2443, 106.7999]}, ts: Date.now()}]);
-          s('trips', [{key: 'x', ts: Date.now(), from: 'Monas', to: 'Blok M', mins: 75, fare: 3500, modes: 'Transjakarta + KRL Commuter Line'}]);
+          s('trips', [{key: 'x', ts: Date.now(), from: 'Monas', to: 'Blok M', mins: 75, fare: 6500, modes: 'Transjakarta + KRL Commuter Line', fm: {TJ: 3500, KRL: 3000}},
+                      {key: 'y', ts: Date.now() - 40 * 864e5, from: 'Monas', to: 'Kota Tua', mins: 30, fare: 3500, modes: 'Transjakarta'}]);
           s('places', [{name: 'Rumah', sub: 'Dari Google Maps', p: [-6.2, 106.8]}]);
           s('recent', [{from: {name: 'Lokasi saya', p: [-6.2, 106.8], me: true}, to: {name: 'Blok M', p: [-6.2443, 106.7999]}}]);
           // v2.16: gangguan aktif
@@ -177,6 +188,12 @@ async def main():
             bw = await pg.evaluate("__stub.busWatch && __stub.busWatch.code")
             if await pg.query_selector("[data-bw]") and not bw: raise SystemExit("pemantau bus tidak dimulai")
             await pg.evaluate("__stub.busWatch = null")
+            # v2.17: pasang bus di widget ETA
+            if await pg.query_selector("[data-etaw]"):
+                await pg.evaluate("document.querySelector('[data-etaw]').click()"); await pg.wait_for_timeout(300); await grab("eta-widget", True)
+                if not await pg.evaluate("(__stub.eta || []).length === 1"): raise SystemExit("bus tidak dipasang di widget ETA")
+                await pg.evaluate("document.querySelector('[data-etaw]').click()"); await grab("eta-widget-off")
+                if await pg.evaluate("(__stub.eta || []).length"): raise SystemExit("bus tidak dilepas dari widget ETA")
             await pg.click("#btnGuide"); await pg.wait_for_timeout(500); await grab("guide", True)
             if not await pg.evaluate("!!__stub.busWatch"): raise SystemExit("mulai pendampingan tidak memantau bus pertama")
             await pg.evaluate("__lumiGuide({phase:'ride',title:'TJ 9 · 3 stops to go',text:'Get off at X · now near Y',stopsLeft:3,metersLeft:-1})"); await grab("guide2")
@@ -251,7 +268,26 @@ async def main():
         await pg.evaluate("document.querySelector('#setAccess').click()"); await grab("set-access")
         await pg.evaluate("document.querySelector('#setVoice').click()"); await grab("set-voice")
         await pg.evaluate("document.querySelector('#btnSaveFav').click()"); await grab("set-fav")
-        await pg.evaluate("document.querySelector('#restoreText').value = 'xx'; document.querySelector('#btnRestore').click()"); await grab("restore-bad")
+        await pg.evaluate("document.querySelector('.restore-more').open = true; document.querySelector('#restoreText').value = 'xx'; document.querySelector('#btnRestore').click()"); await grab("restore-bad")
+        if NATIVE:
+            # v2.17: ekspor/impor berkas, preferensi rute, peta offline
+            await pg.evaluate("document.querySelector('#btnExport').click()"); await pg.wait_for_timeout(200); await grab("export")
+            exp = await pg.evaluate("__stub.exported && JSON.parse(__stub.exported.text)")
+            if not exp or exp.get("v") != 2 or "native" not in exp: raise SystemExit("ekspor tidak menghasilkan cadangan format 2")
+            await pg.evaluate("""() => { const o = JSON.parse(__stub.exported.text); o.data.routePrefs = {maxTr: 1};
+              o.native = {reminders: [{id: 'r1', leave: '07:05', arrive: '08:00', lead: 5, days: [2,3,4,5,6], to: {name: 'Kantor'}, from: {name: 'Rumah'}}],
+                          etaWidget: [{code: 'JAK36', title: 'JAK36', stop: {name: 'Halte A', lat: -6.2, lon: 106.8}}]};
+              __stub.importText = JSON.stringify(o); }""")
+            await pg.evaluate("document.querySelector('#btnImport').click()"); await pg.wait_for_timeout(300); await grab("import", True)
+            if not await pg.evaluate("(__stub.rem || []).some(r => r.id === 'r1') && (__stub.eta || []).length === 1"): raise SystemExit("impor tidak memulihkan pengingat / widget ETA")
+            await pg.select_option("#prefWalk", "1"); await pg.wait_for_timeout(150)
+            await pg.evaluate("document.querySelector('[data-avoid]').click()"); await pg.wait_for_timeout(150); await grab("prefs", True)
+            await pg.evaluate("document.querySelector('#offDl').click()"); await pg.wait_for_timeout(300); await grab("offline-dl", True)
+            await pg.evaluate("__stub.off = {ready: true, bytes: 73400320, date: '2026-11-11'}; __lumiOfflineMap(__stub.off)"); await pg.wait_for_timeout(300); await grab("offline-ready", True)
+            await pg.select_option("#setMap", "offline"); await grab("map-offline")
+            await pg.evaluate("__lumiOfflineMap({ready: false, error: 'HTTP 404'})"); await grab("offline-err")
+            await pg.evaluate("document.querySelector('#setVoice').click()"); await pg.wait_for_timeout(100)
+            if await pg.evaluate("__stub.voice === undefined"): raise SystemExit("suara tidak dikirim ke layanan native")
         await pg.evaluate("document.querySelector('#btnClearTrips') && document.querySelector('#btnClearTrips').click()"); await grab("trips-cleared")
         await pg.select_option("#setMap", "bright"); await grab("map-style")
         if NATIVE:

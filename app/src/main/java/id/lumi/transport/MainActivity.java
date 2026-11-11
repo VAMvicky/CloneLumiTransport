@@ -43,7 +43,9 @@ import java.util.concurrent.Executors;
  * lokasi GPS, membuka aplikasi ojol, dan berbagi teks.
  */
 public class MainActivity extends Activity {
-    private static final int REQ_LOCATION = 41, REQ_GUIDE = 42, REQ_NOTIF = 43, REQ_PERM = 44;
+    private static final int REQ_LOCATION = 41, REQ_GUIDE = 42, REQ_NOTIF = 43, REQ_PERM = 44, REQ_EXPORT = 45, REQ_IMPORT = 46;
+    /** Isi berkas cadangan yang menunggu lokasi simpan dari pengguna (Ekspor data). */
+    private String pendingExport;
     /** User-Agent tunggal untuk semua permintaan (AppInfo: dari versionName, bukan string tertanam). */
     private static final String UA = AppInfo.userAgent();
     /** Pintasan dari app shortcut / Quick Settings, dikirim ke JS setelah halaman siap. */
@@ -150,6 +152,8 @@ public class MainActivity extends Activity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
                 try {
                     Uri u = req.getUrl();
+                    // v2.17: peta offline Jabodetabek dilayani dari berkas lokal (lihat OfflineMap).
+                    if (u != null && OfflineMap.HOST.equals(u.getHost())) return OfflineMap.serve(MainActivity.this, u);
                     if (u == null || !GoogleKeys.isGoogleApiHost(u.getHost())) return null;
                     if (!"GET".equalsIgnoreCase(req.getMethod())) return null;
                     return googleFetch(u.toString());
@@ -615,13 +619,40 @@ public class MainActivity extends Activity {
     private boolean watchWanted;
 
     @Override
+    protected void onActivityResult(int code, int result, Intent data) {
+        super.onActivityResult(code, result, data);
+        final Uri uri = data == null ? null : data.getData();
+        if (code == REQ_EXPORT) {
+            final String text = pendingExport;
+            pendingExport = null;
+            if (result != Activity.RESULT_OK || uri == null || text == null) { js("window.__lumiExported && __lumiExported(false)"); return; }
+            pool.execute(new Runnable() { @Override public void run() {
+                boolean ok = false;
+                try (java.io.OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
+                    if (o != null) { o.write(text.getBytes("UTF-8")); ok = true; }
+                } catch (Exception ignored) { }
+                js("window.__lumiExported && __lumiExported(" + ok + ")");
+            }});
+        } else if (code == REQ_IMPORT) {
+            if (result != Activity.RESULT_OK || uri == null) { js("window.__lumiImport && __lumiImport(null)"); return; }
+            pool.execute(new Runnable() { @Override public void run() {
+                String text = null;
+                try (InputStream in = getContentResolver().openInputStream(uri)) {
+                    if (in != null) text = new String(OfflineMap.readAll(in, 2 * 1024 * 1024), "UTF-8");
+                } catch (Exception ignored) { }
+                js("window.__lumiImport && __lumiImport(" + (text == null ? "null" : JSONObject.quote(text)) + ")");
+            }});
+        }
+    }
+
+    @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
         if (code == REQ_PERM) { js("window.__lumiPerm && __lumiPerm()"); return; }
         if (code == REQ_GUIDE) {
             boolean ok = false;
             for (int i = 0; i < perms.length; i++)
                 if (perms[i].contains("LOCATION") && results[i] == PackageManager.PERMISSION_GRANTED) ok = true;
-            if (ok && pendingGuide != null) { NavService.start(this, pendingGuide[0], pendingGuide[1]); }
+            if (ok && pendingGuide != null && NavService.start(this, pendingGuide[0], pendingGuide[1])) { /* berjalan */ }
             else js("window.__lumiGuide && __lumiGuide({error:" + JSONObject.quote(Lang.t("Izin lokasi ditolak. Pendampingan butuh akses lokasi.", "Location permission denied. Guidance needs location access.")) + "})");
             pendingGuide = null;
             return;
@@ -845,6 +876,8 @@ public class MainActivity extends Activity {
                 String body = "";
                 HttpURLConnection c = null;
                 try {
+                    // B-11: hanya HTTPS ke layanan yang dipakai Lumi (lihat HostPolicy).
+                    if (!HostPolicy.urlAllowed(url)) throw new java.io.IOException("host tidak diizinkan");
                     c = (HttpURLConnection) new URL(url).openConnection();
                     c.setRequestProperty("User-Agent", UA);
                     c.setRequestProperty("Accept-Language", "id,en");
@@ -852,11 +885,12 @@ public class MainActivity extends Activity {
                     if (headersJson != null && headersJson.length() > 2) {
                         JSONObject h = new JSONObject(headersJson);
                         java.util.Iterator<String> it = h.keys();
-                        while (it.hasNext()) { String k = it.next(); c.setRequestProperty(k, h.getString(k)); }
+                        while (it.hasNext()) { String k = it.next(), v = h.optString(k); if (HostPolicy.headerAllowed(k, v)) c.setRequestProperty(k, v); }
                     }
                     c.setConnectTimeout(12000);
                     c.setReadTimeout(15000);
                     status = c.getResponseCode();
+                    if (!HostPolicy.urlAllowed(c.getURL().toString())) throw new java.io.IOException("pengalihan ke host lain");
                     InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
                     if (in != null) body = readAll(in);
                 } catch (Exception e) {
@@ -1026,6 +1060,86 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void stopSpeak() { LumiTts.stop(); }
 
+        /** v2.17: panduan suara dibacakan layanan pendampingan (juga saat layar mati). */
+        @JavascriptInterface
+        public void setVoice(boolean on) { NavService.setVoice(MainActivity.this, on); }
+
+        // ---------------------------------------------------------- v2.17: ekspor & impor data
+        /** Simpan cadangan ke berkas pilihan pengguna (Storage Access Framework, tanpa izin penyimpanan). */
+        @JavascriptInterface
+        public void exportFile(final String name, final String text) {
+            main.post(new Runnable() { @Override public void run() {
+                pendingExport = text;
+                Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("application/json").putExtra(Intent.EXTRA_TITLE, name);
+                try { startActivityForResult(i, REQ_EXPORT); }
+                catch (ActivityNotFoundException e) { pendingExport = null; js("window.__lumiExported && __lumiExported(false)"); }
+            }});
+        }
+
+        /** Pilih berkas cadangan; isinya dikirim ke window.__lumiImport(teks). */
+        @JavascriptInterface
+        public void importFile() {
+            main.post(new Runnable() { @Override public void run() {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/json", "text/plain", "application/octet-stream"});
+                try { startActivityForResult(i, REQ_IMPORT); }
+                catch (ActivityNotFoundException e) { js("window.__lumiImport && __lumiImport(null)"); }
+            }});
+        }
+
+        /** Bahasa & suara native ikut dicadangkan. */
+        @JavascriptInterface
+        public String nativeSettings() {
+            try {
+                return new JSONObject().put("voice", NavService.voiceOn(MainActivity.this))
+                        .put("etaWidget", EtaWidget.list(MainActivity.this)).toString();
+            } catch (Exception e) { return "{}"; }
+        }
+
+        // ---------------------------------------------------------- v2.17: widget ETA bus favorit
+        @JavascriptInterface
+        public String etaWidgetList() { return EtaWidget.list(MainActivity.this).toString(); }
+
+        /** Pasang/lepas bus favorit di widget; mengembalikan true bila kini terpasang. */
+        @JavascriptInterface
+        public boolean etaWidgetToggle(String spec) {
+            try { return EtaWidget.toggle(MainActivity.this, spec); } catch (Exception e) { return false; }
+        }
+
+        @JavascriptInterface
+        public void etaWidgetSetList(String json) {
+            try { EtaWidget.setList(MainActivity.this, json); } catch (Exception ignored) { }
+        }
+
+        /** Sudah ada widget ETA di layar utama? */
+        @JavascriptInterface
+        public boolean etaWidgetPlaced() { return EtaWidget.ids(MainActivity.this).length > 0; }
+
+        /** Minta peluncur menambahkan widget ETA (Android 8+, bila peluncur mendukung). */
+        @JavascriptInterface
+        public boolean etaWidgetPin() {
+            try {
+                android.appwidget.AppWidgetManager m = android.appwidget.AppWidgetManager.getInstance(MainActivity.this);
+                if (!m.isRequestPinAppWidgetSupported()) return false;
+                return m.requestPinAppWidget(new android.content.ComponentName(MainActivity.this, EtaWidget.class), null, null);
+            } catch (Exception e) { return false; }
+        }
+
+        // ---------------------------------------------------------- v2.17: peta offline Jabodetabek
+        @JavascriptInterface
+        public String offlineMapState() { return OfflineMap.state(MainActivity.this); }
+
+        @JavascriptInterface
+        public void offlineMapDownload() {
+            OfflineMap.download(MainActivity.this, new OfflineMap.Listener() {
+                @Override public void onState(String json) { js("window.__lumiOfflineMap && __lumiOfflineMap(" + json + ")"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void offlineMapDelete() { OfflineMap.delete(MainActivity.this); }
+
         @JavascriptInterface
         public void openUrl(final String url) {
             main.post(new Runnable() { @Override public void run() { openExternal(url); }});
@@ -1069,8 +1183,10 @@ public class MainActivity extends Activity {
                     pendingGuide = new String[]{spec, title};
                     if (hasLoc) need.add(Manifest.permission.ACCESS_FINE_LOCATION);   // agar hasil memuat izin lokasi
                     requestPermissions(need.toArray(new String[0]), REQ_GUIDE);
-                } else {
-                    NavService.start(MainActivity.this, spec, title);
+                } else if (!NavService.start(MainActivity.this, spec, title)) {
+                    // B-04: izin lokasi dicabut di tengah jalan → beri tahu halaman, jangan crash.
+                    js("window.__lumiGuide && __lumiGuide({error:" + JSONObject.quote(Lang.t("Izin lokasi diperlukan untuk pendampingan. Izinkan lokasi di pengaturan aplikasi.", "Guidance needs location permission. Allow location in the app settings.")) + "})");
+                    return;
                 }
                 updatePip(true);
             }});
@@ -1237,6 +1353,7 @@ public class MainActivity extends Activity {
                 String out = "";
                 HttpURLConnection c = null;
                 try {
+                    if (!HostPolicy.urlAllowed(url)) throw new java.io.IOException("host tidak diizinkan");
                     c = (HttpURLConnection) new URL(url).openConnection();
                     c.setRequestMethod("POST");
                     c.setDoOutput(true);
@@ -1247,7 +1364,7 @@ public class MainActivity extends Activity {
                     if (headersJson != null && headersJson.length() > 2) {
                         JSONObject h = new JSONObject(headersJson);
                         java.util.Iterator<String> it = h.keys();
-                        while (it.hasNext()) { String k = it.next(); c.setRequestProperty(k, h.getString(k)); }
+                        while (it.hasNext()) { String k = it.next(), v = h.optString(k); if (HostPolicy.headerAllowed(k, v)) c.setRequestProperty(k, v); }
                     }
                     c.setConnectTimeout(12000);
                     c.setReadTimeout(15000);
@@ -1258,6 +1375,7 @@ public class MainActivity extends Activity {
                         os.close();
                     }
                     status = c.getResponseCode();
+                    if (!HostPolicy.urlAllowed(c.getURL().toString())) throw new java.io.IOException("pengalihan ke host lain");
                     InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
                     if (in != null) out = readAll(in);
                 } catch (Exception e) {
@@ -1288,7 +1406,7 @@ public class MainActivity extends Activity {
                      .setContentText(body)
                      .setStyle(new android.app.Notification.BigTextStyle().bigText(body))
                      .setAutoCancel(true);
-                    nm.notify(7003, b.build());
+                    nm.notify(NotifIds.BUS_ALERT, b.build());
                 } catch (Throwable ignored) { }
             }});
         }

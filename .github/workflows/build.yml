@@ -12,9 +12,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+# B-12 (v2.17): token bawaan hanya-baca; izin tulis diberikan per job yang membutuhkannya.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -83,6 +83,9 @@ jobs:
     # Satu-satunya jalur build APK (R2). APK inilah yang diuji di emulator dan dirilis.
     name: Build APK (Gradle, R8 + lint)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write     # komentar ukuran APK di PR
     outputs:
       version: ${{ steps.ver.outputs.version }}
     steps:
@@ -227,6 +230,17 @@ jobs:
             exit 1
           fi
 
+      - name: Uji unit Java (JUnit, app/src/test)
+        run: ./gradlew --no-daemon testReleaseUnitTest
+
+      - name: Upload laporan uji unit
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unit-tests
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
       - name: Android lint (gagal = ada temuan baru di luar app/lint-baseline.xml)
         run: ./gradlew --no-daemon lintRelease
 
@@ -291,6 +305,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [test, gradle, smoke]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write          # membuat rilis
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Tag harus menunjuk kepala main

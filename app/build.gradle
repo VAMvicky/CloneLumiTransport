@@ -86,10 +86,19 @@ android {
         fatal "NewApi", "MissingPermission", "JavascriptInterface", "AddJavascriptInterface"
         disable "GradleDependency", "OldTargetApi", "NewerVersionAvailable", "AndroidGradlePluginVersion"
     }
+
+    // v2.17: uji unit Java di JVM (./gradlew testReleaseUnitTest), dijalankan CI.
+    testOptions {
+        unitTests.all {
+            testLogging { events "failed"; exceptionFormat "full" }
+        }
+    }
 }
 
 dependencies {
     implementation libs.androidx.profileinstaller
+    testImplementation libs.junit
+    testImplementation libs.org.json
 }
 
 // Bangun ulang data rute sebelum build (butuh python3).

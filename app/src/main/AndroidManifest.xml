@@ -24,6 +24,8 @@
     <!-- Cek saldo kartu uang elektronik (opsional: aplikasi tetap terpasang di HP tanpa NFC) -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <!-- v2.17: notifikasi progres pendampingan sebagai "Live Update" di Android 16+ (diabaikan versi lama) -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!-- Agar bisa membuka aplikasi ojol yang terpasang (Android 11+) -->
     <queries>
@@ -136,5 +138,21 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
         </receiver>
+        <!-- v2.17: widget perkiraan tiba bus favorit + tugas latar pembaruannya -->
+        <receiver
+            android:name=".EtaWidget"
+            android:exported="false"
+            android:label="@string/widget_eta_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_eta_info" />
+        </receiver>
+        <service
+            android:name=".EtaWidget$Job"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 </manifest>

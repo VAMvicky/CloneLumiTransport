@@ -24,7 +24,7 @@ import java.util.List;
 public class RouteUpdater {
     static final String CH_ROUTES = "lumi_routes";
     /** ID tugas harian lama (RouteUpdateJob); kini dibatalkan & digabung ke RouteWatchJob. */
-    static final int LEGACY_JOB_ID = 4242, NOTIF_ID = 7101;
+    static final int LEGACY_JOB_ID = 4242, NOTIF_ID = NotifIds.ROUTE_UPDATE;
     static final long DAY = 24L * 60 * 60 * 1000;
     /** Unduhan penuh tidak diulang dalam rentang ini, apa pun pemicunya. */
     static final long MIN_GAP_MS = 30L * 60 * 1000;

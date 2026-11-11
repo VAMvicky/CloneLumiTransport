@@ -60,6 +60,40 @@ public class GuideTracker {
 
     public int size() { return cps.size(); }
     public State last() { return last; }
+    public int cursor() { return cursor; }
+
+    /**
+     * v2.17: panjang tiap ruas untuk notifikasi progres (ProgressStyle): jumlah titik berurutan dengan
+     * leg yang sama. Jumlahnya = size(); progres = cursor + 1.
+     */
+    public int[] segmentLengths() {
+        List<Integer> out = new ArrayList<Integer>();
+        int run = 0, leg = Integer.MIN_VALUE;
+        for (Cp c : cps) {
+            if (c.leg != leg && run > 0) { out.add(run); run = 0; }
+            leg = c.leg; run++;
+        }
+        if (run > 0) out.add(run);
+        int[] a = new int[out.size()];
+        for (int i = 0; i < a.length; i++) a[i] = out.get(i);
+        return a;
+    }
+
+    /** Ruas ke-i berupa naik kendaraan (punya kode rute) atau jalan kaki/tujuan. */
+    public boolean[] segmentIsRide() {
+        int[] len = segmentLengths();
+        boolean[] r = new boolean[len.length];
+        int k = 0;
+        for (int i = 0; i < len.length; i++) {
+            Cp c = cps.get(k);
+            r[i] = c.kind != 'D' && c.line != null && !c.line.isEmpty();
+            k += len[i];
+        }
+        return r;
+    }
+
+    /** Progres 0..size(): jumlah titik yang sudah dicapai. */
+    public int progress() { return Math.max(0, cursor + 1); }
 
     static double hav(double la1, double lo1, double la2, double lo2) {
         double R = 6371000, r = Math.PI / 180;

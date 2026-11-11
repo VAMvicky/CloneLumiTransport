@@ -59,10 +59,12 @@ public class RouteWatchJob extends JobService {
     @Override
     public boolean onStopJob(JobParameters params) { return true; }
 
-    static String httpGet(String url, int max) throws Exception {
+    static String httpGet(String url, int max) throws Exception { return httpGet(url, max, 10000, 15000); }
+
+    static String httpGet(String url, int max, int connectMs, int readMs) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(10000);
-        c.setReadTimeout(15000);
+        c.setConnectTimeout(connectMs);
+        c.setReadTimeout(readMs);
         c.setRequestProperty("User-Agent", AppInfo.userAgent());
         c.setRequestProperty("Cache-Control", "no-cache");
         try {

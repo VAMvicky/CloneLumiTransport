@@ -1,7 +1,8 @@
 {
  "v": 1,
- "_": "Satu sumber tarif Lumi (R8). Ubah angka di sini, bukan di kode. build_data.py menyalinnya ke data.js; aplikasi juga mengambil versi terbaru dari repo dan memakainya bila 'updated' lebih baru.",
+ "_": "Satu sumber tarif Lumi (R8). Ubah angka di sini, bukan di kode. build_data.py menyalinnya ke data.js; aplikasi juga mengambil versi terbaru dari repo dan memakainya bila 'updated' lebih baru. v2.17: 'schedule' berisi perubahan tarif yang sudah diumumkan, mis. {\"from\":\"2027-01-01\",\"set\":{\"tj\":{\"base\":4000}},\"note\":{\"id\":\"…\",\"en\":\"…\"}} — berlaku otomatis mulai tanggal 'from' (WIB). Isi angka hanya setelah resmi diumumkan.",
  "updated": "2026-10-29",
+ "schedule": [],
  "tj": {
   "base": 3500,
   "morning": 2000,

@@ -1054,3 +1054,28 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 :root[data-theme="dark"] .chip.on { color: #06213F; }
 
 :root[data-theme="dark"] .lm-halt { background: #132033; }
+
+/* ---------------------------------------------------------------- v2.17 */
+.btn-row { display: flex; gap: 8px; margin-top: 10px; }
+.restore-more { margin-top: 12px; }
+.restore-more > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); padding: 4px 0; }
+.restore-more .btn-sec { display: block; width: 100%; margin-top: 8px; }
+.pref-note { font-size: 13px; color: var(--muted); background: var(--paper); border-radius: var(--r-sm); padding: 8px 12px; margin-bottom: 12px; }
+.pref-note .link { font-size: 13px; }
+.pref-avoid { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin: 12px 0 4px; }
+.pref-avoid .fl { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: 2px; }
+.recap { margin: 10px 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--paper); }
+.recap-h { font-size: 12.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+.recap-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.recap-m { width: 52px; flex: none; color: var(--muted); }
+.recap-bar { flex: 1; height: 8px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.recap-bar i { display: block; height: 100%; border-radius: 6px; background: var(--brand, #1565D8); }
+.recap-v { width: 78px; flex: none; text-align: right; font-weight: 700; }
+.recap-n { width: 28px; flex: none; text-align: right; color: var(--muted); font-size: 12px; }
+.recap-sub { margin: 8px 0 4px; font-size: 12.5px; color: var(--muted); }
+.recap-modes { display: flex; flex-wrap: wrap; gap: 6px; }
+.recap-modes .chip { font-size: 12px; padding: 4px 9px; }
+.off-bar { height: 8px; border-radius: 6px; background: var(--line); overflow: hidden; margin: 6px 0 2px; }
+.off-bar i { display: block; height: 100%; background: var(--brand, #1565D8); transition: width .3s; }
+.etaw-btn.on { background: var(--ok-bg); color: var(--ok-fg); }
+.pref-note .link { color: var(--blue, #1565D8); font-weight: 700; padding: 0; background: none; border: 0; }

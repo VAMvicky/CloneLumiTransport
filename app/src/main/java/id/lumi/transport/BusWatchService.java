@@ -37,7 +37,7 @@ import java.util.Set;
  */
 public class BusWatchService extends Service {
     static final String CH_WATCH = "lumi_bus_watch", CH_ALERT = "lumi_bus";
-    static final int NOTIF_ID = 7004, ALERT_ID = 7003;
+    static final int NOTIF_ID = NotifIds.BUS_WATCH, ALERT_ID = NotifIds.BUS_ALERT;
     static final long MAX_MS = 90L * 60 * 1000, ARRIVED_LINGER_MS = 3L * 60 * 1000;
     static final String URL = "wss://mqtt.tj.co.id:8084/mqtt";
     static volatile boolean running;

@@ -50,31 +50,42 @@ public final class Disruptions {
     static String key(String s) { return s == null ? "" : s.toUpperCase(java.util.Locale.US).replaceAll("[.\\s-]", ""); }
 
     /** Unduh daftar gangguan (null bila gagal / tidak sah). Dipanggil di thread latar. */
-    static JSONArray fetch() {
+    static JSONArray fetch() { return fetch(null, 10000, 15000); }
+
+    /**
+     * v2.17 (B-03): dengan Context, jawaban yang sah disimpan sebagai cadangan; bila jaringan gagal atau
+     * lambat (batas waktu pendek dari pengingat), cadangan ≤ 6 jam yang dipakai.
+     */
+    static JSONArray fetch(Context c, int connectMs, int readMs) {
         try {
-            String body = RouteWatchJob.httpGet(FEED, 300000);
-            if (body == null) return null;
+            String body = RouteWatchJob.httpGet(FEED, 300000, connectMs, readMs);
+            JSONArray a = parse(body);
+            if (a != null && c != null) prefs(c).edit().putString("cache", body).putLong("cacheAt", System.currentTimeMillis()).apply();
+            if (a != null) return a;
+        } catch (Exception ignored) { }
+        return cached(c);
+    }
+
+    static JSONArray cached(Context c) {
+        if (c == null) return null;
+        SharedPreferences p = prefs(c);
+        if (System.currentTimeMillis() - p.getLong("cacheAt", 0) > 6L * 3600000) return null;
+        return parse(p.getString("cache", null));
+    }
+
+    static JSONArray parse(String body) {
+        if (body == null) return null;
+        try {
             JSONObject o = new JSONObject(body);
             if (o.optInt("v") != 1) return null;
             return o.optJSONArray("items");
         } catch (Exception e) { return null; }
     }
 
-    static long ts(String s) {
-        if (s == null || s.isEmpty()) return -1;
-        try {
-            // ISO 8601 dengan zona, mis. 2026-11-11T05:00+07:00 (detik opsional)
-            String x = s.replace("Z", "+00:00");
-            if (x.matches(".*T\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$")) x = x.replaceFirst("(T\\d{2}:\\d{2})", "$1:00");
-            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US);
-            return f.parse(x.replaceFirst("\\.\\d+", "")).getTime();
-        } catch (Exception e) { return -2; }
-    }
+    static long ts(String s) { return IsoTime.parse(s); }
 
     static boolean active(JSONObject x, long now) {
-        long a = ts(x.optString("from", null)), b = ts(x.optString("until", null));
-        if (a == -2 || b == -2) return false;              // jam tidak terbaca → abaikan (sama dengan app.js)
-        return (a < 0 || a <= now) && (b < 0 || b > now);
+        return IsoTime.active(x.optString("from", null), x.optString("until", null), now);
     }
 
     /** Apakah gangguan x mengenai rute {id, code, mode}. */
@@ -143,7 +154,7 @@ public final class Disruptions {
     static void checkFavourites(Context c) {
         JSONArray lines = watched(c);
         if (lines.length() == 0) return;
-        List<JSONObject> hits = affecting(fetch(), lines);
+        List<JSONObject> hits = affecting(fetch(c, 10000, 15000), lines);
         SharedPreferences p = prefs(c);
         JSONObject seen;
         try { seen = new JSONObject(p.getString("seen", "{}")); } catch (Exception e) { seen = new JSONObject(); }
@@ -168,7 +179,7 @@ public final class Disruptions {
             if (body.length() > 0) body.append('\n');
             body.append(fresh.size() == 1 ? text(x, "text") : text(x, "title") + " — " + text(x, "text"));
         }
-        notify(c, 7300, title, body.toString().trim());
+        notify(c, NotifIds.FAV_DISRUPTION, title, body.toString().trim());
     }
 
     public static void schedule(Context c) {

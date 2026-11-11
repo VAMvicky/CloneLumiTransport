@@ -32,64 +32,72 @@ public class GtfsImporter {
     public interface Progress { void update(String message); }
 
     // ------------------------------------------------------------------ unduh
+    /** Batas ukuran unduhan GTFS (zip resmi ±10–20 MB); lebih dari ini dianggap tidak wajar. */
+    static final long MAX_BYTES = 80L * 1024 * 1024;
+
+    /**
+     * Unduh ke `dest`. v2.17 (B-09): aliran selalu ditutup (try-with-resources), data ditulis ke berkas
+     * sementara ".part" lalu diganti nama hanya bila selesai utuh, dan ukurannya dibatasi.
+     */
     public static void download(String url, File dest, Progress p) throws IOException {
         for (int hop = 0; hop < 6; hop++) {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent", AppInfo.userAgent());
-            c.setConnectTimeout(20000);
-            c.setReadTimeout(60000);
-            int code = c.getResponseCode();
-            if (code >= 300 && code < 400 && c.getHeaderField("Location") != null) {
-                url = new URL(new URL(url), c.getHeaderField("Location")).toString();
-                c.disconnect();
-                continue;
-            }
-            if (code != 200) throw new IOException("Server GTFS membalas HTTP " + code);
-            long total = c.getContentLength();
-            InputStream in = c.getInputStream();
-            OutputStream out = new FileOutputStream(dest);
-            byte[] buf = new byte[64 * 1024];
-            long got = 0, lastReport = 0;
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
-                got += n;
-                if (got - lastReport > 512 * 1024) {
-                    lastReport = got;
-                    p.update(Lang.t("Mengunduh GTFS… ", "Downloading GTFS… ") + (got / 1024 / 1024) + (total > 0 ? " / " + (total / 1024 / 1024) : "") + " MB");
+            try {
+                c.setInstanceFollowRedirects(false);
+                c.setRequestProperty("User-Agent", AppInfo.userAgent());
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(60000);
+                int code = c.getResponseCode();
+                String loc = c.getHeaderField("Location");
+                if (code >= 300 && code < 400 && loc != null) {
+                    URL next = new URL(new URL(url), loc);
+                    if (!"https".equalsIgnoreCase(next.getProtocol())) throw new IOException("Pengalihan GTFS tidak aman");
+                    url = next.toString();
+                    continue;
                 }
+                if (code != 200) throw new IOException("Server GTFS membalas HTTP " + code);
+                long total = c.getContentLength();
+                if (total > MAX_BYTES) throw new IOException("Berkas GTFS terlalu besar");
+                File part = new File(dest.getPath() + ".part");
+                long got = 0, lastReport = 0;
+                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(part)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        got += n;
+                        if (got > MAX_BYTES) throw new IOException("Berkas GTFS terlalu besar");
+                        out.write(buf, 0, n);
+                        if (got - lastReport > 512 * 1024) {
+                            lastReport = got;
+                            p.update(Lang.t("Mengunduh GTFS… ", "Downloading GTFS… ") + (got / 1024 / 1024) + (total > 0 ? " / " + (total / 1024 / 1024) : "") + " MB");
+                        }
+                    }
+                } catch (IOException e) {
+                    //noinspection ResultOfMethodCallIgnored
+                    part.delete();
+                    throw e;
+                }
+                if (total > 0 && got != total) {
+                    //noinspection ResultOfMethodCallIgnored
+                    part.delete();
+                    throw new IOException("Unduhan GTFS terputus");
+                }
+                //noinspection ResultOfMethodCallIgnored
+                dest.delete();
+                if (!part.renameTo(dest)) throw new IOException("Gagal menyimpan GTFS");
+                return;
+            } finally {
+                c.disconnect();
             }
-            out.close();
-            in.close();
-            c.disconnect();
-            return;
         }
         throw new IOException("Terlalu banyak pengalihan");
     }
 
     // ------------------------------------------------------------------ CSV
-    static List<String> parseCsv(String line) {
-        List<String> out = new ArrayList<String>();
-        StringBuilder sb = new StringBuilder();
-        boolean q = false;
-        for (int i = 0; i < line.length(); i++) {
-            char ch = line.charAt(i);
-            if (q) {
-                if (ch == '"') {
-                    if (i + 1 < line.length() && line.charAt(i + 1) == '"') { sb.append('"'); i++; }
-                    else q = false;
-                } else sb.append(ch);
-            } else if (ch == '"') q = true;
-            else if (ch == ',') { out.add(sb.toString()); sb.setLength(0); }
-            else sb.append(ch);
-        }
-        out.add(sb.toString());
-        return out;
-    }
+    static List<String> parseCsv(String line) { return Csv.parseLine(line); }
 
     static class Table {
-        BufferedReader r;
+        Csv r;
         Map<String, Integer> col = new HashMap<String, Integer>();
         List<String> row;
 
@@ -103,19 +111,16 @@ public class GtfsImporter {
                 }
             }
             if (e == null) throw new IOException(name + " tidak ada di GTFS");
-            r = new BufferedReader(new InputStreamReader(z.getInputStream(e), "UTF-8"), 1 << 16);
-            String head = r.readLine();
-            if (head == null) throw new IOException(name + " kosong");
-            if (head.startsWith("\uFEFF")) head = head.substring(1);
-            List<String> h = parseCsv(head);
+            r = new Csv(new BufferedReader(new InputStreamReader(z.getInputStream(e), "UTF-8"), 1 << 16));
+            List<String> h = r.next();
+            if (h == null) throw new IOException(name + " kosong");
+            if (!h.isEmpty() && h.get(0).startsWith("\uFEFF")) h.set(0, h.get(0).substring(1));
             for (int i = 0; i < h.size(); i++) col.put(h.get(i).trim(), i);
         }
 
         boolean next() throws IOException {
-            String l;
-            do { l = r.readLine(); if (l == null) { r.close(); return false; } } while (l.trim().isEmpty());
-            row = parseCsv(l);
-            return true;
+            row = r.next();
+            return row != null;
         }
 
         String get(String name) {

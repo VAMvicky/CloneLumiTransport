@@ -17,6 +17,8 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.content.pm.PackageManager;
+import android.Manifest;
 
 /**
  * Mode pendampingan: layanan latar depan yang membaca GPS terus-menerus (juga saat layar mati /
@@ -26,7 +28,7 @@ import android.os.Vibrator;
 public class NavService extends Service {
     public static final String CH_GUIDE = "lumi_guide";
     public static final String CH_ALERT = "lumi_guide_alert";
-    static final int NOTIF_ID = 7001, ALERT_ID = 7002;
+    static final int NOTIF_ID = NotifIds.GUIDE, ALERT_ID = NotifIds.GUIDE_ALERT;
 
     public interface Listener { void onGuide(String stateJson); }
     static Listener listener;
@@ -37,12 +39,24 @@ public class NavService extends Service {
     private LocationManager lm;
     private LocationListener ll;
 
-    public static void start(Context ctx, String spec, String title) {
+    /** Izin lokasi sudah diberikan? Layanan latar depan tipe location wajib memilikinya (Android 14+). */
+    static boolean hasLocation(Context ctx) {
+        return ctx.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || ctx.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Mulai pendampingan. v2.17 (B-04): tanpa izin lokasi, layanan tidak dimulai (dulu startForeground
+     * melempar SecurityException di Android 14+ dan aplikasi tertutup). Mengembalikan false bila gagal.
+     */
+    public static boolean start(Context ctx, String spec, String title) {
+        if (!hasLocation(ctx)) return false;
         tracker = new GuideTracker(spec);
         lastJson = null;
         Intent i = new Intent(ctx, NavService.class);
         i.putExtra("title", title);
-        ctx.startForegroundService(i);
+        try { ctx.startForegroundService(i); return true; }
+        catch (Exception e) { tracker = null; return false; }
     }
 
     public static void stop(Context ctx) {
@@ -77,16 +91,26 @@ public class NavService extends Service {
         return PendingIntent.getService(this, 2, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    private Notification build(String title, String text) { return build(title, text, null); }
+
     @SuppressWarnings("deprecation")
-    private Notification build(String title, String text) {
+    private Notification build(String title, String text, GuideTracker.State st) {
         Notification.Builder b = new Notification.Builder(this, CH_GUIDE);
         b.setSmallIcon(android.R.drawable.ic_menu_mylocation)
                 .setContentTitle(title).setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))
                 .setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false)
                 .setColor(0xFF1565D8)
+                .setCategory(Notification.CATEGORY_NAVIGATION)
                 .setContentIntent(openApp())
-                .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, "Berhenti", stopIntent()).build());
+                .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, Lang.t("Berhenti", "Stop"), stopIntent()).build());
+        GuideTracker t = tracker;
+        if (t != null && t.size() > 1) {
+            // v2.17: notifikasi progres langsung. Semua versi: batang progres biasa.
+            // Android 16+: ProgressStyle bersegmen per ruas + "Live Update" di layar kunci / status bar.
+            b.setProgress(t.size(), t.progress(), false);
+            if (Build.VERSION.SDK_INT >= 36) LiveProgress.apply(b, t, st, title);
+        }
         return b.build();
     }
 
@@ -118,9 +142,19 @@ public class NavService extends Service {
         Lang.load(this);
         String title = intent != null && intent.getStringExtra("title") != null ? intent.getStringExtra("title") : Lang.t("Pendampingan perjalanan", "Trip guidance");
         Notification n = build(title, Lang.t("Mencari posisi GPS…", "Finding GPS position…"));
-        if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
-        else startForeground(NOTIF_ID, n);
+        try {
+            if (!hasLocation(this)) throw new SecurityException("location permission");
+            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+            else startForeground(NOTIF_ID, n);
+        } catch (Exception e) {
+            // B-04: izin lokasi dicabut / sistem menolak layanan latar depan → berhenti dengan pesan, bukan crash.
+            tracker = null; lastJson = null;
+            if (listener != null) listener.onGuide("{\"stopped\":true,\"error\":\"permission\"}");
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         running = true;
+        spokenPhase = null; spokenStops = -1;
         startLocation();
         return START_NOT_STICKY;
     }
@@ -159,23 +193,56 @@ public class NavService extends Service {
         if (LocationManager.NETWORK_PROVIDER.equals(loc.getProvider())) {
             if (System.currentTimeMillis() - lastNetAt < 15000) return;
         } else lastNetAt = System.currentTimeMillis();
+        if (finishing) return;                      // B-08: sudah sampai, tunggu berhenti
         GuideTracker.State s = t.update(loc.getLatitude(), loc.getLongitude(), loc.hasAccuracy() ? loc.getAccuracy() : 30);
-        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, build(s.title, s.text));
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, build(s.title, s.text, s));
         if (s.alert != null) alert(s.alert);
+        voice(s);
         String json = GuideTracker.toJson(s);
         lastJson = json;
         if (listener != null) listener.onGuide(json);
         if (s.done) {
-            // Biarkan notifikasi "sampai" tampil sebentar lalu berhenti.
-            new android.os.Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            // Biarkan notifikasi "sampai" tampil sebentar lalu berhenti. v2.17 (B-08): cukup SATU penunda,
+            // dan GPS dimatikan (dulu tiap posisi baru menambah penunda 60 detik dan notifikasi terus diperbarui).
+            finishing = true;
+            if (lm != null && ll != null) try { lm.removeUpdates(ll); } catch (Exception ignored) { }
+            handler.postDelayed(new Runnable() {
                 @Override public void run() { if (tracker != null && tracker.last() != null && tracker.last().done) { tracker = null; stopSelf(); } }
             }, 60000);
         }
     }
 
+    private final android.os.Handler handler = new android.os.Handler(Looper.getMainLooper());
+    private boolean finishing;
+    private String spokenPhase;
+    private int spokenStops = -1;
+
+    /**
+     * v2.17: panduan suara dari layanan (tetap jalan saat layar mati / aplikasi di belakang). Diucapkan:
+     * setiap peringatan, perubahan fase (jalan → tunggu → naik → pindah), dan sisa 3/2 pemberhentian.
+     */
+    private void voice(GuideTracker.State s) {
+        if (!voiceOn(this)) return;
+        String say = null;
+        if (s.alert != null) say = s.alert;
+        else if (!s.phase.equals(spokenPhase)) say = s.title + ". " + s.text;
+        else if ("ride".equals(s.phase) && s.stopsLeft != spokenStops && s.stopsLeft >= 2 && s.stopsLeft <= 3) say = s.title;
+        spokenPhase = s.phase;
+        if ("ride".equals(s.phase) || "wait".equals(s.phase)) spokenStops = s.stopsLeft;
+        if (say != null) LumiTts.speak(this, say);
+    }
+
+    static boolean voiceOn(Context c) { return c.getSharedPreferences("lumi", MODE_PRIVATE).getBoolean("voice", false); }
+
+    static void setVoice(Context c, boolean on) {
+        c.getSharedPreferences("lumi", MODE_PRIVATE).edit().putBoolean("voice", on).apply();
+        if (!on) LumiTts.stop();
+    }
+
     @Override
     public void onDestroy() {
         running = false;
+        handler.removeCallbacksAndMessages(null);
         if (lm != null && ll != null) try { lm.removeUpdates(ll); } catch (Exception ignored) { }
         lm = null;
         // Pastikan notifikasi pendampingan hilang saat layanan berhenti.

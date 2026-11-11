@@ -9,10 +9,10 @@
 *Transjakarta · Mikrotrans · KRL · MRT · LRT · KA Bandara · Whoosh · ojol, dalam satu rute*
 
 [![Rilis](https://img.shields.io/github/v/release/VAMvicky/LumiTransport?label=rilis&color=1565D8&style=for-the-badge)](https://github.com/VAMvicky/LumiTransport/releases/latest)
-[![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-kebutuhan-sistem)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-kebutuhan-sistem)
 [![Java](https://img.shields.io/badge/Java-WebView-38BDF8?style=for-the-badge&logo=openjdk&logoColor=white)](#%EF%B8%8F-teknologi)
 [![Lisensi](https://img.shields.io/badge/lisensi-GPL--3.0-blue?style=for-the-badge)](LICENSE)
-[![Ukuran](https://img.shields.io/badge/APK-~350%20KB-00897B?style=for-the-badge)](#-kenapa-lumi-transportation)
+[![Ukuran](https://img.shields.io/badge/APK-~1,7%20MB-00897B?style=for-the-badge)](#-kenapa-lumi-transport)
 
 **🌐 Bahasa / Language:** &nbsp; **🇮🇩 Bahasa Indonesia** &nbsp;|&nbsp; [🇬🇧 English](README.en.md)
 
@@ -37,7 +37,7 @@
 | 💸 **Tarif yang benar** | Pindah di dalam halte = tidak bayar lagi. Turun di luar halte = tap ulang. Termasuk tarif SH2, Hub Connector, MRT per stasiun, KA Bandara. |
 | 🌙 **Sadar jam operasional** | Pukul 00.00? Lumi hanya memakai layanan 24 jam (AMARI koridor 1–14, JAK36/47/52/75) dan ojol. |
 | 📍 **Alamat dari Google** | Saran alamat langsung dari Google Places saat mengetik, memakai **kunci API internal Google Maps** (paket & sertifikat Google ditiru). Koordinat terbaca otomatis. |
-| 🪶 **Super ringan & offline** | APK sekitar **350 KB**. Perhitungan rute berjalan **di HP**, tanpa server. |
+| 🪶 **Super ringan & offline** | APK sekitar **1,7 MB** (sudah termasuk mesin peta, data rute, dan huruf). Perhitungan rute berjalan **di HP**, tanpa server; peta Jabodetabek bisa diunduh untuk dipakai **tanpa internet**. |
 
 ---
 
@@ -70,6 +70,17 @@
 ---
 
 ## ✨ Fitur
+
+**🆕 Baru di v2.17**
+- 🗺️ **Peta offline Jabodetabek**: unduh sekali (Pengaturan → Peta offline), peta tetap tampil tanpa internet — dipakai otomatis saat sinyal hilang, atau pilih sebagai gaya peta
+- 🗣️ **Panduan suara dari layanan pendampingan**: langkah, sisa pemberhentian, dan "turun sekarang" dibacakan juga saat layar mati; suara navigasi menurunkan volume musik sejenak
+- 📊 **Notifikasi progres langsung**: batang progres perjalanan per ruas di notifikasi; di Android 16 tampil sebagai *Live Update* di layar kunci & status bar
+- 🧩 **Widget "Bus favorit"**: perkiraan tiba hingga 3 bus di halte naikmu, langsung di layar utama (ketuk "Widget ETA" di detail perjalanan)
+- ⚙️ **Preferensi rute**: batas jalan kaki, batas pindah, moda yang dihindari, sembunyikan ojol, urutan bawaan
+- 💰 **Rekap ongkos per bulan** di Riwayat, lengkap dengan rincian per moda
+- 💾 **Ekspor & impor data** ke satu berkas (favorit, riwayat, tempat, pengingat, preferensi, widget) — pindah HP tanpa kehilangan apa pun
+- 📅 **Tarif dengan tanggal berlaku**: kenaikan tarif yang sudah diumumkan otomatis dipakai mulai harinya (mis. tarif TJ 2027)
+- 🛠️ Perbaikan: notifikasi pengingat tidak lagi menunggu internet; pendampingan tidak tertutup bila izin lokasi dicabut; ID notifikasi tidak saling menimpa; layanan pendampingan berhenti rapi setelah tiba; unduhan GTFS lebih tahan putus; klien WebSocket lebih aman; jembatan HTTP hanya ke layanan yang dipakai; izin CI dipersempit; uji unit Java
 
 **🆕 Baru di v2.16**
 - 🔔 **Bus makin dekat juga saat layar mati**: notifikasi ±10/±5/±2 menit dan saat bus tiba di halte naikmu, otomatis saat pendampingan dimulai (hanya bus yang searah)
@@ -116,7 +127,7 @@
 
 **🔔 Rute selalu terbaru**
 - Saat pertama dibuka, Lumi mengunduh **GTFS resmi Transjakarta** dan memprosesnya di HP
-- **Tiap jam** (latar belakang, sangat hemat kuota) Lumi mengecek:
+- **Berkala** (latar belakang, sangat hemat kuota) Lumi mengecek:
   1. umpan perubahan rute dari repo ini (`data/route_changes.json`), yang diperbarui GitHub Actions beberapa kali sehari (dijadwalkan tiap jam, tetapi GitHub sering menunda jadwal hingga beberapa jam), dan
   2. tanda versi file GTFS resmi (ETag / Last-Modified / ukuran)
 - Bila ada yang berubah, data rute diunduh ulang, perbedaannya dihitung (rute baru, dihapus, halte bertambah/berkurang, pola varian berubah), lalu muncul **notifikasi**
@@ -195,7 +206,7 @@ Diperbarui **29 Oktober 2026**. Tarif adalah perkiraan; selalu cek pengumuman op
 > 💡 **Update:** Cukup pasang APK baru di atas yang lama. Tempat tersimpan dan pengaturanmu tetap aman.
 
 ### 📋 Kebutuhan Sistem
-- Android **7.0 (API 24)** atau lebih baru
+- Android **8.0 (API 26)** atau lebih baru
 - Ruang kosong sekitar **10 MB** (data rute resmi disimpan di HP)
 - Internet untuk peta, membaca tautan Google Maps, dan cek perubahan rute (perhitungan rute sendiri offline)
 - Aplikasi **Google Maps** untuk mencari alamat (disarankan)
@@ -383,7 +394,7 @@ Lumi Transport bisa berdiri berkat data terbuka, proyek open-source, dan layanan
 | Wikipedia & media (Kompas, detik, CNA, Bisnis, CNN Indonesia, Suara, IDN Times, dll.) | Perubahan rute (mis. koridor 9 via tol), tarif terbaru, dan jam operasional |
 
 ### 🗺️ Peta & lokasi
-[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [OSRM](https://project-osrm.org/) (jarak jalan untuk estimasi ojol) · [Google Maps](https://maps.google.com) (peta raster & saran alamat, memakai kunci internal hasil RE — [docs/google-api-keys.md](docs/google-api-keys.md))
+[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [Planetiler](https://github.com/onthegomap/planetiler) & [PMTiles](https://github.com/protomaps/PMTiles) (peta offline) · [OSRM](https://project-osrm.org/) (jarak jalan untuk estimasi ojol) · [Google Maps](https://maps.google.com) (peta raster & saran alamat, memakai kunci internal hasil RE — [docs/google-api-keys.md](docs/google-api-keys.md))
 
 ### 📚 Library & aset
 [Leaflet](https://github.com/Leaflet/Leaflet) oleh Volodymyr Agafonkin dkk. · [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) oleh Tokotype (SIL OFL) · [Eclipse JDT ecj](https://github.com/eclipse-jdt/eclipse.jdt.core) · Android build tools (aapt2, d8, apksigner)

@@ -9,10 +9,10 @@
 *Transjakarta · Mikrotrans · KRL · MRT · LRT · Airport Rail · Whoosh · ride-hailing, in one route*
 
 [![Release](https://img.shields.io/github/v/release/VAMvicky/LumiTransport?label=release&color=1565D8&style=for-the-badge)](https://github.com/VAMvicky/LumiTransport/releases/latest)
-[![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Java](https://img.shields.io/badge/Java-WebView-38BDF8?style=for-the-badge&logo=openjdk&logoColor=white)](#%EF%B8%8F-tech-stack)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=for-the-badge)](LICENSE)
-[![Size](https://img.shields.io/badge/APK-~350%20KB-00897B?style=for-the-badge)](#-why-lumi-transportation)
+[![Size](https://img.shields.io/badge/APK-~1.7%20MB-00897B?style=for-the-badge)](#-why-lumi-transport)
 
 **🌐 Bahasa / Language:** &nbsp; [🇮🇩 Bahasa Indonesia](README.md) &nbsp;|&nbsp; **🇬🇧 English**
 
@@ -37,7 +37,7 @@
 | 💸 **Correct fares** | Transferring inside a station is free; leaving the station means tapping in again. Covers SH2, Hub Connector, MRT per-station fares and Airport Rail. |
 | 🌙 **Knows opening hours** | At midnight Lumi only uses 24-hour services (AMARI corridors 1–14, JAK36/47/52/75) and ride-hailing. |
 | 📍 **Addresses from Google** | Address suggestions straight from Google Places while you type, using Google Maps' **internal API key** (package and certificate are spoofed). Coordinates are filled in automatically. |
-| 🪶 **Tiny and offline** | About **350 KB**. Route planning runs **on your phone**, with no server. |
+| 🪶 **Tiny and offline** | About **1.7 MB** (map engine, route data and fonts included). Route planning runs **on your phone**, with no server; the Jabodetabek map can be downloaded to work **without internet**. |
 
 ---
 
@@ -70,6 +70,17 @@
 ---
 
 ## ✨ Features
+
+**🆕 New in v2.17**
+- 🗺️ **Jabodetabek offline map**: download once (Settings → Offline map) and the map keeps working without internet — used automatically when you lose signal, or pick it as the map style
+- 🗣️ **Voice guidance from the guidance service**: steps, stops left and "get off now" are read out even with the screen off; navigation audio briefly lowers your music
+- 📊 **Live progress notification**: a per-leg trip progress bar in the notification; on Android 16 it shows as a *Live Update* on the lock screen & status bar
+- 🧩 **"Favourite buses" widget**: arrival estimates for up to 3 buses at your boarding stop, right on the home screen (tap "ETA widget" in a trip's details)
+- ⚙️ **Route preferences**: longest walk, most transfers, modes to avoid, hide ride-hailing, default order
+- 💰 **Monthly spending summary** in History, split by mode
+- 💾 **Export & import** everything to one file (favourites, history, places, reminders, preferences, widget) — switch phones without losing anything
+- 📅 **Fares with effective dates**: announced fare changes apply automatically from their start date (e.g. the 2027 TJ fare)
+- 🛠️ Fixes: reminder notifications no longer wait for the network; guidance no longer crashes if location permission was revoked; notification IDs no longer overwrite each other; the guidance service stops cleanly after arrival; sturdier GTFS download; safer WebSocket client; the HTTP bridge only reaches the services Lumi uses; narrower CI permissions; Java unit tests
 
 **🆕 New in v2.16**
 - 🔔 **Bus-approaching alerts even with the screen off**: ±10/±5/±2 min and on arrival at your boarding stop, automatic when guidance starts (only buses going your way)
@@ -116,7 +127,7 @@
 
 **🔔 Always-current routes**
 - On first launch Lumi downloads the **official Transjakarta GTFS** and processes it on the phone
-- **Every hour** (in the background, very little data) Lumi checks:
+- **Regularly** (in the background, very little data) Lumi checks:
   1. the route-change feed in this repo (`data/route_changes.json`), updated several times a day by GitHub Actions (scheduled hourly, but GitHub often delays scheduled runs by hours), and
   2. the version signature of the official GTFS file (ETag / Last-Modified / size)
 - When something changes, route data is re-downloaded, differences are computed (new or removed routes, stops added/removed, variant patterns changed) and a **notification** appears
@@ -177,7 +188,7 @@ Sources are listed in the [Indonesian README](README.md#-tarif-yang-dipakai).
 > 💡 **Updating:** just install the new APK over the old one. Saved places and settings are kept.
 
 ### 📋 Requirements
-- Android **7.0 (API 24)** or newer
+- Android **8.0 (API 26)** or newer
 - About **10 MB** of free space (official route data is stored on the phone)
 - Internet for maps, reading Google Maps links and checking route changes (route planning itself is offline)
 - The **Google Maps** app for address search (recommended)
@@ -311,7 +322,7 @@ Lumi Transport exists thanks to the open data, open-source projects and services
 | Wikipedia & news media (Kompas, detik, CNA, Bisnis, CNN Indonesia, Suara, IDN Times, etc.) | Route changes (e.g. corridor 9 via toll), latest fares and operating hours |
 
 ### 🗺️ Maps & location
-[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [OSRM](https://project-osrm.org/) (road distance for ride-hailing estimates) · [Google Maps](https://maps.google.com) (raster maps & address suggestions via the internal key found by RE — [docs/google-api-keys.md](docs/google-api-keys.md))
+[OpenStreetMap](https://www.openstreetmap.org/copyright) contributors · [OpenFreeMap](https://openfreemap.org) & [OpenMapTiles](https://openmaptiles.org) · [MapLibre GL JS](https://maplibre.org) · [Planetiler](https://github.com/onthegomap/planetiler) & [PMTiles](https://github.com/protomaps/PMTiles) (offline map) · [OSRM](https://project-osrm.org/) (road distance for ride-hailing estimates) · [Google Maps](https://maps.google.com) (raster maps & address suggestions via the internal key found by RE — [docs/google-api-keys.md](docs/google-api-keys.md))
 
 ### 📚 Libraries & assets
 [Leaflet](https://github.com/Leaflet/Leaflet) by Volodymyr Agafonkin et al. · [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) by Tokotype (SIL OFL) · [Eclipse JDT ecj](https://github.com/eclipse-jdt/eclipse.jdt.core) · Android build tools (aapt2, d8, apksigner)

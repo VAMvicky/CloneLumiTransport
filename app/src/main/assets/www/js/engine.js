@@ -68,11 +68,51 @@
   /* ---------------------------------------------------------------- tarif
    * Semua angka tarif ada di data/fares.json (R8) dan masuk lewat data.fares (build_data.py) atau versi
    * terbaru yang diunduh aplikasi. Lihat file itu untuk sumber/aturan tiap moda. */
-  var FARES = null;
+  var FARES = null, BASE_FARES = null, FARE_DATE = null;
   function rpId(n) { return "Rp" + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+  /*
+   * v2.17 — tarif dengan tanggal berlaku. fares.json boleh memuat
+   *   "schedule": [{ "from": "2027-01-01", "set": { "tj": { "base": 4000 } }, "note": {id, en} }, …]
+   * Setiap entri yang tanggal "from"-nya ≤ tanggal perjalanan ditimpakan (berurutan) ke tarif dasar, jadi
+   * kenaikan tarif yang sudah diumumkan cukup ditulis sekali dan berlaku otomatis pada harinya.
+   * Objek digabung per kunci; angka & larik diganti utuh.
+   */
+  function ymdWib(ms) {
+    var d = new Date((ms == null ? Date.now() : ms) + 7 * 3600000);
+    return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
+  }
+  function mergeFare(a, b) {
+    if (!b || typeof b !== "object" || Array.isArray(b)) return b;
+    var out = {}, k;
+    for (k in a) out[k] = a[k];
+    for (k in b) out[k] = a && a[k] && typeof a[k] === "object" && !Array.isArray(a[k]) ? mergeFare(a[k], b[k]) : b[k];
+    return out;
+  }
+  function scheduleOf(f) {
+    return (Array.isArray(f.schedule) ? f.schedule : []).filter(function (x) {
+      return x && /^\d{4}-\d{2}-\d{2}$/.test(String(x.from || "")) && x.set && typeof x.set === "object";
+    }).sort(function (a, b) { return a.from < b.from ? -1 : a.from > b.from ? 1 : 0; });
+  }
+  function faresAt(ymd) {
+    var f = BASE_FARES;
+    scheduleOf(BASE_FARES).forEach(function (x) { if (x.from <= ymd) f = mergeFare(f, x.set); });
+    return f;
+  }
   function useFares(f) {
     if (!f || f.v !== 1 || !f.tj || !f.krl || !f.ojol) throw new Error("data tarif (fares.json) tidak valid");
-    FARES = f;
+    BASE_FARES = f;
+    FARES = faresAt(FARE_DATE || ymdWib());
+  }
+  /* Tarif yang dipakai mesin mengikuti tanggal perjalanan ("yyyy-mm-dd", WIB). */
+  function setFareDate(ymd) {
+    FARE_DATE = /^\d{4}-\d{2}-\d{2}$/.test(String(ymd || "")) ? ymd : null;
+    if (BASE_FARES) FARES = faresAt(FARE_DATE || ymdWib());
+    return FARES;
+  }
+  /* Perubahan tarif yang belum berlaku pada `ymd` (untuk pengumuman di layar Tarif). */
+  function upcomingFares(ymd) {
+    ymd = ymd || ymdWib();
+    return BASE_FARES ? scheduleOf(BASE_FARES).filter(function (x) { return x.from > ymd; }) : [];
   }
   function range(km, o) {
     return { lo: round500(Math.max(o.min[0], km * o.perKm[0]) + o.fee[0]), hi: round500(Math.max(o.min[1], km * o.perKm[1]) + o.fee[1]) };
@@ -813,7 +853,8 @@
     return order.filter(function (k) { return g[k].shut === g[k].n; });
   };
 
-  var api = { Planner: Planner, MODES: MODES, RAIL: RAIL, hav: hav, openAt: openAt, isNight: isNight, ojolMotor: ojolMotor, ojolCar: ojolCar, ojolMinutes: ojolMinutes, useFares: useFares, fares: function () { return FARES; } };
+  var api = { Planner: Planner, MODES: MODES, RAIL: RAIL, hav: hav, openAt: openAt, isNight: isNight, ojolMotor: ojolMotor, ojolCar: ojolCar, ojolMinutes: ojolMinutes, useFares: useFares, fares: function (ymd) { return ymd ? faresAt(ymd) : FARES; },
+    setFareDate: setFareDate, upcomingFares: upcomingFares, ymdWib: ymdWib };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LumiEngine = api;
 })(typeof window !== "undefined" ? window : this);
