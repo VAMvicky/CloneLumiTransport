@@ -41,6 +41,22 @@ jobs:
       - name: Uji mesin rute (gagal = build merah)
         run: node tools/test_engine.js
 
+      - name: Uji klien posisi bus (cadangan sementara, aliran byte, versi klien)
+        run: node tools/test_live.js
+
+      - name: Uji jadwal kereta (pipeline + mesin rute)
+        run: python3 tools/test_rail.py
+
+      - name: Periksa data jarak jauh (remote_config, gangguan, jadwal kereta)
+        run: python3 tools/check_remote.py
+
+      - name: Uji dekoder GTFS-Realtime (Java murni)
+        run: |
+          set -euo pipefail
+          mkdir -p build/rt
+          javac -d build/rt app/src/main/java/id/lumi/transport/GtfsRt.java tools/GtfsRtTest.java
+          java -cp build/rt GtfsRtTest
+
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
@@ -53,6 +69,9 @@ jobs:
           set -euo pipefail
           python3 tools/ui_check.py en native --shots ui-shots
           python3 tools/ui_check.py id native --shots ui-shots
+
+      - name: Uji ikuti perjalananku (enkripsi Java → penampil WebCrypto)
+        run: python3 tools/test_share.py
 
       - name: Upload tangkapan layar uji
         if: always()

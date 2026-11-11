@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v2.15: tidak ada data yang ikut cadangan cloud maupun pemindahan perangkat (adb/D2D).
+  Data Lumi berisi token tamu Transjakarta, ID perangkat acak, cache rute, kunci berbagi perjalanan,
+  dan riwayat lokasi; pengguna bisa memindahkannya sendiri lewat Pengaturan → Cadangkan & pulihkan.
+  allowBackup="false" di manifest berlaku untuk Android ≤ 11; berkas ini untuk Android 12+.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

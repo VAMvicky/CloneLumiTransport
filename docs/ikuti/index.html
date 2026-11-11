@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <title>Ikuti perjalanan · Lumi Transport</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    :root { --ink: #1565D8; --paper: #EEF6FC; --card: #fff; --text: #0F2740; --muted: #527089; --line: #D5E5F2; --ok: #11643A; --okbg: #E3F6EA; --warn: #7A3E00; --warnbg: #FFF4E5; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #5AA9FF; --paper: #0B1422; --card: #132033; --text: #E3ECF7; --muted: #9DB0C6; --line: #233650; --ok: #7EE2A8; --okbg: #12352A; --warn: #FFCB7A; --warnbg: #3A2A10; }
+      .leaflet-tile-pane { filter: invert(.92) hue-rotate(180deg) brightness(.95) contrast(.88) saturate(.8); }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--paper); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    #map { position: fixed; inset: 0 0 auto 0; height: 58vh; background: var(--line); }
+    .panel { position: fixed; left: 0; right: 0; bottom: 0; min-height: 42vh; background: var(--card); border-radius: 22px 22px 0 0;
+      padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0,0,0,.12); }
+    .brand { font-size: 12px; font-weight: 800; letter-spacing: .06em; color: var(--ink); text-transform: uppercase; }
+    h1 { margin: 4px 0 2px; font-size: 22px; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); font-size: 14px; }
+    .state { display: inline-block; margin-top: 12px; padding: 5px 11px; border-radius: 999px; font-weight: 800; font-size: 13px; background: var(--paper); color: var(--ink); }
+    .state.ok { background: var(--okbg); color: var(--ok); }
+    .state.warn { background: var(--warnbg); color: var(--warn); }
+    .now { margin: 12px 0 0; font-size: 15px; }
+    .now b { display: block; font-size: 17px; }
+    .age { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+    .note { margin-top: 14px; font-size: 12px; color: var(--muted); }
+    .me { width: 18px; height: 18px; border-radius: 50%; background: #1A73E8; border: 3px solid #fff; box-shadow: 0 0 0 7px rgba(26,115,232,.22), 0 1px 4px rgba(0,0,0,.35); }
+    .dest { width: 22px; height: 22px; border-radius: 50%; background: #38BDF8; border: 4px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+    .err { color: #C2410C; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <section class="panel" aria-live="polite">
+    <div class="brand">Lumi Transport · ikuti perjalanan</div>
+    <h1 id="title">Menyambungkan…</h1>
+    <div class="sub" id="to"></div>
+    <span class="state" id="state">Menunggu posisi</span>
+    <div class="now" id="now"></div>
+    <div class="age" id="age"></div>
+    <p class="note">Posisi dikirim dari HP pengirim selama pendampingan berjalan dan berhenti otomatis saat tiba.
+      Isinya terenkripsi: kunci hanya ada di tautan ini (setelah tanda #) dan tidak pernah dikirim ke server mana pun.</p>
+  </section>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+  /*
+   * Penampil "Ikuti perjalananku" (Lumi Transport v2.15).
+   * Tautan: …/ikuti/#t=<topik>&k=<kunci base64url>[&r=<host relay>]
+   * Pesan diambil dari relay ntfy (https://<relay>/<topik>/json?poll=1&since=…) lalu didekripsi di sini
+   * dengan AES-256-GCM (WebCrypto). Format pesan sama dengan ShareCrypto.java: base64url(iv[12] ‖ ct ‖ tag).
+   */
+  (function () {
+    "use strict";
+    var EN = !/^id\b/i.test(navigator.language || "id");
+    function t(id, en) { return EN ? en : id; }
+    var $ = function (s) { return document.querySelector(s); };
+    var q = {};
+    location.hash.replace(/^#/, "").split("&").forEach(function (kv) { var i = kv.indexOf("="); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+    if (EN) {
+      document.documentElement.lang = "en";
+      document.querySelector(".brand").textContent = "Lumi Transport · follow a trip";
+      document.querySelector(".note").textContent = "The position is sent from the sender's phone while guidance runs and stops automatically on arrival. It is end-to-end encrypted: the key lives only in this link (after the #) and is never sent to any server.";
+    }
+    function fail(msg) { $("#title").textContent = t("Tautan tidak bisa dibuka", "This link can't be opened"); $("#now").innerHTML = '<span class="err"></span>'; $("#now .err").textContent = msg; $("#state").hidden = true; }
+    if (!/^lumi-[0-9a-f]{32}$/.test(q.t || "") || !/^[A-Za-z0-9_-]{43}$/.test(q.k || "")) { fail(t("Tautan tidak lengkap. Minta pengirim membagikan ulang.", "The link is incomplete. Ask the sender to share it again.")); return; }
+    var relayHost = q.r && /^[A-Za-z0-9.-]+(:\d+)?$/.test(q.r) ? q.r : "ntfy.sh";
+    var BASE = "https://" + relayHost + "/" + q.t;
+    if (!window.crypto || !crypto.subtle) { fail(t("Peramban ini tidak mendukung dekripsi (WebCrypto).", "This browser doesn't support decryption (WebCrypto).")); return; }
+
+    function unb64url(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+    var keyP = crypto.subtle.importKey("raw", unb64url(q.k), { name: "AES-GCM" }, false, ["decrypt"]);
+    function decrypt(msg) {
+      var all = unb64url(msg.trim());
+      return keyP.then(function (key) { return crypto.subtle.decrypt({ name: "AES-GCM", iv: all.slice(0, 12) }, key, all.slice(12)); })
+        .then(function (buf) { return JSON.parse(new TextDecoder().decode(buf)); });
+    }
+
+    var map = null, me = null, dest = null, fitted = false, last = null, lastId = "12h", ended = false;
+    function initMap() {
+      if (map || !window.L) return;
+      map = L.map("map", { zoomControl: false, attributionControl: true }).setView([-6.2, 106.83], 12);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(map);
+    }
+    var PHASE = { walk: ["Berjalan kaki", "Walking"], wait: ["Menunggu angkutan", "Waiting for a ride"], ride: ["Dalam perjalanan", "On board"],
+      alight: ["Bersiap turun", "About to get off"], dest: ["Menuju tujuan", "Heading to the destination"], start: ["Baru berangkat", "Just set off"] };
+    function show(m) {
+      if (m.to) $("#to").textContent = t("Menuju ", "Heading to ") + m.to;
+      if (m.toLat && m.toLon) {
+        initMap();
+        if (map && !dest) dest = L.marker([m.toLat, m.toLon], { icon: L.divIcon({ className: "", html: '<div class="dest"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(map);
+      }
+      var st = $("#state");
+      st.className = "state";
+      if (m.state === "arrived") { st.textContent = t("Sudah tiba ✓", "Arrived ✓"); st.classList.add("ok"); $("#title").textContent = t("Sudah sampai tujuan", "Has arrived"); ended = true; }
+      else if (m.state === "ended") { st.textContent = t("Berbagi dihentikan", "Sharing stopped"); st.classList.add("warn"); $("#title").textContent = t("Berbagi posisi dihentikan", "Location sharing stopped"); ended = true; }
+      else { st.textContent = t((PHASE[m.state] || ["Dalam perjalanan"])[0], (PHASE[m.state] || [0, "On the way"])[1]); $("#title").textContent = t("Sedang dalam perjalanan", "On the way"); }
+      if (m.title || m.text) $("#now").innerHTML = "<b></b><span></span>", $("#now b").textContent = m.title || "", $("#now span").textContent = m.text || "";
+      if (m.lat && m.lon) {
+        initMap();
+        if (map) {
+          if (!me) me = L.marker([m.lat, m.lon], { icon: L.divIcon({ className: "", html: '<div class="me"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000 }).addTo(map);
+          else me.setLatLng([m.lat, m.lon]);
+          if (!fitted) { fitted = true; map.fitBounds(L.latLngBounds([[m.lat, m.lon]].concat(dest ? [dest.getLatLng()] : [])).pad(0.3), { maxZoom: 16 }); }
+        }
+        last = m;
+      }
+    }
+    function ago() {
+      if (!last || !last.ts) return;
+      var s = Math.max(0, Math.round((Date.now() - last.ts) / 1000));
+      $("#age").textContent = t("Posisi diperbarui ", "Position updated ") + (s < 60 ? s + t(" detik lalu", " s ago") : Math.round(s / 60) + t(" menit lalu", " min ago")) +
+        (last.acc ? " · ±" + last.acc + " m" : "") + (s > 300 && !ended ? t(" — sinyal pengirim mungkin lemah", " — the sender's signal may be weak") : "");
+    }
+    function poll() {
+      fetch(BASE + "/json?poll=1&since=" + encodeURIComponent(lastId), { cache: "no-store", referrerPolicy: "no-referrer" })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+        .then(function (txt) {
+          var lines = txt.split("\n").filter(Boolean), chain = Promise.resolve();
+          lines.forEach(function (ln) {
+            var ev; try { ev = JSON.parse(ln); } catch (e) { return; }
+            if (ev.event !== "message" || !ev.message) return;
+            lastId = ev.id || lastId;
+            chain = chain.then(function () { return decrypt(ev.message).then(show, function () { /* bukan pesan kita / kunci salah */ }); });
+          });
+          return chain;
+        })
+        .then(function () { if (!last && !ended) $("#title").textContent = t("Menunggu posisi pertama…", "Waiting for the first position…"); })
+        .catch(function () { $("#age").textContent = t("Gagal menghubungi server, mencoba lagi…", "Couldn't reach the server, retrying…"); })
+        .then(function () { if (!ended) setTimeout(poll, 10000); });
+    }
+    initMap();
+    poll();
+    setInterval(ago, 5000);
+  })();
+  </script>
+</body>
+</html>

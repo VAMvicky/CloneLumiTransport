@@ -162,6 +162,8 @@ public class NavService extends Service {
         GuideTracker.State s = t.update(loc.getLatitude(), loc.getLongitude(), loc.hasAccuracy() ? loc.getAccuracy() : 30);
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, build(s.title, s.text));
         if (s.alert != null) alert(s.alert);
+        // "Ikuti perjalananku": kirim posisi terenkripsi bila pengguna sedang berbagi (TripShare).
+        try { TripShare.onGuide(this, s, loc.hasAccuracy() ? loc.getAccuracy() : 30); } catch (Exception ignored) { }
         String json = GuideTracker.toJson(s);
         lastJson = json;
         if (listener != null) listener.onGuide(json);
@@ -176,6 +178,8 @@ public class NavService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        // Pendampingan berhenti sebelum tiba: penerima tautan diberi tahu ("ended"), topik dibuang.
+        try { TripShare.stop(this, false); } catch (Exception ignored) { }
         if (lm != null && ll != null) try { lm.removeUpdates(ll); } catch (Exception ignored) { }
         lm = null;
         // Pastikan notifikasi pendampingan hilang saat layanan berhenti.

@@ -3,34 +3,22 @@ package id.lumi.transport;
 import android.app.job.JobParameters;
 import android.app.job.JobService;
 
-/** Tugas harian: unduh GTFS resmi, perbarui data rute, beri notifikasi bila ada rute yang berubah. */
+/**
+ * Tugas harian LAMA (sampai v2.14). Sejak v2.15 pembaruan data rute hanya lewat RouteWatchJob
+ * (tiap jam, dengan penjaga unduhan bersama di RouteUpdater.runGuarded) supaya GTFS penuh tidak
+ * pernah diunduh dua kali berdekatan oleh dua tugas yang tumpang tindih.
+ *
+ * Kelas ini tetap terdaftar di manifest hanya agar tugas lama yang masih tersimpan di JobScheduler
+ * (dijadwalkan versi sebelumnya, persisted) tidak menunjuk ke komponen yang hilang. Bila terpicu,
+ * ia membatalkan dirinya sendiri dan memastikan pemantau tiap jam terjadwal, tanpa mengunduh apa pun.
+ */
 public class RouteUpdateJob extends JobService {
-    private Thread worker;
-
     @Override
     public boolean onStartJob(final JobParameters params) {
-        Lang.load(this);
-        if (RouteUpdater.freshEnough(this)) return false;   // sudah diperbarui hari ini (mis. dari aplikasi)
-        worker = new Thread(new Runnable() {
-            @Override public void run() {
-                boolean fail = false;
-                try {
-                    RouteUpdater.run(RouteUpdateJob.this, new GtfsImporter.Progress() {
-                        public void update(String m) { }
-                    }, true);
-                } catch (Throwable e) {
-                    fail = true;
-                }
-                jobFinished(params, fail);
-            }
-        });
-        worker.start();
-        return true;
+        try { RouteUpdater.schedule(this); } catch (Exception ignored) { }
+        return false;
     }
 
     @Override
-    public boolean onStopJob(JobParameters params) {
-        if (worker != null) worker.interrupt();
-        return true;   // coba lagi nanti
-    }
+    public boolean onStopJob(JobParameters params) { return false; }
 }

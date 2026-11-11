@@ -37,13 +37,21 @@ STUB = r"""
       { k: "chg", code: "2", name: "Pulo Gadung - Monas", text: "Urutan halte berubah" },
       { k: "del", code: "T99", name: "Zona Z", text: "Rute tidak ada lagi di data resmi" },
       { k: "chg", code: "3", name: "Kalideres - Monas", text: "Nama trayek: Lama → Baru" }]}]}),
-    getChangeDetail: () => null, markChangesSeen: () => {}, pipOk: () => true, enterPip: () => {}, versionName: () => "2.12",
+    getChangeDetail: () => null, markChangesSeen: () => {}, pipOk: () => true, enterPip: () => {}, versionName: () => "2.15.0",
     share: (t) => { st.shared = t; }, shareImage: (u, t) => { st.sharedImg = t; }, openUrl: (u) => { st.url = u; }, openApp: () => {},
     updateGtfs: () => cb(() => { __lumiGtfs("progress", "Downloading GTFS… 3 MB"); __lumiGtfs("error", "HTTP 503"); }),
     takeShared: () => null, takeOpen: () => null, compass: () => {}, speak: (t) => { st.spoken = t; }, stopSpeak: () => {},
     getRouteData: () => null, resolve: (id, u) => cb(() => __lumiResolved(id, u)), openTjApp: () => {}, busNotify: () => {},
     liveOpen: () => { cb(() => window.LumiLive && LumiLive.__nativeClose && LumiLive.__nativeClose("server refused: 403")); }, liveSend: () => {}, liveClose: () => {}, liveFilter: () => {}, liveBytes: () => 0,
-    watchPos: (on) => { st.watch = on; if (on) cb(() => window.__lumiPos && __lumiPos(-6.2089, 106.8457, 8)); }
+    watchPos: (on) => { st.watch = on; if (on) cb(() => window.__lumiPos && __lumiPos(-6.2089, 106.8457, 8)); },
+    // v2.15
+    nightMode: () => !!st.night, setThemeDark: (d) => { st.dark = d; }, tjClientVersion: () => "2.11.0", setRemoteTjClientVersion: () => {},
+    rtFetch: (id, u) => cb(() => __lumiHttp(id, 200, JSON.stringify(st.rt || { ts: 0, vehicles: [], trips: [], alerts: [] }))),
+    setReminder: (j) => { const r = JSON.parse(j); st.rem = (st.rem || []).filter(x => x.id !== r.id).concat([r]); return JSON.stringify({ ok: true, at: Date.now() + 3.6e6, exact: false }); },
+    listReminders: () => JSON.stringify(st.rem || []), getReminder: (id) => { const r = (st.rem || []).find(x => x.id === id); return r ? JSON.stringify(r) : null; },
+    removeReminder: (id) => { st.rem = (st.rem || []).filter(x => x.id !== id); }, exactAlarmOk: () => false, openExactAlarmSettings: () => { st.exactAsked = true; },
+    shareLiveStart: () => { st.sharing = true; return "https://vamvicky.github.io/LumiTransport/ikuti/#t=lumi-0123&k=abc"; },
+    shareLiveStop: () => { st.sharing = false; }, shareLiveActive: () => !!st.sharing
   };
   try { localStorage.setItem('lumi:debug', '1'); } catch (e) { }
 })();
@@ -106,7 +114,20 @@ async def main():
           s('trips', [{key: 'x', ts: Date.now(), from: 'Monas', to: 'Blok M', mins: 75, fare: 3500, modes: 'Transjakarta + KRL Commuter Line'}]);
           s('places', [{name: 'Rumah', sub: 'Dari Google Maps', p: [-6.2, 106.8]}]);
           s('recent', [{from: {name: 'Lokasi saya', p: [-6.2, 106.8], me: true}, to: {name: 'Blok M', p: [-6.2443, 106.7999]}}]);
+          // v2.15: gangguan aktif + jadwal kereta tiruan (tiap 10 mnt, 04.00–24.00) untuk KRL Bogor & MRT
+          const now = Date.now();
+          s('disruptions', {v: 1, items: [
+            {id: 'krl1', mode: 'KRL', lines: ['B'], severity: 'warn', title: {id: 'KRL Bogor tertahan', en: 'Bogor line held'}, text: {id: 'Gangguan sinyal di Manggarai, perjalanan tertahan ±15 menit.', en: 'Signal fault at Manggarai, trains held ±15 min.'}, until: new Date(now + 3 * 3600e3).toISOString()},
+            {id: 'tj9', mode: 'TJ', lines: ['9'], severity: 'severe', title: {id: 'Koridor 9 dialihkan', en: 'Corridor 9 diverted'}, text: {id: 'Halte Semanggi ditutup sementara.', en: 'Semanggi stop temporarily closed.'}, until: new Date(now + 3600e3).toISOString(), url: 'https://transjakarta.co.id'}]});
+          const lines = __lumiDebug.data.lines.filter(l => l.id === 'krl-b' || l.id === 'mrt-ns'), sched = {v: 1, lines: {}};
+          for (const l of lines) sched.lines[l.id] = {d: l.dirs.map((d, di) => ({n: d.s.length, trips: Array.from({length: 120}, (_, k) => [(l.mode === 'MRT' ? 'MRT ' : 'KA ') + (1000 + k * 2 + di), d.s.map((_, i) => 240 + k * 10 + i * (l.mode === 'MRT' ? 2 : 3))])}))};
+          s('railSched', sched);
+          s('remoteAt', {cfg: now, dis: now, sched: now});
+          s('remoteCfg', {v: 1, updated: 'x', rail: {realtime: [{id: 'krl', url: 'https://example.org/rt.pb', kind: 'all', modes: ['KRL'], routeMap: {BOGOR: 'krl-b'}}]}});
         }""")
+        if NATIVE:
+            await pg.evaluate("""() => { __stub.rt = {ts: 1, vehicles: [{id: 'K1', label: 'KA 1234', route: 'BOGOR', lat: -6.30, lon: 106.83, bearing: 180, occ: 'STANDING_ROOM_ONLY', ts: Math.floor(Date.now()/1000)}],
+              trips: [{trip: '1004', delay: 240}], alerts: [{id: 'a1', routes: ['BOGOR'], severity: 'WARNING', header: {id: 'Perjalanan KRL Bogor terlambat', en: 'Bogor line delays'}, desc: {id: 'Antrean kereta di Manggarai.', en: 'Trains queuing at Manggarai.'}}]}; }""")
         await pg.reload(); await pg.wait_for_timeout(700); await grab("home-seeded", True)
         await pg.click("#inFrom"); await grab("suggest-empty")
         await pg.fill("#inFrom", "monas"); await grab("suggest-q")
@@ -140,8 +161,26 @@ async def main():
             await pg.evaluate("document.querySelectorAll('#results .it-share')[0] && document.querySelectorAll('#results .it-share')[0].click()")
             await pg.wait_for_timeout(400); await grab(f"share{i}")
         if NATIVE:
+            # v2.15: detail perjalanan kereta (jadwal pasti, posisi kereta, gangguan), favorit lengkap, pengingat
+            await pg.evaluate("a => { __lumiSet('from', {name: a[0], p: a[1]}); __lumiSet('to', {name: a[2], p: a[3]}); }", ["Stasiun Bogor", [-6.595, 106.79], "Lebak Bulus", [-6.2894, 106.7745]])
+            await pg.click("#btnTime"); await pg.click('#timeMode [data-m="arr"]'); await pg.fill("#inTime", "09:00"); await pg.click("#btnTimeOk")
+            await pg.wait_for_timeout(1500); await grab("results-rail", True)
+            await pg.evaluate("document.querySelectorAll('#results .it')[0].click()"); await pg.wait_for_timeout(1500); await grab("trip-rail", True)
+            await pg.click("#btnTripFav"); await grab("trip-fav")
+            await pg.click("#btnRemind"); await pg.wait_for_timeout(200); await grab("remind", True)
+            await pg.click("#remRepeat"); await grab("remind-repeat")
+            await pg.click("#remOk"); await pg.wait_for_timeout(300); await grab("remind-ok")
+            n_rem = await pg.evaluate("(__stub.rem || []).length")
+            if n_rem != 1: raise SystemExit("pengingat tidak tersimpan lewat jembatan native")
+            await pg.evaluate("document.querySelector('#sheetTrip').hidden = true")
+            await pg.click("#btnTime"); await pg.click('#timeMode [data-m="now"]'); await pg.click("#btnTimeOk")
+            await pg.evaluate("a => { __lumiSet('from', {name: a[0], p: a[1]}); __lumiSet('to', {name: a[2], p: a[3]}); }", ["Monas", [-6.1754, 106.8272], "Blok M", [-6.2443, 106.7999]])
+            await pg.click("#btnGo"); await pg.wait_for_timeout(1500)
             await pg.evaluate("document.querySelectorAll('#results .it')[0].click()"); await pg.wait_for_timeout(600)
             await pg.click("#btnGuide"); await pg.wait_for_timeout(500); await grab("guide", True)
+            await pg.click(".guide-share"); await pg.wait_for_timeout(200); await grab("guide-share", True)
+            if not await pg.evaluate("__stub.sharing && /ikuti/.test(__stub.shared || '')"): raise SystemExit("tautan ikuti perjalananku tidak dibagikan")
+            await pg.click(".guide-share"); await grab("guide-share-stop")
             await pg.evaluate("__lumiGuide({phase:'ride',title:'TJ 9 · 3 stops to go',text:'Get off at X · now near Y',stopsLeft:3,metersLeft:-1})"); await grab("guide2")
             await pg.evaluate("__lumiGuide({phase:'walk',title:'Walk to your destination',text:'±300 m to go to Z',stopsLeft:-1,metersLeft:1300})"); await grab("guide3")
             await pg.evaluate("__lumiGuide({phase:'done',done:true,title:'Arrived',text:'You have arrived at Z.',stopsLeft:-1,metersLeft:-1})"); await grab("guide4")
@@ -199,6 +238,10 @@ async def main():
         await pg.evaluate("document.querySelector('#restoreText').value = 'xx'; document.querySelector('#btnRestore').click()"); await grab("restore-bad")
         await pg.evaluate("document.querySelector('#btnClearTrips') && document.querySelector('#btnClearTrips').click()"); await grab("trips-cleared")
         await pg.select_option("#setMap", "bright"); await grab("map-style")
+        if NATIVE:
+            await pg.evaluate("document.querySelector('[data-remgo]') && document.querySelector('[data-remgo]').scrollIntoView()"); await grab("set-reminders", True)
+            await pg.evaluate("document.querySelector('#btnExactAlarm') && document.querySelector('#btnExactAlarm').click()")
+        await pg.select_option("#setTheme", "dark"); await pg.wait_for_timeout(200); await grab("set-dark", True)
         await pg.evaluate("document.querySelector('#btnUpdate').click()"); await pg.wait_for_timeout(500); await grab("update")
         await pg.evaluate("document.querySelector('#sheetSettings').hidden = true")
 
@@ -208,6 +251,18 @@ async def main():
         await pg.evaluate("lumiShared('Toko Kue\\nhttps://maps.app.goo.gl/abc')"); await pg.wait_for_timeout(500); await grab("share-nocoord")
         await pg.click("#shareTo"); await pg.wait_for_timeout(500); await grab("pick", True)
         await pg.click("#pickOk"); await grab("pick-ok")
+
+        # v2.15: layar utama dalam mode gelap
+        await pg.evaluate("document.querySelectorAll('.sheet,.modal').forEach(x => x.hidden = true)")
+        await pg.evaluate("() => { const t = document.querySelector('.nav-btn[data-tab=\"plan\"]'); t && t.click(); }")
+        await pg.evaluate("document.querySelector('#btnClear') && document.querySelector('#btnClear').click()"); await grab("dark-home", True)
+        await pg.evaluate("a => { __lumiSet('from', {name: a[0], p: a[1]}); __lumiSet('to', {name: a[2], p: a[3]}); }", ["Stasiun Bogor", [-6.595, 106.79], "Lebak Bulus", [-6.2894, 106.7745]])
+        await pg.click("#btnGo"); await pg.wait_for_timeout(1500); await grab("dark-results", True)
+        await pg.evaluate("document.querySelectorAll('#results .it')[0].click()"); await pg.wait_for_timeout(1200); await grab("dark-trip", True)
+        await pg.evaluate("document.querySelector('#sheetTrip').hidden = true")
+        await pg.evaluate("() => { const b = document.querySelector('.nav-btn[data-tab=\"lines\"]'); b && b.click(); }")
+        await pg.evaluate("id => { const b = document.querySelector('.l-item[data-id=\"'+id+'\"]'); b && b.click(); }", "krl-b")
+        await pg.wait_for_timeout(900); await grab("dark-line-krl", True)
 
         names = await pg.evaluate("""() => { const s = new Set(); for (const l of __lumiDebug.data.lines) { s.add(l.code); s.add(l.name); for (const d of l.dirs) { if (d.h) s.add(d.h); for (const x of d.s) s.add(x.n); } } return [...s]; }""")
         swallowed = await pg.evaluate("() => window.lumiErrors ? lumiErrors() : []")

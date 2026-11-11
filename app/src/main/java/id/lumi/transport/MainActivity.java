@@ -44,8 +44,8 @@ import java.util.concurrent.Executors;
  */
 public class MainActivity extends Activity {
     private static final int REQ_LOCATION = 41, REQ_GUIDE = 42, REQ_NOTIF = 43, REQ_PERM = 44;
-    /** User-Agent tunggal untuk semua permintaan; diisi dari versionName di onCreate. */
-    private static String UA = "LumiTransport/2.0 (Android)";
+    /** User-Agent tunggal untuk semua permintaan (AppInfo: dari versionName, bukan string tertanam). */
+    private static final String UA = AppInfo.userAgent();
     /** Pintasan dari app shortcut / Quick Settings, dikirim ke JS setelah halaman siap. */
     private String pendingShortcut;
     private volatile int insetsTop, insetsBottom;
@@ -109,16 +109,13 @@ public class MainActivity extends Activity {
         }
 
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#EEF6FC"));
+        // Latar sebelum halaman dimuat mengikuti mode gelap sistem (halaman lalu memakai pilihan tema pengguna).
+        web.setBackgroundColor(Color.parseColor(systemNight() ? "#0B1422" : "#EEF6FC"));
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
-        // Identitas aplikasi untuk server peta: satu UA, diambil dari versionName.
-        try {
-            String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            if (v != null && !v.isEmpty()) UA = "LumiTransport/" + v + " (Android)";
-        } catch (Exception ignored) { }
+        // Identitas aplikasi untuk server peta: satu UA, diambil dari versionName (AppInfo).
         s.setUserAgentString(s.getUserAgentString() + " " + UA);
         s.setDatabaseEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(true);
@@ -198,8 +195,39 @@ public class MainActivity extends Activity {
         NavService.listener = new NavService.Listener() {
             @Override public void onGuide(String json) { js("window.__lumiGuide && __lumiGuide(" + json + ")"); }
         };
+        // Satu tugas latar untuk data rute (RouteWatchJob); tugas harian lama dibatalkan di sini.
         try { RouteUpdater.schedule(this); } catch (Exception ignored) { }
-        try { RouteWatchJob.schedule(this); } catch (Exception ignored) { }
+        // Alarm pengingat berangkat hilang bila aplikasi pernah dihentikan paksa: pasang ulang.
+        try { Reminders.rescheduleAll(this); } catch (Exception ignored) { }
+    }
+
+    /* ---- tema (v2.15): terang / gelap / ikuti sistem — dipilih di halaman, bilah sistem disesuaikan di sini ---- */
+    boolean systemNight() {
+        return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
+    private boolean pageDark;
+    void applyBars(boolean dark) {
+        pageDark = dark;
+        Window w = getWindow();
+        if (web != null) web.setBackgroundColor(Color.parseColor(dark ? "#0B1422" : "#EEF6FC"));
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                android.view.WindowInsetsController c = w.getDecorView().getWindowInsetsController();
+                if (c != null) c.setSystemBarsAppearance(dark ? 0 : android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+            } catch (Exception ignored) { }
+        } else {
+            w.setNavigationBarColor(Color.parseColor(dark ? "#0B1422" : "#FFFFFF"));
+            w.getDecorView().setSystemUiVisibility(dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration cfg) {
+        super.onConfigurationChanged(cfg);
+        // configChanges memuat uiMode: aktivitas tidak dibuat ulang, halaman diberi tahu mode sistem baru.
+        if (pageReady) js("window.__lumiUiMode && __lumiUiMode(" + systemNight() + ")");
     }
 
     private String pendingOpen;
@@ -643,8 +671,44 @@ public class MainActivity extends Activity {
         js("window.__lumiResolved(" + JSONObject.quote(id) + "," + JSONObject.quote(out) + ")");
     }
 
-    /** Muat tautan di WebView tersembunyi dan tunggu koordinat muncul di URL/halaman (maks. 20 detik). */
+    /*
+     * v2.15: WebView tersembunyi itu berat (≈ satu tab peramban). Beberapa resolve() paralel dulu
+     * membuat beberapa WebView 400×700 sekaligus selama ≤ 20 detik. Sekarang paling banyak
+     * PROBE_MAX berjalan bersamaan, sisanya antre (antrean dibatasi; permintaan tertua yang belum
+     * mulai dibuang dan dijawab tanpa koordinat), dan batas waktunya 12 detik.
+     */
+    private static final int PROBE_MAX = 1, PROBE_QUEUE_MAX = 3;
+    private static final long PROBE_TIMEOUT_MS = 12000;
+    private int probesRunning;
+    private final java.util.ArrayDeque<String[]> probeQueue = new java.util.ArrayDeque<String[]>();
+
+    /** Dipanggil di thread utama. */
     private void probe(final String id, final String url) {
+        if (resolvedIds.containsKey(id)) return;
+        if (probesRunning >= PROBE_MAX) {
+            if (probeQueue.size() >= PROBE_QUEUE_MAX) {
+                String[] old = probeQueue.pollFirst();
+                if (old != null) deliverResolved(old[0], old[1], null);
+            }
+            probeQueue.addLast(new String[]{id, url});
+            return;
+        }
+        probesRunning++;
+        probeNow(id, url);
+    }
+
+    private void probeDone() {
+        probesRunning = Math.max(0, probesRunning - 1);
+        while (probesRunning < PROBE_MAX && !probeQueue.isEmpty()) {
+            String[] next = probeQueue.pollFirst();
+            if (next == null || resolvedIds.containsKey(next[0])) continue;   // HTTP sudah menjawab
+            probesRunning++;
+            probeNow(next[0], next[1]);
+        }
+    }
+
+    /** Muat tautan di WebView tersembunyi dan tunggu koordinat muncul di URL/halaman (maks. 12 detik). */
+    private void probeNow(final String id, final String url) {
         final WebView w = new WebView(this);
         final boolean[] done = {false};
         w.getSettings().setJavaScriptEnabled(true);
@@ -668,11 +732,12 @@ public class MainActivity extends Activity {
             String cur = w.getUrl();
             String c = placeCoords(cur);
             boolean other = resolvedIds.containsKey(id);   // HTTP sudah lebih dulu menemukan
-            if (other || c != null || System.currentTimeMillis() - start > 20000) {
+            if (other || c != null || System.currentTimeMillis() - start > PROBE_TIMEOUT_MS || closing) {
                 done[0] = true;
                 if (!other) deliverResolved(id, cur != null ? cur : url, c);
                 root.removeView(w);
                 w.destroy();
+                probeDone();
                 return;
             }
             main.postDelayed(tick[0], 250);
@@ -889,10 +954,15 @@ public class MainActivity extends Activity {
 
         /** Versi aplikasi (versionName) untuk layar Tentang dan laporan bug. */
         @JavascriptInterface
-        public String versionName() {
-            try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
-            catch (Exception e) { return "0"; }
-        }
+        public String versionName() { return AppInfo.version(); }
+
+        /** Versi klien TJ untuk header x-app-version (live.js): bawaan build atau dari remote_config.json. */
+        @JavascriptInterface
+        public String tjClientVersion() { return AppInfo.tjClientVersion(MainActivity.this); }
+
+        /** Simpan nilai dari data/remote_config.json (dipanggil app.js setelah memvalidasi isinya). */
+        @JavascriptInterface
+        public void setRemoteTjClientVersion(String v) { AppInfo.setTjClientVersion(MainActivity.this, v); }
 
         /** Crash terakhir di sisi Android (untuk laporan bug); "" bila tidak ada. */
         @JavascriptInterface
@@ -1223,6 +1293,81 @@ public class MainActivity extends Activity {
             synchronized (liveLock) { if (live != null) live.close(); live = null; liveQueue.clear(); }
         }
 
+        /* ---- v2.15: tema ---- */
+        /** Mode gelap sistem sedang aktif? (WebView tidak selalu meneruskan prefers-color-scheme.) */
+        @JavascriptInterface
+        public boolean nightMode() { return systemNight(); }
+
+        /** Halaman memakai tema gelap/terang → sesuaikan warna latar WebView & ikon bilah sistem. */
+        @JavascriptInterface
+        public void setThemeDark(final boolean dark) {
+            main.post(new Runnable() { @Override public void run() { applyBars(dark); }});
+        }
+
+        /* ---- v2.15: GTFS-Realtime (posisi kereta, keterlambatan, gangguan) ---- */
+        /** Unduh & dekode feed GTFS-Realtime; hasil JSON (GtfsRt) ke window.__lumiHttp(id, status, body). */
+        @JavascriptInterface
+        public void rtFetch(final String id, final String url) {
+            pool.execute(new Runnable() { @Override public void run() {
+                int status; String body;
+                try {
+                    if (url == null || !url.startsWith("https://")) throw new IllegalArgumentException("URL harus https");
+                    body = GtfsRt.fetchJson(url, UA); status = 200;
+                } catch (Exception e) { status = 0; body = String.valueOf(e.getMessage()); }
+                js("window.__lumiHttp(" + JSONObject.quote(id) + "," + status + "," + JSONObject.quote(body) + ")");
+            }});
+        }
+
+        /* ---- v2.15: pengingat waktunya berangkat ---- */
+        /** Simpan pengingat (JSON, lihat Reminders). Hasil: {"ok":true,"at":ms,"exact":bool} atau {"ok":false,"error":".."}. */
+        @JavascriptInterface
+        public String setReminder(String json) {
+            try {
+                long at = Reminders.put(MainActivity.this, json);
+                return "{\"ok\":true,\"at\":" + at + ",\"exact\":" + Reminders.exactAllowed(MainActivity.this) + "}";
+            } catch (Exception e) {
+                return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(e.getMessage())) + "}";
+            }
+        }
+
+        @JavascriptInterface
+        public String listReminders() { return Reminders.list(MainActivity.this).toString(); }
+
+        @JavascriptInterface
+        public String getReminder(String id) { JSONObject r = Reminders.find(MainActivity.this, id); return r == null ? null : r.toString(); }
+
+        @JavascriptInterface
+        public void removeReminder(String id) { Reminders.remove(MainActivity.this, id); }
+
+        @JavascriptInterface
+        public boolean exactAlarmOk() { return Reminders.exactAllowed(MainActivity.this); }
+
+        /** Android 12+: buka layar izin "Alarm & pengingat" supaya pengingat tepat waktu. */
+        @JavascriptInterface
+        public void openExactAlarmSettings() {
+            main.post(new Runnable() { @Override public void run() {
+                try {
+                    if (Build.VERSION.SDK_INT >= 31)
+                        startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getPackageName())));
+                } catch (Exception e) {
+                    startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+                }
+            }});
+        }
+
+        /* ---- v2.15: ikuti perjalananku (berbagi posisi langsung, terenkripsi) ---- */
+        /** Mulai berbagi; mengembalikan tautan penampil. relay/viewer dari remote_config (boleh kosong). */
+        @JavascriptInterface
+        public String shareLiveStart(String title, String toName, double toLat, double toLon, String relay, String viewer) {
+            return TripShare.start(MainActivity.this, title, toName, toLat, toLon, relay, viewer);
+        }
+
+        @JavascriptInterface
+        public void shareLiveStop() { TripShare.stop(MainActivity.this, false); }
+
+        @JavascriptInterface
+        public boolean shareLiveActive() { return TripShare.active(MainActivity.this); }
+
         /** Buka aplikasi resmi TJ (pelacak bus resmi); bila belum terpasang, buka Play Store. */
         @JavascriptInterface
         public void openTjApp() {
@@ -1236,10 +1381,6 @@ public class MainActivity extends Activity {
             }});
         }
 
-        @JavascriptInterface
-        public String version() {
-            return "2.4";
-        }
     }
 }
 

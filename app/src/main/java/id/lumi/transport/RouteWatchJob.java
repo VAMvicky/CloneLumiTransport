@@ -15,11 +15,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Pemantau perubahan rute TIAP JAM (ringan, beberapa KB):
+ * SATU-SATUNYA tugas latar untuk data rute (v2.15; dulu ada RouteUpdateJob harian yang tumpang tindih).
+ * Berjalan tiap jam dan ringan (beberapa KB):
  *  1) Umpan perubahan dari GitHub (data/route_changes.json), diisi GitHub Actions yang memeriksa
  *     GTFS resmi Transjakarta tiap jam → notifikasi langsung walau HP belum mengunduh GTFS.
- *  2) Tanda versi file GTFS resmi (ETag / Last-Modified / ukuran) lewat permintaan HEAD.
- * Jika salah satu berubah, data rute lengkap diunduh ulang (RouteUpdater) dan perbedaannya dicatat.
+ *  2) Tanda versi file GTFS resmi (ETag / Last-Modified / ukuran) lewat permintaan HEAD,
+ *     dibandingkan dengan tanda versi data yang SUDAH diunduh (bukan sekadar pengecekan sebelumnya).
+ *  3) Penyegaran berkala menggantikan tugas harian lama: bila tanda versi tidak bisa dibaca dan data
+ *     sudah > 20 jam, atau data sudah > 7 hari walau tanda versinya sama.
+ * Unduhan penuh selalu lewat RouteUpdater.runGuarded(): tidak pernah dua kali dalam 30 menit,
+ * dari mana pun pemicunya (umpan, tanda versi, penyegaran, atau tombol di aplikasi).
  */
 public class RouteWatchJob extends JobService {
     static final int JOB_ID = 4243;
@@ -29,6 +34,7 @@ public class RouteWatchJob extends JobService {
     public static void schedule(Context ctx) {
         JobScheduler js = (JobScheduler) ctx.getSystemService(Context.JOB_SCHEDULER_SERVICE);
         if (js == null) return;
+        js.cancel(RouteUpdater.LEGACY_JOB_ID);   // tugas harian lama (RouteUpdateJob) digabung ke sini
         for (JobInfo j : js.getAllPendingJobs()) if (j.getId() == JOB_ID) return;
         js.schedule(new JobInfo.Builder(JOB_ID, new ComponentName(ctx, RouteWatchJob.class))
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
@@ -57,7 +63,7 @@ public class RouteWatchJob extends JobService {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(10000);
         c.setReadTimeout(15000);
-        c.setRequestProperty("User-Agent", "LumiTransportation/2.0 (Android)");
+        c.setRequestProperty("User-Agent", AppInfo.userAgent());
         c.setRequestProperty("Cache-Control", "no-cache");
         try {
             if (c.getResponseCode() != 200) return null;
@@ -124,7 +130,7 @@ public class RouteWatchJob extends JobService {
             c.setRequestMethod("HEAD");
             c.setConnectTimeout(10000);
             c.setReadTimeout(15000);
-            c.setRequestProperty("User-Agent", "LumiTransportation/2.0 (Android)");
+            c.setRequestProperty("User-Agent", AppInfo.userAgent());
             int code = c.getResponseCode();
             String sig = code + "|" + c.getHeaderField("ETag") + "|" + c.getHeaderField("Last-Modified") + "|" + c.getHeaderField("Content-Length");
             c.disconnect();
@@ -175,16 +181,22 @@ public class RouteWatchJob extends JobService {
             }
         } catch (Exception ignored) { }
 
-        // 2) tanda versi GTFS resmi
+        // 2) tanda versi GTFS resmi, dibandingkan dengan versi data yang terakhir diunduh
         String sig = gtfsSignature();
         if (sig != null) {
-            String old = p.getString("gtfsSig", null);
-            if (old != null && !old.equals(sig)) needUpdate = true;
+            String have = p.getString(RouteUpdater.KEY_DATA_SIG, null);
+            if (have == null) have = p.getString("gtfsSig", null);          // data dari versi < 2.15
+            if (have != null && !have.equals(sig)) needUpdate = true;
             p.edit().putString("gtfsSig", sig).apply();
         }
 
+        // 3) penyegaran berkala (menggantikan RouteUpdateJob harian)
+        long age = System.currentTimeMillis() - p.getLong("lastOk", 0);
+        if (sig == null && age > RouteUpdater.STALE_UNKNOWN_MS) needUpdate = true;
+        if (age > RouteUpdater.STALE_MAX_MS) needUpdate = true;
+
         if (needUpdate) {
-            RouteUpdater.run(ctx, new GtfsImporter.Progress() { public void update(String m) { } }, !notified);
+            RouteUpdater.runGuarded(ctx, !notified, sig);
         }
     }
 }

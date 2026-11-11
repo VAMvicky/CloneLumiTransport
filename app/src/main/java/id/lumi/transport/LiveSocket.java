@@ -18,7 +18,7 @@ import javax.net.ssl.SSLSocketFactory;
  * pernah menyeberang ke JS.
  *
  * Catatan: broker armada TJ menerima koneksi anonim hanya bila client ID diawali "mqttjs_"
- * (lihat live.js). Header User-Agent tetap milik Lumi.
+ * (lihat live.js). Header User-Agent tetap milik Lumi (AppInfo.userAgent(), dari versionName).
  */
 public class LiveSocket {
     public interface Listener {
@@ -116,7 +116,7 @@ public class LiveSocket {
                     "Sec-WebSocket-Key: " + k64 + "\r\n" +
                     "Sec-WebSocket-Version: 13\r\n" +
                     "Sec-WebSocket-Protocol: mqtt\r\n" +
-                    "User-Agent: LumiTransportation/2.4 (Android)\r\n\r\n";
+                    "User-Agent: " + AppInfo.userAgent() + "\r\n\r\n";
             out.write(req.getBytes("UTF-8"));
             out.flush();
             String status = readHeaders(in);

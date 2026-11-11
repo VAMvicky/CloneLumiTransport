@@ -4,9 +4,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -25,8 +23,17 @@ import java.util.List;
  */
 public class RouteUpdater {
     static final String CH_ROUTES = "lumi_routes";
-    static final int JOB_ID = 4242, NOTIF_ID = 7101;
+    /** ID tugas harian lama (RouteUpdateJob); kini dibatalkan & digabung ke RouteWatchJob. */
+    static final int LEGACY_JOB_ID = 4242, NOTIF_ID = 7101;
     static final long DAY = 24L * 60 * 60 * 1000;
+    /** Unduhan penuh tidak diulang dalam rentang ini, apa pun pemicunya. */
+    static final long MIN_GAP_MS = 30L * 60 * 1000;
+    /** Tanda versi tidak terbaca → segarkan bila data lebih tua dari ini. */
+    static final long STALE_UNKNOWN_MS = 20L * 60 * 60 * 1000;
+    /** Batas umur data walau tanda versi tidak berubah. */
+    static final long STALE_MAX_MS = 7L * DAY;
+    /** Tanda versi GTFS (ETag/Last-Modified/ukuran) milik data yang tersimpan di HP. */
+    static final String KEY_DATA_SIG = "dataSig";
 
     public static class Result { public String date; public int changes; public boolean first; }
 
@@ -49,7 +56,24 @@ public class RouteUpdater {
         if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f); }
     }
 
+    /**
+     * Unduh penuh dari tugas latar, dengan penjaga bersama: dilewati bila unduhan (berhasil ATAU gagal)
+     * terjadi kurang dari MIN_GAP_MS yang lalu. Mengembalikan null bila dilewati.
+     */
+    static synchronized Result runGuarded(Context ctx, boolean notify, String knownSig) throws Exception {
+        SharedPreferences p = prefs(ctx);
+        long now = System.currentTimeMillis();
+        long last = Math.max(p.getLong("lastOk", 0), p.getLong("lastAttempt", 0));
+        if (now - last < MIN_GAP_MS && now >= last) return null;
+        return run(ctx, new GtfsImporter.Progress() { public void update(String m) { } }, notify, knownSig);
+    }
+
     public static synchronized Result run(Context ctx, GtfsImporter.Progress p, boolean notify) throws Exception {
+        return run(ctx, p, notify, null);
+    }
+
+    static synchronized Result run(Context ctx, GtfsImporter.Progress p, boolean notify, String knownSig) throws Exception {
+        prefs(ctx).edit().putLong("lastAttempt", System.currentTimeMillis()).apply();
         File zip = new File(ctx.getCacheDir(), "file_gtfs.zip");
         GtfsImporter.download(GtfsImporter.GTFS_URL, zip, p);
         String date = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(new java.util.Date());
@@ -73,7 +97,11 @@ public class RouteUpdater {
             }
         }
         write(idxFile, idx.toString());
-        prefs(ctx).edit().putLong("lastOk", System.currentTimeMillis()).putString("lastDate", date).apply();
+        // Catat tanda versi data yang baru diunduh, supaya RouteWatchJob tidak mengunduhnya lagi.
+        String sig = knownSig != null ? knownSig : RouteWatchJob.gtfsSignature();
+        SharedPreferences.Editor e = prefs(ctx).edit().putLong("lastOk", System.currentTimeMillis()).putString("lastDate", date);
+        if (sig != null) e.putString(KEY_DATA_SIG, sig).putString("gtfsSig", sig);
+        e.apply();
         return r;
     }
 
@@ -168,17 +196,14 @@ public class RouteUpdater {
         catch (SecurityException ignored) { /* izin notifikasi belum diberikan */ }
     }
 
-    /** Jadwalkan pengecekan harian (butuh internet). Aman dipanggil berulang. */
+    /**
+     * v2.15: hanya ada satu tugas latar (RouteWatchJob). Metode ini dipertahankan untuk pemanggil lama:
+     * membatalkan tugas harian lama dan memastikan pemantau tiap jam terjadwal.
+     */
     public static void schedule(Context ctx) {
         JobScheduler js = (JobScheduler) ctx.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-        if (js == null) return;
-        for (JobInfo j : js.getAllPendingJobs()) if (j.getId() == JOB_ID) return;
-        JobInfo info = new JobInfo.Builder(JOB_ID, new ComponentName(ctx, RouteUpdateJob.class))
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                .setPeriodic(DAY, 4 * 60 * 60 * 1000L)
-                .setPersisted(true)
-                .build();
-        js.schedule(info);
+        if (js != null) js.cancel(LEGACY_JOB_ID);
+        RouteWatchJob.schedule(ctx);
     }
 
     static boolean freshEnough(Context ctx) {

@@ -6,6 +6,10 @@ plugins {
 def currentVersion = { ->
     new File(rootProject.projectDir, "release-notes/CURRENT").text.trim().replaceFirst("^v", "")
 }
+// Versi klien TJ (header x-app-version): satu sumber di gradle.properties.
+def tjClientVersion = { ->
+    (project.findProperty("lumi.tjClientVersion") ?: "0").toString().trim()
+}
 def versionCodeOf = { ->
     def p = currentVersion().split("\\.")
     int major = p.length > 0 ? (p[0] as int) : 0
@@ -24,6 +28,13 @@ android {
         targetSdk 35
         versionCode versionCodeOf()
         versionName currentVersion()
+        // v2.15: semua User-Agent & header versi dirakit dari nilai ini (lihat AppInfo.java),
+        // bukan string yang ditulis tangan di banyak tempat.
+        buildConfigField "String", "TJ_CLIENT_VERSION", "\"${tjClientVersion()}\""
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     signingConfigs {
@@ -86,4 +97,10 @@ tasks.register("buildRouteData", Exec) {
     workingDir rootProject.projectDir
     commandLine "python3", "tools/build_data.py"
 }
+// js/build.js (versi aplikasi + versi klien TJ untuk sisi web) dari sumber yang sama dengan BuildConfig.
+tasks.register("buildInfo", Exec) {
+    workingDir rootProject.projectDir
+    commandLine "python3", "tools/gen_build_info.py"
+}
 preBuild.dependsOn buildRouteData
+preBuild.dependsOn buildInfo

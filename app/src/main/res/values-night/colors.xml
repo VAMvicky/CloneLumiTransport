@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mode gelap (v2.15) -->
+    <color name="widget_bg">#132033</color>
+    <color name="widget_text">#E3ECF7</color>
+    <color name="widget_btn2_bg">#1C2C44</color>
+    <color name="widget_btn2_text">#8CC4FF</color>
+</resources>

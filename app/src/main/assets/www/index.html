@@ -9,6 +9,13 @@
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="css/app.css">
   <script>
+    /* v2.15: tema dipasang sebelum CSS digambar supaya tidak berkedip putih di mode gelap. */
+    try {
+      var tc = (JSON.parse(localStorage.getItem("lumi:cfg") || "null") || {}), th = tc.theme || "system", dk = th === "dark";
+      if (th === "system") { try { dk = window.LumiNative && LumiNative.nightMode ? !!LumiNative.nightMode() : matchMedia("(prefers-color-scheme: dark)").matches; } catch (e) { } }
+      document.documentElement.setAttribute("data-theme", dk ? "dark" : "light");
+      if (dk && tc.mapDark !== false) document.documentElement.classList.add("map-dim");
+    } catch (e) { }
     /* Sambutan belum selesai: sembunyikan beranda sejak awal agar tidak tampil sekilas sebelum sambutan dipasang. */
     try { if (localStorage.getItem("lumi:onboarded") !== "2") document.documentElement.classList.add("ob-pending"); } catch (e) { }
     /* Catatan galat: 100 galat terakhir (tanpa data pribadi), ikut terlampir di Pengaturan → Laporkan masalah. */
@@ -281,7 +288,9 @@
   <script src="js/data.js"></script>
   <script src="js/gtfs.js"></script>
   <script src="js/stopfix.js"></script>
+  <script src="js/build.js"></script>
   <script src="js/engine.js"></script>
+  <script src="js/rail.js"></script>
   <script src="js/live.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/gmaps.js"></script>

@@ -16,8 +16,19 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: GTFS resmi ringkas (cabang gtfs-data)
         run: git fetch -q origin gtfs-data && git show origin/gtfs-data:tj_gtfs.json > tj_gtfs.json || true
-      - run: python3 tools/osm_stops.py . 2> data/stop_fix_error.txt || true
-      - run: test -s data/stop_fix_error.txt || rm -f data/stop_fix_error.txt
+      # Galat pipeline (mis. Overpass 502) TIDAK lagi ditulis ke data/ — dulu berkasnya ikut ter-commit.
+      # Ditampilkan sebagai peringatan Actions + ringkasan job; data lama tetap dipakai bila gagal.
+      - name: Selaraskan titik dengan OpenStreetMap
+        run: |
+          set +e
+          python3 tools/osm_stops.py . 2> "$RUNNER_TEMP/stop_fix_error.txt"
+          code=$?
+          if [ -s "$RUNNER_TEMP/stop_fix_error.txt" ]; then
+            while IFS= read -r l; do echo "::warning title=osm_stops::$l"; done < "$RUNNER_TEMP/stop_fix_error.txt"
+            { echo '### osm_stops.py'; echo '```'; cat "$RUNNER_TEMP/stop_fix_error.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          [ $code -eq 0 ] || echo "::warning::osm_stops.py gagal (kode $code); data/stop_fix.json lama dipertahankan"
+          rm -f data/stop_fix_error.txt
       - run: |
           git config user.name "lumi-route-watch[bot]"
           git config user.email "lumi-route-watch@users.noreply.github.com"

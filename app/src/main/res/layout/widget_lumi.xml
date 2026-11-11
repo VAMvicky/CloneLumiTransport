@@ -4,16 +4,18 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="10dp"
-    android:background="#F2F8FE">
+    android:background="@color/widget_bg">
 
     <TextView
         android:id="@+id/wgTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/widget_title"
-        android:textColor="#0B2545"
+        android:textColor="@color/widget_text"
         android:textSize="13sp"
         android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:paddingBottom="6dp" />
 
     <LinearLayout
@@ -40,8 +42,8 @@
             android:layout_marginStart="8dp"
             android:text="@string/widget_home"
             android:textSize="12sp"
-            android:background="#FFFFFF"
-            android:textColor="#1565D8"
+            android:background="@color/widget_btn2_bg"
+            android:textColor="@color/widget_btn2_text"
             android:padding="8dp" />
     </LinearLayout>
 </LinearLayout>

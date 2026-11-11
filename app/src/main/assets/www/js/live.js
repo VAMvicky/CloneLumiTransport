@@ -17,7 +17,10 @@
  * pesan rute yang tidak diminta dibuang di sisi native.
  *
  * Langganan: mula-mula per rute (hemat kuota). Bila server memutus koneksi setelah langganan
- * per rute, Lumi beralih ke topik umum "/mobile_armada/#" dan menyaring sendiri.
+ * per rute (tanpa sempat mengirim data), Lumi SEMENTARA beralih ke topik umum "/mobile_armada/#"
+ * dan menyaring sendiri. v2.15: mode umum itu tidak lagi disimpan permanen — hanya berlaku di
+ * memori selama 30 menit (lalu 2 jam, maks. 6 jam bila per rute gagal lagi), setelah itu Lumi
+ * mencoba per rute lagi. Begitu per rute berhasil menerima data, tenggatnya kembali ke awal.
  */
 (function (root) {
   "use strict";
@@ -35,13 +38,25 @@
   function clientId() { return "mqttjs_" + Math.random().toString(16).slice(2, 10); }
   var NATIVE = function () { return root.LumiNative && root.LumiNative.liveOpen ? root.LumiNative : null; };
 
-  var ws = null, connected = false, buf = new Uint8Array(0), pid = 1, pingT = null, retryT = null, retryMs = 2000;
+  var ws = null, connected = false, buf = new Uint8Array(0), bufOff = 0, pid = 1, pingT = null, retryT = null, retryMs = 2000;
   var watchers = [];        // { want: {KODE:1}, codes: [...], fn }
   var active = {};          // topik yang sedang dilanggan di koneksi ini
   var statusFns = [];
   var state = "idle", lastMsgAt = 0, lastError = "", phase = "", bytesWeb = 0, gotData = false;
-  var allMode = false;
-  try { allMode = localStorage.getItem("lumi:liveAll") === "1"; } catch (e) { lumiLog(e); }
+  /* Cadangan topik umum: sementara saja (lihat catatan di atas). allUntil = tenggat (ms),
+     allStep = berapa kali per rute gagal berturut-turut (menentukan lama cadangan berikutnya). */
+  var ALL_MS = [30 * 60000, 2 * 3600000, 6 * 3600000];
+  var allUntil = 0, allStep = 0, allT = null;
+  // Versi lama menyimpan mode umum selamanya di sini; bersihkan supaya per rute dicoba lagi.
+  try { localStorage.removeItem("lumi:liveAll"); } catch (e) { lumiLog(e); }
+  function allMode() { return allUntil > Date.now(); }
+  function enterAllMode() {
+    allUntil = Date.now() + ALL_MS[Math.min(allStep, ALL_MS.length - 1)];
+    allStep++;
+    clearTimeout(allT);
+    // Saat tenggat lewat, langganan ditukar kembali ke per rute (tanpa memutus koneksi).
+    allT = setTimeout(function () { allUntil = 0; syncSubs(); }, allUntil - Date.now() + 50);
+  }
 
   function setState(s) { state = s; statusFns.forEach(function (f) { try { f(s); } catch (e) { lumiLog(e); } }); }
   function send(u8) {
@@ -59,7 +74,7 @@
   function wantedTopics() {
     var t = {};
     if (!watchers.length) return t;
-    if (allMode) { t[ALL] = 1; return t; }
+    if (allMode()) { t[ALL] = 1; return t; }
     watchers.forEach(function (w) { w.codes.forEach(function (c) { topicsFor(c).forEach(function (x) { t[x] = 1; }); }); });
     return t;
   }
@@ -70,20 +85,29 @@
     if (n && n.liveFilter) n.liveFilter(JSON.stringify(wantedCodes()));
     if (!connected) return;
     var want = wantedTopics();
+    var leftAll = !!active[ALL] && !want[ALL], added = false;
     Object.keys(active).forEach(function (t) { if (!want[t]) { unsubscribeTopic(t); delete active[t]; } });
-    Object.keys(want).forEach(function (t) { if (!active[t]) { subscribeTopic(t); active[t] = 1; } });
-    if (Object.keys(want).length) phase = "sub";
+    Object.keys(want).forEach(function (t) { if (!active[t]) { subscribeTopic(t); active[t] = 1; added = true; } });
+    // Kembali dari topik umum ke per rute: anggap koneksi ini belum terbukti menerima data per rute,
+    // supaya pemutusan berikutnya dikenali sebagai "per rute ditolak" dan cadangan dipakai lagi.
+    if (leftAll) gotData = false;
+    if (added) phase = "sub";
   }
 
+  /* Aliran byte → paket MQTT. v2.15: dibaca dengan offset (bufOff), bukan buf.slice() per paket
+     yang menyalin sisa buffer berulang kali (O(n²) untuk banyak pesan dalam satu potongan). */
   function onBytes(u8) {
-    var nb = new Uint8Array(buf.length + u8.length); nb.set(buf); nb.set(u8, buf.length); buf = nb;
+    var rest = buf.length - bufOff;
+    if (rest <= 0) { buf = u8; bufOff = 0; }
+    else { var nb = new Uint8Array(rest + u8.length); nb.set(buf.subarray(bufOff)); nb.set(u8, rest); buf = nb; bufOff = 0; }
     for (;;) {
-      if (buf.length < 2) return;
-      var mult = 1, len = 0, i = 1, d;
-      do { if (i >= buf.length) return; d = buf[i++]; len += (d & 127) * mult; mult *= 128; } while (d & 128);
-      if (buf.length < i + len) return;
-      var type = buf[0] >> 4, flags = buf[0] & 15, body = buf.subarray(i, i + len);
-      buf = buf.slice(i + len);
+      var o = bufOff;
+      if (buf.length - o < 2) break;
+      var mult = 1, len = 0, i = o + 1, d, whole = true;
+      do { if (i >= buf.length) { whole = false; break; } d = buf[i++]; len += (d & 127) * mult; mult *= 128; } while (d & 128);
+      if (!whole || buf.length < i + len) break;
+      var type = buf[o] >> 4, flags = buf[o] & 15, body = buf.subarray(i, i + len);
+      bufOff = i + len;
       if (type === 2) {                        // CONNACK
         if (body[1] === 0) { connected = true; phase = "connack"; retryMs = 2000; active = {}; lastError = ""; setState("connected"); syncSubs(); }
         else { lastError = lt("ditolak server (kode CONNACK ", "rejected by server (CONNACK code ") + body[1] + ")"; setState("error"); }
@@ -96,10 +120,14 @@
         var msg;
         try { msg = JSON.parse(dec.decode(body.subarray(p))); } catch (e) { continue; }
         lastMsgAt = Date.now(); gotData = true; phase = "data";
+        if (!allMode()) allStep = 0;           // per rute terbukti jalan: cadangan berikutnya kembali singkat
         var rc = norm(msg.route_code || topic.split("/")[3]);
         watchers.forEach(function (w) { if (w.want[rc]) { try { w.fn(msg, topic); } catch (e) { lumiLog(e); } } });
       }
     }
+    // Buang bagian yang sudah dibaca sesekali saja (bukan per paket).
+    if (bufOff > 0 && bufOff >= buf.length) { buf = new Uint8Array(0); bufOff = 0; }
+    else if (bufOff > 65536) { buf = buf.slice(bufOff); bufOff = 0; }
   }
 
   function onOpen() {
@@ -115,19 +143,19 @@
   function lt(id, en) { var I = root.LumiI18n; return I && I.en ? en : id; }
   function onClosed(reason) {
     var ph = phase;
-    ws = null; connected = false; buf = new Uint8Array(0); clearInterval(pingT); active = {};
+    ws = null; connected = false; buf = new Uint8Array(0); bufOff = 0; clearInterval(pingT); active = {};
     lastError = (reason || lt("koneksi terputus", "connection lost")) + " · " + ((root.LumiI18n && root.LumiI18n.en ? PHASE_EN[ph] : PHASE_TXT[ph]) || ph);
-    // Server memutus setelah langganan per rute (belum ada data) → pakai topik umum seperti klien publik lain.
-    if (ph === "sub" && !gotData && !allMode) {
-      allMode = true;
-      try { localStorage.setItem("lumi:liveAll", "1"); } catch (e) { lumiLog(e); }
+    // Server memutus setelah langganan per rute (koneksi ini belum menerima data) → SEMENTARA pakai
+    // topik umum seperti klien publik lain; setelah tenggat, per rute dicoba lagi (enterAllMode).
+    if (ph === "sub" && !gotData && !allMode()) {
+      enterAllMode();
       retryMs = 500;
     }
     if (watchers.length) { setState("reconnecting"); scheduleRetry(); } else setState("idle");
   }
   function connect() {
     if (ws || !watchers.length) return;
-    setState("connecting"); phase = "";
+    setState("connecting"); phase = ""; gotData = false;   // gotData berlaku per koneksi
     var n = NATIVE();
     if (n) { ws = "native"; if (n.liveFilter) n.liveFilter(JSON.stringify(wantedCodes())); n.liveOpen(Live.url); return; }
     try { ws = new WebSocket(Live.url, ["mqtt"]); } catch (e) { ws = null; lastError = String(e.message || e); scheduleRetry(); return; }
@@ -152,7 +180,8 @@
     norm: norm,
     state: function () { return state; },
     lastError: function () { return lastError; },
-    allMode: function () { return allMode; },
+    allMode: function () { return allMode(); },
+    allModeUntil: function () { return allUntil; },
     bytes: function () { var n = NATIVE(); try { return n && n.liveBytes ? +n.liveBytes() : bytesWeb; } catch (e) { return bytesWeb; } },
     // dipanggil dari MainActivity (koneksi native)
     __nativeOpen: function () { if (ws === "native") onOpen(); },
@@ -215,8 +244,18 @@
     return d;
   }
 
+  /* Versi klien TJ yang dikirim di x-app-version. Satu sumber: gradle.properties (lumi.tjClientVersion)
+     → BuildConfig (native) dan js/build.js (browser); bisa ditimpa dari data/remote_config.json
+     tanpa rilis baru bila TJ menaikkan versi minimum klien. */
+  function tjClientVersion() {
+    var n = NATIVE();
+    try { if (n && n.tjClientVersion) { var v = n.tjClientVersion(); if (v) return v; } } catch (e) { lumiLog(e); }
+    try { var rc = JSON.parse(localStorage.getItem("lumi:remoteCfg") || "null"); if (rc && /^\d+(\.\d+){1,3}$/.test(rc.tjClientVersion || "")) return rc.tjClientVersion; } catch (e) { lumiLog(e); }
+    var B = root.LUMI_BUILD;
+    return (B && B.tjClientVersion) || "0";
+  }
   function baseHeaders() {
-    return { "Accept": "application/json", "x-app-version": "2.11.0", "x-app-os": "android",
+    return { "Accept": "application/json", "x-app-version": tjClientVersion(), "x-app-os": "android",
       "x-app-os-version": "12", "x-app-platform": "32", "x-lang": "en", "x-device-id": devId() };
   }
 
@@ -382,6 +421,7 @@
     return null;
   }
 
+  Live.tjClientVersion = tjClientVersion;
   Live.token = token;
   Live.stops = nearbyStops;
   Live.stopIdFor = stopIdFor;

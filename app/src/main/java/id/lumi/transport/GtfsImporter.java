@@ -36,7 +36,7 @@ public class GtfsImporter {
         for (int hop = 0; hop < 6; hop++) {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent", "LumiTransportation/1.5 (Android)");
+            c.setRequestProperty("User-Agent", AppInfo.userAgent());
             c.setConnectTimeout(20000);
             c.setReadTimeout(60000);
             int code = c.getResponseCode();

@@ -47,4 +47,25 @@ if bash tools/version.sh "dua" >/dev/null 2>&1; then
   fail=1
 fi
 
+# v2.15: versi tidak boleh ditulis tangan di kode (UA, x-app-version, Bridge.version()).
+# Satu sumber: release-notes/CURRENT (versionName) dan gradle.properties (lumi.tjClientVersion).
+hard=$(grep -rnE '"LumiTransport(ation)?/[0-9]|x-app-version"\s*:\s*"[0-9]|return "[0-9]+\.[0-9]+";' \
+  app/src/main/java app/src/main/assets/www/js --include=*.java --include=*.js | grep -v '/js/build.js' || true)
+if [ -n "$hard" ]; then
+  echo "GAGAL: angka versi tertanam di kode (pakai AppInfo / LUMI_BUILD):" >&2
+  echo "$hard" >&2
+  fail=1
+else
+  echo "ok: tidak ada angka versi tertanam di kode"
+fi
+
+# js/build.js harus sama dengan CURRENT + gradle.properties
+python3 tools/gen_build_info.py >/dev/null
+if ! grep -q "\"version\":\"$ver\"" app/src/main/assets/www/js/build.js; then
+  echo "GAGAL: js/build.js tidak sesuai CURRENT ($ver)" >&2
+  fail=1
+else
+  echo "ok: js/build.js = $ver"
+fi
+
 exit "$fail"

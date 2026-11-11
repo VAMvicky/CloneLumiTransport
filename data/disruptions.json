@@ -1,0 +1,6 @@
+{
+  "v": 1,
+  "updated": "2026-11-11",
+  "_": "Info gangguan layanan sementara (kereta telat, koridor ditutup, halte tutup). Diisi pengelola; item yang 'until'-nya lewat diabaikan aplikasi. Format tiap item: lihat docs/gangguan-layanan.md.",
+  "items": []
+}

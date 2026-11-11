@@ -18,7 +18,15 @@ Aturan pencocokan:
 import json, math, re, sys, urllib.request, urllib.parse, datetime, os
 
 BBOX = (-6.80, 106.35, -5.95, 107.25)   # selatan, barat, utara, timur (Jabodetabek)
-OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
+# Beberapa server Overpass publik; urutan dicoba bergiliran. Bisa ditimpa lewat variabel lingkungan
+# OVERPASS_URLS (dipisah koma), mis. bila salah satu server pindah alamat.
+OVERPASS = [u for u in os.environ.get("OVERPASS_URLS", "").split(",") if u.strip()] or [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+OVERPASS_ROUNDS = int(os.environ.get("OVERPASS_ROUNDS", "3"))
 UA = "LumiTransportation-stopfix/1.0 (+https://github.com/VAMvicky/LumiTransport)"
 RAIL_MODES = {"KRL", "MRT", "LRT", "LRTJ", "KABANDARA", "WHOOSH"}
 # Nama di data Lumi yang berbeda dengan nama di OSM
@@ -49,17 +57,34 @@ def overpass():
          'way["railway"~"station|platform"]%s;' % bb +
          'way["building"="train_station"]%s;' % bb +
          ");out center tags;")
+    return overpass_query(q)
+
+def overpass_query(q, rounds=None, sleep=None):
+    """Kirim kueri ke server Overpass bergiliran dengan jeda bertambah (eksponensial + acak).
+    Jawaban yang bukan JSON Overpass yang sah (mis. halaman galat HTML dengan status 200, atau
+    "runtime error" di remark) dianggap gagal juga. Server yang menjawab 429 (dibatasi) dilewati
+    sampai putaran berikutnya. Gagal semua → exception terakhir (data lama tetap dipakai)."""
+    import time, random
+    rounds = OVERPASS_ROUNDS if rounds is None else rounds
+    sleep = time.sleep if sleep is None else sleep
     last = None
-    import time
-    for url in OVERPASS * 3:                     # server Overpass kadang sibuk / membatasi: coba lagi
-        try:
-            req = urllib.request.Request(url, data=urllib.parse.urlencode({"data": q}).encode(), headers={"User-Agent": UA})
-            return json.load(urllib.request.urlopen(req, timeout=300))["elements"]
-        except Exception as ex:
-            last = ex
-            print("overpass gagal:", url, ex, file=sys.stderr)
-            time.sleep(45)
-    raise last
+    for rnd in range(rounds):
+        for url in OVERPASS:
+            try:
+                req = urllib.request.Request(url, data=urllib.parse.urlencode({"data": q}).encode(), headers={"User-Agent": UA})
+                body = json.load(urllib.request.urlopen(req, timeout=300))
+                if not isinstance(body, dict) or "elements" not in body:
+                    raise ValueError("jawaban bukan JSON Overpass")
+                if "runtime error" in str(body.get("remark", "")):
+                    raise ValueError("Overpass: " + str(body["remark"])[:160])
+                if not body["elements"]:
+                    raise ValueError("Overpass: hasil kosong")
+                return body["elements"]
+            except Exception as ex:
+                last = ex
+                print("overpass gagal (putaran %d): %s %s" % (rnd + 1, url, ex), file=sys.stderr)
+                sleep(min(240, 15 * (2 ** rnd)) + random.uniform(0, 10))
+    raise last or RuntimeError("tidak ada server Overpass")
 
 # Jenis kereta yang diharapkan per moda Lumi, dan cara mengenalinya di OSM.
 RAIL_WANT = {"KRL": "train", "KABANDARA": "train", "WHOOSH": "train", "MRT": "subway", "LRT": "light_rail", "LRTJ": "light_rail"}

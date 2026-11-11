@@ -65,6 +65,81 @@
     return w;
   }
 
+  /* ------------------------------------------------- jadwal pasti moda berjadwal (v2.15)
+   * KRL / MRT / LRT / KA Bandara berjalan menurut jadwal, bukan headway. Bila data/rail_schedule.json
+   * (dibuat tools/rail_schedule.py dari stop_times GTFS atau jadwal KAI Commuter) tersedia, waktu tunggu
+   * dan lama perjalanan ruas kereta dihitung dari perjalanan terjadwal pertama yang bisa dikejar.
+   * Bentuk: { v:1, lines: { <id rute Lumi>: { d: [ { n: <jumlah stasiun arah itu>,
+   *            trips: [ [label, [menit stasiun 0, menit stasiun 1, ... | null]], ... ] }, ... ] } } }
+   * Menit dihitung dari 00.00 hari layanan; perjalanan lewat tengah malam memakai nilai >= 1440.
+   * Jumlah stasiun (n) harus sama dengan data rute Lumi; arah yang tidak cocok diabaikan. */
+  var SCHED = null;
+  function validSchedule(sc) {
+    if (!sc || sc.v !== 1 || !sc.lines || typeof sc.lines !== "object") return false;
+    var ok = true;
+    Object.keys(sc.lines).forEach(function (id) {
+      var L = sc.lines[id];
+      if (!L || !Array.isArray(L.d)) { ok = false; return; }
+      L.d.forEach(function (dd) {
+        if (!dd) return;
+        if (typeof dd.n !== "number" || !Array.isArray(dd.trips)) { ok = false; return; }
+        dd.trips.forEach(function (t) {
+          if (!Array.isArray(t) || !Array.isArray(t[1]) || t[1].length !== dd.n) ok = false;
+        });
+      });
+    });
+    return ok;
+  }
+  function useSchedule(sc) {
+    if (sc == null) { SCHED = null; return true; }
+    if (!validSchedule(sc)) return false;
+    SCHED = sc; return true;
+  }
+  /* Data jadwal satu arah rute, hanya bila jumlah stasiunnya cocok dengan data Lumi. */
+  function schedDir(line, dirIndex) {
+    if (!SCHED || !line || !SCHED.lines[line.id]) return null;
+    var dd = SCHED.lines[line.id].d[dirIndex], dir = line.dirs && line.dirs[dirIndex];
+    if (!dd || !dir || !dir.s || dd.n !== dir.s.length) return null;
+    return dd;
+  }
+  /*
+   * Perjalanan terjadwal pertama dari stasiun ke-fromK yang berangkat >= menit `atMin` dan berhenti
+   * di stasiun ke-toK. Hasil: { dep, arr, wait, label } (menit), { none: true } bila tidak ada lagi
+   * kereta hari itu, atau null bila jadwal arah ini tidak tersedia (pakai perkiraan headway).
+   */
+  function schedTrip(line, dirIndex, fromK, toK, atMin) {
+    var dd = schedDir(line, dirIndex);
+    if (!dd) return null;
+    var at = ((atMin % 1440) + 1440) % 1440;
+    var cands = at < 360 ? [at, at + 1440] : [at];   // dini hari: kereta hari layanan sebelumnya (>= 1440)
+    var best = null;
+    for (var i = 0; i < dd.trips.length; i++) {
+      var tt = dd.trips[i][1], a = tt[fromK], b = tt[toK];
+      if (a == null || b == null || b < a) continue;
+      for (var c = 0; c < cands.length; c++) {
+        if (a + 0.01 < cands[c]) continue;
+        var w = a - cands[c];
+        if (!best || w < best.wait) best = { dep: a, arr: b, wait: w, label: dd.trips[i][0] };
+      }
+    }
+    return best || { none: true };
+  }
+  /* n keberangkatan berikutnya dari stasiun ke-k (untuk tampilan "kereta berikutnya"). */
+  function nextDepartures(line, dirIndex, k, atMin, n) {
+    var dd = schedDir(line, dirIndex);
+    if (!dd) return null;
+    var at = ((atMin % 1440) + 1440) % 1440, out = [];
+    dd.trips.forEach(function (t) {
+      var a = t[1][k];
+      if (a == null) return;
+      var last = t[1].reduce(function (m, x, j) { return x != null ? j : m; }, -1);
+      if (last <= k) return;                         // kereta berakhir di stasiun ini: bukan keberangkatan
+      if (a >= at || (at < 360 && a >= at + 1440)) out.push({ dep: a, label: t[0], wait: a >= at ? a - at : a - at - 1440 });
+    });
+    out.sort(function (x, y) { return x.wait - y.wait; });
+    return out.slice(0, n || 3);
+  }
+
   /* ---------------------------------------------------------------- tarif
    * Semua angka tarif ada di data/fares.json (R8) dan masuk lewat data.fares (build_data.py) atau versi
    * terbaru yang diunduh aplikasi. Lihat file itu untuk sumber/aturan tiap moda. */
@@ -427,7 +502,14 @@
     var min = 0, fareLo = 0, fareHi = 0, rides = 0, prevRide = null, walkSince = 0;
     isHalte = isHalte || function () { return false; };
     legs.forEach(function (l) {
-      if (l.type === "ride") { l.wait = waitAt(l.line, depMin + min); l.night = isNight(depMin + min) && (l.line.mode === "TJ" || l.line.mode === "MIKRO"); }
+      if (l.type === "ride") {
+        if (l.min0 == null) l.min0 = l.min;          // lama perjalanan perkiraan (sebelum jadwal)
+        l.min = l.min0; l.sched = null; l.schedNone = false;
+        var sc = RAIL[l.line.mode] ? schedTrip(l.line, l.dirIndex, l.fromK, l.toK, depMin + min) : null;
+        if (sc && !sc.none) { l.wait = sc.wait; l.min = Math.max(1, sc.arr - sc.dep); l.sched = sc; }
+        else { l.wait = waitAt(l.line, depMin + min); if (sc && sc.none) l.schedNone = true; }
+        l.night = isNight(depMin + min) && (l.line.mode === "TJ" || l.line.mode === "MIKRO");
+      }
       min += l.min + (l.wait || 0);
       if (l.type === "ride") {
         rides++;
@@ -813,7 +895,9 @@
     return order.filter(function (k) { return g[k].shut === g[k].n; });
   };
 
-  var api = { Planner: Planner, MODES: MODES, RAIL: RAIL, hav: hav, openAt: openAt, isNight: isNight, ojolMotor: ojolMotor, ojolCar: ojolCar, ojolMinutes: ojolMinutes, useFares: useFares, fares: function () { return FARES; } };
+  var api = { Planner: Planner, MODES: MODES, RAIL: RAIL, hav: hav, openAt: openAt, isNight: isNight, ojolMotor: ojolMotor, ojolCar: ojolCar, ojolMinutes: ojolMinutes, useFares: useFares, fares: function () { return FARES; },
+    useSchedule: useSchedule, validSchedule: validSchedule, schedTrip: schedTrip, nextDepartures: nextDepartures,
+    hasSchedule: function (line, d) { return !!schedDir(line, d || 0); } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LumiEngine = api;
 })(typeof window !== "undefined" ? window : this);

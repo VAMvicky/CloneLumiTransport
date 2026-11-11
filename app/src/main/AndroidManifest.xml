@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- minSdk/targetSdk/versi/namespace diisi oleh app/build.gradle (versi dari release-notes/CURRENT). -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -15,6 +16,9 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- "Berjalan di latar belakang": minta dikecualikan dari penghemat baterai -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Pengingat "waktunya berangkat": alarm tepat waktu bila pengguna mengizinkan (Android 12+);
+         tanpa izin, Lumi memakai alarm biasa yang bisa mundur beberapa menit. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- Agar bisa membuka aplikasi ojol yang terpasang (Android 11+) -->
     <queries>
@@ -37,7 +41,9 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/LumiTheme"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:targetApi="31"
         android:usesCleartextTraffic="false"
         android:supportsRtl="false">
 
@@ -94,6 +100,16 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+        <!-- Pengingat berangkat: alarm + pasang ulang setelah HP dinyalakan / aplikasi diperbarui -->
+        <receiver
+            android:name=".Reminders$ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <!-- Widget Berangkat / Pulang -->
         <receiver
             android:name=".LumiWidgetProvider"

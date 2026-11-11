@@ -71,6 +71,16 @@
 
 ## ✨ Features
 
+**🆕 New in v2.15**
+- 🚆 **Exact train timetables**: KRL, MRT, LRT and Airport Rail use timetables (when present in `data/rail_schedule.json`) instead of headway guesses — waits, arrival times and "Arrive by" become exact; leg cards show the train number and the next departures
+- 📍 **Train positions**: live from an operator GTFS-Realtime feed when available, otherwise estimated from the timetable (always labelled as an estimate)
+- ⚠️ **Service disruptions**: delayed trains, diverted corridors, closed stops — on the home screen, result cards, trip details and route details
+- ⏰ **"Time to leave" reminders**: "leave at 07:05 to arrive by 08:00", one-off or weekly, also shown on the Go/Home widget
+- ⭐ **Save & repeat full trips** from favourites, history or a reminder notification
+- 👨‍👩‍👧 **Follow my trip**: a live-location link for family until you arrive, end-to-end encrypted, stops automatically
+- 🌙 **Dark mode** (follow system / light / dark) and 🚌 **bus crowding** (Plenty of room / Some seats taken / Crowded)
+- Maintainer guide (Indonesian): [docs/kereta-gangguan-berbagi.md](docs/kereta-gangguan-berbagi.md)
+
 **🗺️ Journey planner**
 - **Offline** routing engine (graph + Dijkstra) plus a systematic search of **every direct route and every two-route combination**, so options like 9/9C → Makasar → JAK36/JAK108 and LRT → TMII → JAK36 show up
 - **Same-code variants** kept apart, e.g. corridor 9 towards Pluit **via the toll road**, skipping Kemanggisan to Jembatan Dua
@@ -83,7 +93,7 @@
 - **Live, inside Lumi**, from Transjakarta's fleet feed: **Buses near you** (closest buses with distance, next stop and arrival estimate), **next bus at your boarding stop** on trip details, and **every bus on a route** on route details
 - **"Bus is getting closer" notifications**: with trip details open, Lumi alerts you at **±10, ±5, ±2 minutes** and when the bus has **arrived** at your boarding stop (once per bus)
 - Per-stop ETAs are precise: boarding and alighting stop IDs are resolved once from the TJ REST API, then the ETA is read from that bus's own data
-- Positions refresh every few seconds over a native connection (WebSocket + MQTT); only the routes you are looking at are downloaded, so data use stays low
+- Positions refresh every few seconds over a native connection (WebSocket + MQTT); only the routes you are looking at are downloaded, so data use stays low. If the server refuses per-route subscriptions, Lumi falls back to the catch-all topic **temporarily** (30 minutes, up to 6 hours if refusals continue) and then retries per route
 - If the feed cannot be reached (e.g. outside operating hours), Lumi explains why and offers an **Open TJ app** button
 
 **🧭 GPS guidance**
@@ -251,7 +261,7 @@ Fares are estimates based on published rules (see [Fares used](#-fares-used)). P
 | Address search | **Google Places** (Autocomplete → Details) with Google Maps' internal key and spoofed `X-Android-Package`/`X-Android-Cert` headers; Photon/OpenStreetMap as fallback |
 | Routing | Multimodal graph + Dijkstra + combination search (`engine.js`), offline |
 | Route data | Official Transjakarta GTFS (processed on the phone by `GtfsImporter.java`) |
-| Background | Foreground service (GPS guidance), JobScheduler (regular and daily route checks) |
+| Background | Foreground service (GPS guidance), JobScheduler (one regular route-check job), AlarmManager (departure reminders) |
 | CI/CD | GitHub Actions: build the APK on every push and watch for route changes regularly |
 
 ### 🏗️ Build from source
