@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Periksa berkas data jarak jauh sebelum di-commit/dirilis (dipakai CI):
-  data/remote_config.json, data/disruptions.json, data/rail_schedule.json
+  data/remote_config.json, data/disruptions.json
 Aturan di sini SAMA dengan pemeriksaan di aplikasi (app.js: validRemoteCfg / validDisruptions) —
 berkas yang gagal di sini juga akan diabaikan aplikasi.
    python3 tools/check_remote.py [berkas_gangguan.json]"""
-import datetime, json, os, re, subprocess, sys
+import datetime, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = os.path.join(ROOT, "data")
@@ -26,35 +26,8 @@ def check_cfg(path):
         err(f, "v harus 1")
     if "tjClientVersion" in c and not VER.match(str(c["tjClientVersion"])):
         err(f, "tjClientVersion tidak valid")
-    rail = c.get("rail", {})
-    if not isinstance(rail, dict):
-        err(f, "rail harus objek")
-        rail = {}
-    rt = rail.get("realtime", [])
-    if not isinstance(rt, list) or len(rt) > 8:
-        err(f, "rail.realtime harus daftar (maks. 8)")
-        rt = []
-    for i, x in enumerate(rt):
-        if not isinstance(x, dict) or not HTTPS.match(str(x.get("url", ""))):
-            err(f, "rail.realtime[%d].url harus https" % i)
-        if x.get("kind") not in ("vehicles", "trips", "alerts", "all"):
-            err(f, "rail.realtime[%d].kind: vehicles|trips|alerts|all" % i)
-        if not set(x.get("modes", ["KRL"])) <= MODES:
-            err(f, "rail.realtime[%d].modes tidak dikenal" % i)
-        rm = x.get("routeMap", {})
-        if not isinstance(rm, dict) or len(rm) > 200:
-            err(f, "rail.realtime[%d].routeMap harus objek (maks. 200)" % i)
-    for k in ("schedule",):
-        v = rail.get(k)
-        if v is not None and not re.match(r"^[a-z0-9_.-]+\.json$", str(v)):
-            err(f, "rail.%s harus nama berkas .json di folder data/" % k)
     if "disruptions" in c and not re.match(r"^[a-z0-9_.-]+\.json$", str(c["disruptions"])):
         err(f, "disruptions harus nama berkas .json di folder data/")
-    sh = c.get("share", {})
-    for k in ("viewer", "relay"):
-        if k in sh and not HTTPS.match(str(sh[k])):
-            err(f, "share.%s harus https" % k)
-
 
 def parse_time(s):
     return datetime.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
@@ -115,9 +88,6 @@ def main():
     else:
         check_cfg(os.path.join(D, "remote_config.json"))
         check_disruptions(os.path.join(D, "disruptions.json"))
-        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "rail_schedule.py"), "--check"], capture_output=True, text=True)
-        if r.returncode:
-            err("rail_schedule.json", (r.stderr or r.stdout).strip())
     for e in errs:
         print("GAGAL:", e, file=sys.stderr)
     print("check_remote:", "lulus" if not errs else "%d galat" % len(errs))

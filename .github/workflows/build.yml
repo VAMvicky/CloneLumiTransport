@@ -44,18 +44,19 @@ jobs:
       - name: Uji klien posisi bus (cadangan sementara, aliran byte, versi klien)
         run: node tools/test_live.js
 
-      - name: Uji jadwal kereta (pipeline + mesin rute)
-        run: python3 tools/test_rail.py
+      - name: Periksa data jarak jauh (remote_config, gangguan, aksesibilitas)
+        run: |
+          python3 tools/check_remote.py
+          python3 tools/osm_access.py --check
+          python3 tools/test_access.py
 
-      - name: Periksa data jarak jauh (remote_config, gangguan, jadwal kereta)
-        run: python3 tools/check_remote.py
-
-      - name: Uji dekoder GTFS-Realtime (Java murni)
+      - name: Uji pembaca saldo kartu NFC (Java murni)
         run: |
           set -euo pipefail
-          mkdir -p build/rt
-          javac -d build/rt app/src/main/java/id/lumi/transport/GtfsRt.java tools/GtfsRtTest.java
-          java -cp build/rt GtfsRtTest
+          mkdir -p build/card
+          javac -d build/card app/src/main/java/id/lumi/transport/CardReader.java tools/CardReaderTest.java
+          java -cp build/card CardReaderTest
+
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
@@ -69,9 +70,6 @@ jobs:
           set -euo pipefail
           python3 tools/ui_check.py en native --shots ui-shots
           python3 tools/ui_check.py id native --shots ui-shots
-
-      - name: Uji ikuti perjalananku (enkripsi Java → penampil WebCrypto)
-        run: python3 tools/test_share.py
 
       - name: Upload tangkapan layar uji
         if: always()

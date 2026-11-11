@@ -4,7 +4,7 @@
  * Sumber: feed MQTT publik armada Transjakarta lewat WebSocket:
  *   wss://mqtt.tj.co.id:8084/mqtt   topik /mobile_armada/{koridor}/{kode_rute}/{trip}/{nomor_bus}
  * Isi pesan (JSON): latitude/longitude (+ snap_*), bearing, route_code, route_long_name,
- * route_color, trip_headsign, bus_body_no, passengers_status, stops[{name, eta, ...}],
+ * route_color, trip_headsign, bus_body_no, stops[{name, eta, ...}],
  * eta_by_parent_stop_id, timestamp, dll.
  *
  * PENTING (temuan v2.4): broker hanya mengizinkan koneksi anonim bila client ID diawali
@@ -18,7 +18,7 @@
  *
  * Langganan: mula-mula per rute (hemat kuota). Bila server memutus koneksi setelah langganan
  * per rute (tanpa sempat mengirim data), Lumi SEMENTARA beralih ke topik umum "/mobile_armada/#"
- * dan menyaring sendiri. v2.15: mode umum itu tidak lagi disimpan permanen — hanya berlaku di
+ * dan menyaring sendiri. v2.16: mode umum itu tidak lagi disimpan permanen — hanya berlaku di
  * memori selama 30 menit (lalu 2 jam, maks. 6 jam bila per rute gagal lagi), setelah itu Lumi
  * mencoba per rute lagi. Begitu per rute berhasil menerima data, tenggatnya kembali ke awal.
  */
@@ -94,7 +94,7 @@
     if (added) phase = "sub";
   }
 
-  /* Aliran byte → paket MQTT. v2.15: dibaca dengan offset (bufOff), bukan buf.slice() per paket
+  /* Aliran byte → paket MQTT. v2.16: dibaca dengan offset (bufOff), bukan buf.slice() per paket
      yang menyalin sisa buffer berulang kali (O(n²) untuk banyak pesan dalam satu potongan). */
   function onBytes(u8) {
     var rest = buf.length - bufOff;

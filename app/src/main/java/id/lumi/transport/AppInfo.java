@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /**
- * Satu tempat untuk identitas & versi yang dikirim ke server (v2.15).
+ * Satu tempat untuk identitas & versi yang dikirim ke server (v2.16).
  *
  * Dulu angka versi ditulis tangan di banyak tempat (User-Agent LiveSocket/RouteWatchJob/GtfsImporter,
  * header x-app-version di live.js, Bridge.version()) dan mudah terlewat saat rilis. Sekarang:
@@ -18,7 +18,7 @@ public final class AppInfo {
     static final String PREFS = "lumi_remote";
     static final String KEY_TJ = "tjClientVersion";
 
-    /** versionName aplikasi, mis. "2.15.0". */
+    /** versionName aplikasi, mis. "2.16.0". */
     public static String version() { return BuildConfig.VERSION_NAME; }
 
     /** User-Agent tunggal Lumi untuk semua permintaan HTTP/WebSocket native. */

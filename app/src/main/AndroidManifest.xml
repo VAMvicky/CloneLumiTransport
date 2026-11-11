@@ -19,6 +19,11 @@
     <!-- Pengingat "waktunya berangkat": alarm tepat waktu bila pengguna mengizinkan (Android 12+);
          tanpa izin, Lumi memakai alarm biasa yang bisa mundur beberapa menit. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- "Bus makin dekat" saat layar mati: layanan latar depan yang mengambil data feed armada -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Cek saldo kartu uang elektronik (opsional: aplikasi tetap terpasang di HP tanpa NFC) -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <!-- Agar bisa membuka aplikasi ojol yang terpasang (Android 11+) -->
     <queries>
@@ -77,6 +82,14 @@
             android:name=".NavService"
             android:exported="false"
             android:foregroundServiceType="location" />
+        <service
+            android:name=".BusWatchService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".Disruptions$Job"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <service
             android:name=".RouteWatchJob"
             android:exported="false"

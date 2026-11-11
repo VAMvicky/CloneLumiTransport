@@ -71,15 +71,15 @@
 
 ## ✨ Features
 
-**🆕 New in v2.15**
-- 🚆 **Exact train timetables**: KRL, MRT, LRT and Airport Rail use timetables (when present in `data/rail_schedule.json`) instead of headway guesses — waits, arrival times and "Arrive by" become exact; leg cards show the train number and the next departures
-- 📍 **Train positions**: live from an operator GTFS-Realtime feed when available, otherwise estimated from the timetable (always labelled as an estimate)
-- ⚠️ **Service disruptions**: delayed trains, diverted corridors, closed stops — on the home screen, result cards, trip details and route details
-- ⏰ **"Time to leave" reminders**: "leave at 07:05 to arrive by 08:00", one-off or weekly, also shown on the Go/Home widget
+**🆕 New in v2.16**
+- 🔔 **Bus-approaching alerts even with the screen off**: ±10/±5/±2 min and on arrival at your boarding stop, automatic when guidance starts (only buses going your way)
+- ⏰ **"Time to leave" reminders** ("leave at 07:05 to arrive by 08:00"), one-off or weekly, shown on the widget; 30 minutes ahead Lumi checks disruptions on your route, and at departure time it starts watching the first bus
+- ⚠️ **Service disruption info** on home, results and details — plus **disruption notifications for favourite routes** without opening the app
 - ⭐ **Save & repeat full trips** from favourites, history or a reminder notification
-- 👨‍👩‍👧 **Follow my trip**: a live-location link for family until you arrive, end-to-end encrypted, stops automatically
-- 🌙 **Dark mode** (follow system / light / dark) and 🚌 **bus crowding** (Plenty of room / Some seats taken / Crowded)
-- Maintainer guide (Indonesian): [docs/kereta-gangguan-berbagi.md](docs/kereta-gangguan-berbagi.md)
+- 💳 **Card balance check (NFC, experimental)**: Mandiri e-money, BNI TapCash, BRI Brizzi, BCA Flazz gen 2, JakCard, KMT
+- ♿ **Wheelchair-friendly routes** + lift/escalator info at stops, stations and on each leg (OpenStreetMap)
+- 🌙 **Dark mode** (follow system / light / dark), 📍 your position moves live with a heading beam on the trip map, and stops can be tapped right on the map
+- Maintainer guide (Indonesian): [docs/gangguan-pengingat-nfc.md](docs/gangguan-pengingat-nfc.md)
 
 **🗺️ Journey planner**
 - **Offline** routing engine (graph + Dijkstra) plus a systematic search of **every direct route and every two-route combination**, so options like 9/9C → Makasar → JAK36/JAK108 and LRT → TMII → JAK36 show up

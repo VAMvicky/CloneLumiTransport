@@ -1,5 +1,5 @@
 // Uji live.js (klien MQTT posisi bus): node tools/test_live.js
-// Mencakup: cadangan topik umum bersifat sementara (v2.15), pembacaan aliran byte berbasis offset,
+// Mencakup: cadangan topik umum bersifat sementara (v2.16), pembacaan aliran byte berbasis offset,
 // dan header x-app-version yang tidak lagi ditanam di kode.
 const fs = require("fs"), path = require("path"), vm = require("vm");
 const SRC = fs.readFileSync(path.join(__dirname, "..", "app/src/main/assets/www/js/live.js"), "utf8");

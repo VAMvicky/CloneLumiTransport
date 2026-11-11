@@ -29,7 +29,7 @@
   --r-md: 14px;
   --r-sm: 9px;
   --nav-h: 64px;
-  /* v2.15: token warna semantik (dipakai mode gelap) */
+  /* v2.16: token warna semantik (dipakai mode gelap) */
   --ok-bg: #E3F6EA; --ok-fg: #11643A;
   --err-bg: #FDECEA; --err-fg: #9B2C1F;
   --warn-bg: #FFF4E5; --warn-fg: #7A3E00;
@@ -921,13 +921,9 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 .live-filter .link { font-size: 13.5px; padding: 0; }
 
 /* ======================================================================================
- * v2.15 — komponen baru: okupansi, gangguan, jadwal kereta, aksi perjalanan, pengingat,
- * berbagi langsung — lalu mode gelap.
+ * v2.16 — komponen baru: gangguan, aksi perjalanan, pengingat, pantau bus, halte di peta,
+ * cek saldo NFC, aksesibilitas — lalu mode gelap.
  * ==================================================================================== */
-.occ { display: inline-block; font-style: normal; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
-.occ-0 { background: var(--ok-bg); color: var(--ok-fg); }
-.occ-1 { background: var(--warn-bg); color: var(--warn-fg); }
-.occ-2 { background: var(--err-bg); color: var(--err-fg); }
 
 .dis { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border-radius: var(--r-md); margin-bottom: 10px;
   background: var(--warn-bg); color: var(--warn-fg); font-size: 13px; }
@@ -946,22 +942,7 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 .dis-more { font-weight: 800; color: var(--ink); margin: -2px 0 14px; }
 #disCard { margin-bottom: 6px; }
 .tag.dis-tag { background: var(--warn-bg); color: var(--warn-fg); }
-.tag.sched { background: var(--soft); color: var(--text); }
 
-.sched-tag { display: inline-block; font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px; margin-left: 6px; vertical-align: 2px;
-  background: var(--soft); color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
-.rail-eta { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--paper); font-size: 12.5px; color: var(--muted); }
-.rail-eta:empty { display: none; }
-.rail-eta b { color: var(--text); font-size: 13px; }
-.rail-eta span { display: block; margin-top: 2px; }
-.rail-eta .late, .bus-list .late { font-style: normal; font-weight: 800; color: var(--err-fg); margin-left: 4px; }
-.rail-eta .ontime, .bus-list .ontime { font-style: normal; font-weight: 800; color: var(--ok-fg); margin-left: 4px; }
-.sched-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; background: #22C55E; }
-.sched-dot.est { background: var(--faint); }
-.sched-dot.off { background: var(--danger); }
-.lm-train b { border-radius: 4px; }
-.lm-train.est { opacity: .78; }
-.lm-train.est i { outline: 2px dashed rgba(255, 255, 255, .85); outline-offset: -3px; }
 
 .trip-acts { display: flex; gap: 8px; flex-wrap: wrap; margin: -4px 0 14px; }
 .chip-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border-radius: 999px; background: var(--card);
@@ -985,14 +966,44 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 .rem-hint { font-size: 12.5px; color: var(--warn-fg); margin: 8px 0 0; min-height: 0; }
 .rem-hint:empty { display: none; }
 
-/* Tombol bulat ikon saja (label di aria-label) supaya muat bersama PiP & Berhenti di layar sempit. */
-.guide-share { flex: none; display: grid; place-items: center; width: 34px; height: 34px; margin-left: auto; border-radius: 50%;
-  background: rgba(255, 255, 255, .18); color: #fff; }
-.guide-share svg { width: 18px; height: 18px; }
-.guide-share.on { background: #fff; color: var(--ink); box-shadow: 0 0 0 3px rgba(255, 255, 255, .35); }
-.guide-share + .guide-pip { margin-left: 0; }
 .guide-top .guide-live { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .guide-top .guide-pip, .guide-top .guide-stop { flex: none; }
+
+/* halte & stasiun yang bisa diketuk di peta "Bus di sekitarmu" */
+.lm-halt { width: 14px; height: 14px; border-radius: 4px; background: #fff; border: 3px solid #1565D8; box-sizing: border-box;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .3); cursor: pointer; }
+.lm-halt.rail { border-color: #E2231A; border-radius: 50%; }
+.stop-act-access:empty { display: none; }
+
+/* pantau bus saat layar mati */
+.bw-btn { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 6px; padding: 8px 10px; border-radius: 10px;
+  background: var(--paper); color: var(--ink); font-size: 12.5px; font-weight: 700; text-align: left; }
+.bw-btn svg { width: 17px; height: 17px; flex: none; }
+.bw-btn.on { background: var(--ok-bg); color: var(--ok-fg); }
+
+/* cek saldo kartu */
+.nfc-entry { margin-top: -6px; }
+#tab-info .nfc-entry { margin: 0 0 14px; }
+.nfc-wait { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 26px 8px 18px; }
+.nfc-wait svg { width: 64px; height: 64px; color: var(--ink); position: relative; z-index: 1; }
+.nfc-wait b { font-size: 16px; } .nfc-wait span { font-size: 13px; color: var(--muted); }
+.nfc-wave { position: absolute; top: 18px; width: 82px; height: 82px; border-radius: 50%; border: 3px solid var(--lamp); opacity: .0; animation: nfcPulse 1.6s ease-out infinite; }
+@keyframes nfcPulse { 0% { transform: scale(.7); opacity: .8; } 100% { transform: scale(1.5); opacity: 0; } }
+.nfc-res { display: flex; flex-direction: column; gap: 4px; padding: 18px 4px 6px; }
+.nfc-res span { font-size: 14px; color: var(--muted); font-weight: 700; }
+.nfc-res b { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; }
+.nfc-res.err b { font-size: 17px; letter-spacing: 0; }
+.nfc-hint { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+
+/* aksesibilitas */
+.chip.acc { display: inline-flex; align-items: center; gap: 6px; }
+.chip.acc svg { width: 16px; height: 16px; }
+.acc-line { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 2px; padding: 8px 10px; border-radius: 10px; background: var(--soft); font-size: 12.5px; color: var(--text); }
+.acc-line svg { width: 18px; height: 18px; flex: none; color: var(--ink); }
+.acc-line small { display: block; color: var(--muted); margin-top: 2px; }
+.acc-line.small { margin-top: 8px; }
+.acc-line.acc-yes { background: var(--ok-bg); } .acc-line.acc-yes svg { color: var(--ok-fg); }
+.acc-line.acc-no { background: var(--err-bg); } .acc-line.acc-no svg { color: var(--err-fg); }
 
 /* ---------------------------------------------------------------- mode gelap */
 :root[data-theme="dark"] {
@@ -1041,3 +1052,5 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 /* Peta dasar diredupkan (bukan marker/garis rute): filter hanya pada lapisan petak & kanvas MapLibre. */
 :root.map-dim .leaflet-tile-pane, :root.map-dim .leaflet-gl-layer { filter: invert(.92) hue-rotate(180deg) brightness(.95) contrast(.88) saturate(.8); }
 :root[data-theme="dark"] .chip.on { color: #06213F; }
+
+:root[data-theme="dark"] .lm-halt { background: #132033; }

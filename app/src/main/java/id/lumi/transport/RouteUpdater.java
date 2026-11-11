@@ -28,6 +28,8 @@ public class RouteUpdater {
     static final long DAY = 24L * 60 * 60 * 1000;
     /** Unduhan penuh tidak diulang dalam rentang ini, apa pun pemicunya. */
     static final long MIN_GAP_MS = 30L * 60 * 1000;
+    /** Setelah unduhan GAGAL, tugas latar menunggu lebih lama (hemat kuota bila server TJ sedang bermasalah). */
+    static final long FAIL_GAP_MS = 6L * 60 * 60 * 1000;
     /** Tanda versi tidak terbaca → segarkan bila data lebih tua dari ini. */
     static final long STALE_UNKNOWN_MS = 20L * 60 * 60 * 1000;
     /** Batas umur data walau tanda versi tidak berubah. */
@@ -63,8 +65,10 @@ public class RouteUpdater {
     static synchronized Result runGuarded(Context ctx, boolean notify, String knownSig) throws Exception {
         SharedPreferences p = prefs(ctx);
         long now = System.currentTimeMillis();
-        long last = Math.max(p.getLong("lastOk", 0), p.getLong("lastAttempt", 0));
-        if (now - last < MIN_GAP_MS && now >= last) return null;
+        long ok = p.getLong("lastOk", 0), attempt = p.getLong("lastAttempt", 0);
+        long last = Math.max(ok, attempt);
+        long gap = attempt > ok ? FAIL_GAP_MS : MIN_GAP_MS;     // percobaan terakhir gagal → jeda 6 jam
+        if (now - last < gap && now >= last) return null;
         return run(ctx, new GtfsImporter.Progress() { public void update(String m) { } }, notify, knownSig);
     }
 
@@ -197,7 +201,7 @@ public class RouteUpdater {
     }
 
     /**
-     * v2.15: hanya ada satu tugas latar (RouteWatchJob). Metode ini dipertahankan untuk pemanggil lama:
+     * v2.16: hanya ada satu tugas latar (RouteWatchJob). Metode ini dipertahankan untuk pemanggil lama:
      * membatalkan tugas harian lama dan memastikan pemantau tiap jam terjadwal.
      */
     public static void schedule(Context ctx) {

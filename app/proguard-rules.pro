@@ -16,9 +16,11 @@
 -keep class id.lumi.transport.RouteWatchJob { *; }
 -keep class id.lumi.transport.RouteUpdateJob { *; }
 -keep class id.lumi.transport.ShareProvider { *; }
-# v2.15: penerima alarm pengingat (manifest) dan widget
+# v2.16: penerima alarm pengingat (manifest) dan widget
 -keep class id.lumi.transport.Reminders$ReminderReceiver { *; }
 -keep class id.lumi.transport.LumiWidgetProvider { *; }
+-keep class id.lumi.transport.BusWatchService { *; }
+-keep class id.lumi.transport.Disruptions$Job { *; }
 
 # Dipakai lintas-thread dan lewat callback native.
 -keep class id.lumi.transport.LiveSocket { *; }

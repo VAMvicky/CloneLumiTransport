@@ -1,15 +1,7 @@
 {
   "v": 1,
   "updated": "2026-11-11",
-  "_": "Konfigurasi jarak jauh Lumi (v2.15). Aplikasi mengambil berkas ini paling sering tiap 6 jam dan memeriksa isinya (tools/check_remote.py juga dijalankan di CI). Semua kolom opsional.",
+  "_": "Konfigurasi jarak jauh Lumi (v2.16). Aplikasi mengambil berkas ini paling sering tiap 6 jam dan memeriksa isinya (tools/check_remote.py juga dijalankan di CI). Semua kolom opsional.",
   "tjClientVersion": "2.11.0",
-  "rail": {
-    "schedule": "rail_schedule.json",
-    "realtime": []
-  },
-  "disruptions": "disruptions.json",
-  "share": {
-    "viewer": "https://vamvicky.github.io/LumiTransport/ikuti/",
-    "relay": "https://ntfy.sh"
-  }
+  "disruptions": "disruptions.json"
 }

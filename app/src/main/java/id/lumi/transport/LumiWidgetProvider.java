@@ -12,7 +12,7 @@ import org.json.JSONObject;
 
 /**
  * Widget "Berangkat / Pulang": dua tombol yang membuka Lumi di kolom asal atau tujuan.
- * v2.15: baris atas menampilkan pengingat berangkat terdekat ("⏰ Berangkat 07.05 → Kantor");
+ * v2.16: baris atas menampilkan pengingat berangkat terdekat ("⏰ Berangkat 07.05 → Kantor");
  * mengetuknya membuka rute pengingat itu.
  */
 public class LumiWidgetProvider extends AppWidgetProvider {

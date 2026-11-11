@@ -199,9 +199,11 @@ public class MainActivity extends Activity {
         try { RouteUpdater.schedule(this); } catch (Exception ignored) { }
         // Alarm pengingat berangkat hilang bila aplikasi pernah dihentikan paksa: pasang ulang.
         try { Reminders.rescheduleAll(this); } catch (Exception ignored) { }
+        // Pemeriksa gangguan rute favorit di latar (hanya bila ada rute yang dipantau).
+        try { Disruptions.schedule(this); } catch (Exception ignored) { }
     }
 
-    /* ---- tema (v2.15): terang / gelap / ikuti sistem — dipilih di halaman, bilah sistem disesuaikan di sini ---- */
+    /* ---- tema (v2.16): terang / gelap / ikuti sistem — dipilih di halaman, bilah sistem disesuaikan di sini ---- */
     boolean systemNight() {
         return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
                 == android.content.res.Configuration.UI_MODE_NIGHT_YES;
@@ -235,6 +237,7 @@ public class MainActivity extends Activity {
         if (i == null) return null;
         if (i.getBooleanExtra("openGuide", false)) return "guide";
         if (i.getBooleanExtra("openChanges", false)) return "changes";
+        if (i.getBooleanExtra("openDisruptions", false)) return "disruptions";
         return null;
     }
 
@@ -278,9 +281,53 @@ public class MainActivity extends Activity {
         else pendingShare = s;
     }
 
+    /* ---- cek saldo kartu (NFC), hanya selama lembar "Cek saldo" terbuka ---- */
+    private boolean nfcWanted;
+    void nfcEnable(boolean on) {
+        android.nfc.NfcAdapter a = android.nfc.NfcAdapter.getDefaultAdapter(this);
+        if (a == null) return;
+        try {
+            if (!on) { a.disableReaderMode(this); return; }
+            int flags = android.nfc.NfcAdapter.FLAG_READER_NFC_A | android.nfc.NfcAdapter.FLAG_READER_NFC_B
+                    | android.nfc.NfcAdapter.FLAG_READER_NFC_F | android.nfc.NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK;
+            a.enableReaderMode(this, new android.nfc.NfcAdapter.ReaderCallback() {
+                @Override public void onTagDiscovered(android.nfc.Tag tag) { readCard(tag); }
+            }, flags, null);
+        } catch (Exception ignored) { }
+    }
+    private void readCard(android.nfc.Tag tag) {
+        CardReader.Result r = null;
+        try {
+            final android.nfc.tech.IsoDep iso = android.nfc.tech.IsoDep.get(tag);
+            if (iso != null) {
+                iso.connect(); iso.setTimeout(5000);
+                try { r = CardReader.readIsoDep(new CardReader.Channel() { public byte[] transceive(byte[] c) throws java.io.IOException { return iso.transceive(c); } }); }
+                finally { try { iso.close(); } catch (Exception ignored) { } }
+            } else {
+                final android.nfc.tech.NfcF f = android.nfc.tech.NfcF.get(tag);
+                if (f != null) {
+                    f.connect();
+                    try { r = CardReader.readFelica(tag.getId(), new CardReader.Channel() { public byte[] transceive(byte[] c) throws java.io.IOException { return f.transceive(c); } }); }
+                    finally { try { f.close(); } catch (Exception ignored) { } }
+                }
+            }
+        } catch (Exception e) {
+            js("window.__lumiNfc && __lumiNfc({error:" + JSONObject.quote(Lang.t("Kartu terlepas sebelum selesai dibaca. Tempelkan lagi dan tahan 2 detik.", "The card moved away before it was read. Tap again and hold for 2 seconds.")) + "})");
+            return;
+        }
+        js("window.__lumiNfc && __lumiNfc(" + (r == null ? "{\"unknown\":true}" : r.toJson()) + ")");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (nfcWanted) nfcEnable(false);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        if (nfcWanted) nfcEnable(true);
         if (watchWanted && watchL == null) watchStart();
         if (pageReady) js("window.__lumiPerm && __lumiPerm(); window.__lumiResume && __lumiResume()");   // kembali dari pengaturan HP
         updatePip(NavService.tracker != null);
@@ -672,13 +719,13 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * v2.15: WebView tersembunyi itu berat (≈ satu tab peramban). Beberapa resolve() paralel dulu
+     * v2.16: WebView tersembunyi itu berat (≈ satu tab peramban). Beberapa resolve() paralel dulu
      * membuat beberapa WebView 400×700 sekaligus selama ≤ 20 detik. Sekarang paling banyak
      * PROBE_MAX berjalan bersamaan, sisanya antre (antrean dibatasi; permintaan tertua yang belum
-     * mulai dibuang dan dijawab tanpa koordinat), dan batas waktunya 12 detik.
+     * mulai dibuang dan dijawab tanpa koordinat), dengan batas waktu 20 detik (12 detik terlalu pendek untuk tautan Google Maps di jaringan lambat).
      */
     private static final int PROBE_MAX = 1, PROBE_QUEUE_MAX = 3;
-    private static final long PROBE_TIMEOUT_MS = 12000;
+    private static final long PROBE_TIMEOUT_MS = 20000;   // satu WebView sekaligus, jadi batas lama (20 dtk) aman
     private int probesRunning;
     private final java.util.ArrayDeque<String[]> probeQueue = new java.util.ArrayDeque<String[]>();
 
@@ -707,7 +754,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Muat tautan di WebView tersembunyi dan tunggu koordinat muncul di URL/halaman (maks. 12 detik). */
+    /** Muat tautan di WebView tersembunyi dan tunggu koordinat muncul di URL/halaman (maks. 20 detik). */
     private void probeNow(final String id, final String url) {
         final WebView w = new WebView(this);
         final boolean[] done = {false};
@@ -1293,7 +1340,7 @@ public class MainActivity extends Activity {
             synchronized (liveLock) { if (live != null) live.close(); live = null; liveQueue.clear(); }
         }
 
-        /* ---- v2.15: tema ---- */
+        /* ---- v2.16: tema ---- */
         /** Mode gelap sistem sedang aktif? (WebView tidak selalu meneruskan prefers-color-scheme.) */
         @JavascriptInterface
         public boolean nightMode() { return systemNight(); }
@@ -1304,21 +1351,7 @@ public class MainActivity extends Activity {
             main.post(new Runnable() { @Override public void run() { applyBars(dark); }});
         }
 
-        /* ---- v2.15: GTFS-Realtime (posisi kereta, keterlambatan, gangguan) ---- */
-        /** Unduh & dekode feed GTFS-Realtime; hasil JSON (GtfsRt) ke window.__lumiHttp(id, status, body). */
-        @JavascriptInterface
-        public void rtFetch(final String id, final String url) {
-            pool.execute(new Runnable() { @Override public void run() {
-                int status; String body;
-                try {
-                    if (url == null || !url.startsWith("https://")) throw new IllegalArgumentException("URL harus https");
-                    body = GtfsRt.fetchJson(url, UA); status = 200;
-                } catch (Exception e) { status = 0; body = String.valueOf(e.getMessage()); }
-                js("window.__lumiHttp(" + JSONObject.quote(id) + "," + status + "," + JSONObject.quote(body) + ")");
-            }});
-        }
-
-        /* ---- v2.15: pengingat waktunya berangkat ---- */
+        /* ---- v2.16: pengingat waktunya berangkat ---- */
         /** Simpan pengingat (JSON, lihat Reminders). Hasil: {"ok":true,"at":ms,"exact":bool} atau {"ok":false,"error":".."}. */
         @JavascriptInterface
         public String setReminder(String json) {
@@ -1355,18 +1388,43 @@ public class MainActivity extends Activity {
             }});
         }
 
-        /* ---- v2.15: ikuti perjalananku (berbagi posisi langsung, terenkripsi) ---- */
-        /** Mulai berbagi; mengembalikan tautan penampil. relay/viewer dari remote_config (boleh kosong). */
+        /* ---- v2.16: bus makin dekat saat layar mati ---- */
+        /** Mulai pemantau bus latar (BusWatchService). spec: {"code","title","stop":{name,lat,lon,id},"next":{..}} */
         @JavascriptInterface
-        public String shareLiveStart(String title, String toName, double toLat, double toLon, String relay, String viewer) {
-            return TripShare.start(MainActivity.this, title, toName, toLat, toLon, relay, viewer);
+        public boolean busWatchStart(String spec) { return BusWatchService.start(MainActivity.this, spec); }
+
+        @JavascriptInterface
+        public void busWatchStop() { BusWatchService.stop(MainActivity.this); }
+
+        /** Kode rute yang sedang dipantau di latar, atau "" bila tidak ada. */
+        @JavascriptInterface
+        public String busWatchActive() { String c = BusWatchService.watchingCode; return BusWatchService.running && c != null ? c : ""; }
+
+        /* ---- v2.16: gangguan rute favorit tanpa membuka aplikasi ---- */
+        @JavascriptInterface
+        public void setWatchedLines(String json) { Disruptions.setWatched(MainActivity.this, json); }
+
+        /* ---- v2.16: cek saldo kartu NFC ---- */
+        /** "none" (HP tanpa NFC) | "off" (NFC dimatikan) | "on". */
+        @JavascriptInterface
+        public String nfcState() {
+            android.nfc.NfcAdapter a = android.nfc.NfcAdapter.getDefaultAdapter(MainActivity.this);
+            return a == null ? "none" : a.isEnabled() ? "on" : "off";
         }
 
         @JavascriptInterface
-        public void shareLiveStop() { TripShare.stop(MainActivity.this, false); }
+        public void nfcStart() { main.post(new Runnable() { @Override public void run() { nfcWanted = true; nfcEnable(true); }}); }
 
         @JavascriptInterface
-        public boolean shareLiveActive() { return TripShare.active(MainActivity.this); }
+        public void nfcStop() { main.post(new Runnable() { @Override public void run() { nfcWanted = false; nfcEnable(false); }}); }
+
+        @JavascriptInterface
+        public void openNfcSettings() {
+            main.post(new Runnable() { @Override public void run() {
+                try { startActivity(new Intent(android.provider.Settings.ACTION_NFC_SETTINGS)); }
+                catch (Exception e) { try { startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS)); } catch (Exception ignored) { } }
+            }});
+        }
 
         /** Buka aplikasi resmi TJ (pelacak bus resmi); bila belum terpasang, buka Play Store. */
         @JavascriptInterface

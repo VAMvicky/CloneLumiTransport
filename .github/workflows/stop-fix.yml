@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["tools/osm_stops.py", ".github/workflows/stop-fix.yml"]
+    paths: ["tools/osm_stops.py", "tools/osm_access.py", ".github/workflows/stop-fix.yml"]
 permissions:
   contents: write
 jobs:
@@ -29,6 +29,14 @@ jobs:
           fi
           [ $code -eq 0 ] || echo "::warning::osm_stops.py gagal (kode $code); data/stop_fix.json lama dipertahankan"
           rm -f data/stop_fix_error.txt
+      - name: Info aksesibilitas (lift, eskalator, kursi roda) dari OpenStreetMap
+        run: |
+          set +e
+          python3 tools/osm_access.py 2> "$RUNNER_TEMP/access.err"
+          code=$?
+          if [ -s "$RUNNER_TEMP/access.err" ]; then while IFS= read -r l; do echo "::warning title=osm_access::$l"; done < "$RUNNER_TEMP/access.err"; fi
+          [ $code -eq 0 ] || echo "::warning::osm_access.py gagal (kode $code); data/accessibility.json lama dipertahankan"
+          exit 0
       - run: |
           git config user.name "lumi-route-watch[bot]"
           git config user.email "lumi-route-watch@users.noreply.github.com"

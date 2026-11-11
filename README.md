@@ -71,15 +71,15 @@
 
 ## ✨ Fitur
 
-**🆕 Baru di v2.15**
-- 🚆 **Jadwal pasti kereta**: KRL, MRT, LRT, dan KA Bandara memakai jadwal (bila tersedia di `data/rail_schedule.json`), bukan tebakan headway — waktu tunggu, jam tiba, dan "Tiba sebelum" jadi tepat; kartu ruas menampilkan nomor KA dan keberangkatan berikutnya
-- 📍 **Posisi kereta**: langsung dari feed GTFS-Realtime operator bila tersedia, atau perkiraan dari jadwal (selalu ditandai "perkiraan")
-- ⚠️ **Info gangguan layanan**: kereta telat, koridor dialihkan, halte tutup — di beranda, kartu hasil, detail perjalanan, dan detail rute
-- ⏰ **Pengingat "waktunya berangkat"**: "berangkat 07.05 agar tiba 08.00", sekali atau tiap minggu, tampil juga di widget Berangkat/Pulang
+**🆕 Baru di v2.16**
+- 🔔 **Bus makin dekat juga saat layar mati**: notifikasi ±10/±5/±2 menit dan saat bus tiba di halte naikmu, otomatis saat pendampingan dimulai (hanya bus yang searah)
+- ⏰ **Pengingat "waktunya berangkat"** ("berangkat 07.05 agar tiba 08.00"), sekali atau mingguan, tampil di widget; 30 menit sebelumnya Lumi mengecek gangguan di rutemu, dan saat waktunya langsung memantau bus pertama
+- ⚠️ **Info gangguan layanan** di beranda, hasil, dan detail — plus **notifikasi gangguan untuk rute favorit** tanpa membuka aplikasi
 - ⭐ **Simpan & ulangi perjalanan lengkap** dari favorit, riwayat, atau notifikasi pengingat
-- 👨‍👩‍👧 **Ikuti perjalananku**: tautan posisi langsung untuk keluarga sampai kamu tiba, terenkripsi ujung-ke-ujung, berhenti otomatis
-- 🌙 **Mode gelap** (ikuti sistem / terang / gelap) dan 🚌 **kepadatan bus** (Longgar / Sedang / Penuh)
-- Panduan pengelola: [docs/kereta-gangguan-berbagi.md](docs/kereta-gangguan-berbagi.md)
+- 💳 **Cek saldo kartu (NFC, eksperimental)**: Mandiri e-money, BNI TapCash, BRI Brizzi, BCA Flazz generasi 2, JakCard, KMT
+- ♿ **Rute ramah kursi roda** + info lift/eskalator di halte, stasiun, dan tiap ruas (OpenStreetMap)
+- 🌙 **Mode gelap** (ikuti sistem / terang / gelap), 📍 posisimu bergerak langsung dengan senter arah di peta perjalanan, dan halte bisa diketuk langsung di peta
+- Panduan pengelola: [docs/gangguan-pengingat-nfc.md](docs/gangguan-pengingat-nfc.md)
 
 **🗺️ Perencana rute**
 - Mesin rute **offline** (graf + Dijkstra) ditambah penjelajahan sistematis **semua rute langsung dan semua kombinasi dua rute**, sehingga opsi seperti 9/9C → Makasar → JAK36/JAK108 dan LRT → TMII → JAK36 ikut muncul
@@ -307,16 +307,16 @@ app/src/main/
 │   ├── RouteDiff.java        # Bandingkan rute lama vs baru
 │   ├── RouteWatchJob.java    # Cek perubahan berkala (±tiap jam)
 │   ├── RouteUpdateJob.java   # Sisa tugas harian lama (membatalkan diri; digabung ke RouteWatchJob)
-│   ├── AppInfo.java          # Satu sumber versi: User-Agent & x-app-version (v2.15)
-│   ├── GtfsRt.java           # Dekoder GTFS-Realtime (posisi kereta, keterlambatan, gangguan)
+│   ├── AppInfo.java          # Satu sumber versi: User-Agent & x-app-version (v2.16)
+│   ├── BusWatchService.java  # Bus makin dekat saat layar mati (MQTT native + BusEta)
+│   ├── Disruptions.java      # Gangguan rute favorit di latar
+│   ├── CardReader.java       # Cek saldo kartu NFC (eksperimental)
 │   ├── Reminders.java        # Pengingat "waktunya berangkat" (AlarmManager + widget)
-│   ├── TripShare.java        # Ikuti perjalananku (relay ntfy, terenkripsi ShareCrypto)
 │   ├── Lang.java             # Bahasa teks native (notifikasi, pendampingan, suara)
 │   └── ShareProvider.java    # Berbagi gambar rute tanpa izin penyimpanan
 └── assets/www/
     ├── index.html, css/app.css
-    ├── js/engine.js          # Mesin rute, tarif, jam operasional, jadwal pasti kereta
-    ├── js/rail.js            # Jadwal & posisi kereta (GTFS-Realtime / perkiraan jadwal)
+    ├── js/engine.js          # Mesin rute, tarif, jam operasional
     ├── js/app.js             # Antarmuka
     ├── js/i18n.js            # Terjemahan Indonesia → Inggris
     └── js/data.js            # Data rute bawaan (dibuat tools/build_data.py)
@@ -325,10 +325,10 @@ data-raw/                     # Data mentah: GTFS, koordinat stasiun, daftar rut
 tools/
 ├── build_data.py             # data-raw → data.js
 ├── route_watch.py            # Pemantau perubahan rute (GitHub Actions)
-├── rail_schedule.py          # Jadwal kereta (GTFS stop_times / Comuline) → data/rail_schedule.json
-├── check_remote.py           # Periksa remote_config, gangguan, jadwal sebelum commit
+├── osm_access.py             # Lift, eskalator, kursi roda dari OpenStreetMap → data/accessibility.json
+├── check_remote.py           # Periksa remote_config & gangguan sebelum commit
 ├── test_engine.js            # Uji mesin rute
-├── test_live.js, test_rail.py, test_share.py, GtfsRtTest.java   # Uji fitur v2.15
+├── test_live.js, test_access.py, CardReaderTest.java   # Uji fitur v2.16
 ├── ui_check.py               # Uji semua layar + terjemahan Inggris (Chrome headless)
 └── smoke.sh                  # Uji asap APK di emulator
 ```

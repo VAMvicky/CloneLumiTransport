@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="css/app.css">
   <script>
-    /* v2.15: tema dipasang sebelum CSS digambar supaya tidak berkedip putih di mode gelap. */
+    /* v2.16: tema dipasang sebelum CSS digambar supaya tidak berkedip putih di mode gelap. */
     try {
       var tc = (JSON.parse(localStorage.getItem("lumi:cfg") || "null") || {}), th = tc.theme || "system", dk = th === "dark";
       if (th === "system") { try { dk = window.LumiNative && LumiNative.nightMode ? !!LumiNative.nightMode() : matchMedia("(prefers-color-scheme: dark)").matches; } catch (e) { } }
@@ -235,6 +235,7 @@
       <div class="modal-card">
         <div class="modal-head"><div class="stop-act-h"><small id="stopActKind">Halte</small><h3 id="stopActName">…</h3></div><button class="icon-btn dark" data-close-modal aria-label="Tutup">×</button></div>
         <div class="stop-act-lines" id="stopActLines"></div>
+        <div class="stop-act-access" id="stopActAccess"></div>
         <div class="stop-acts">
           <button class="btn-sec" id="stopActFrom" type="button">Berangkat dari sini</button>
           <button class="btn-go" id="stopActTo" type="button">Pergi ke sini</button>
@@ -290,7 +291,6 @@
   <script src="js/stopfix.js"></script>
   <script src="js/build.js"></script>
   <script src="js/engine.js"></script>
-  <script src="js/rail.js"></script>
   <script src="js/live.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/gmaps.js"></script>

@@ -47,7 +47,7 @@ if bash tools/version.sh "dua" >/dev/null 2>&1; then
   fail=1
 fi
 
-# v2.15: versi tidak boleh ditulis tangan di kode (UA, x-app-version, Bridge.version()).
+# v2.16: versi tidak boleh ditulis tangan di kode (UA, x-app-version, Bridge.version()).
 # Satu sumber: release-notes/CURRENT (versionName) dan gradle.properties (lumi.tjClientVersion).
 hard=$(grep -rnE '"LumiTransport(ation)?/[0-9]|x-app-version"\s*:\s*"[0-9]|return "[0-9]+\.[0-9]+";' \
   app/src/main/java app/src/main/assets/www/js --include=*.java --include=*.js | grep -v '/js/build.js' || true)

@@ -1,0 +1,17 @@
+Lumi Transport
+Copyright (C) Lumi Transport contributors. Dilisensikan GPL-3.0 (lihat LICENSE).
+
+Bagian pihak ketiga
+-------------------
+CardReader.java (cek saldo kartu NFC) menulis ulang urutan perintah APDU dari:
+  OSP KUE Reader — https://github.com/muhakmal/osp-kue-reader
+  Copyright 2026 Akmal (@muhakmal) and contributors. Apache License 2.0.
+
+Nama kartu berikut adalah merek dagang pemiliknya masing-masing; Lumi Transport tidak berafiliasi
+dengan, didukung oleh, atau disponsori oleh mereka: "Mandiri e-money" (PT Bank Mandiri (Persero) Tbk),
+"Flazz" (PT Bank Central Asia Tbk), "TapCash" (PT Bank Negara Indonesia (Persero) Tbk),
+"Brizzi" (PT Bank Rakyat Indonesia (Persero) Tbk), "JakCard" (PT Bank DKI),
+"KMT / Kartu Multi Trip" (PT Kereta Commuter Indonesia).
+
+Info aksesibilitas (data/accessibility.json) berasal dari OpenStreetMap © kontributor OpenStreetMap, ODbL.
+Library peta: Leaflet (BSD-2-Clause), MapLibre GL JS (BSD-3-Clause) — lihat app/src/main/assets/www/vendor/.

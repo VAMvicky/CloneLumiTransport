@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * SATU-SATUNYA tugas latar untuk data rute (v2.15; dulu ada RouteUpdateJob harian yang tumpang tindih).
+ * SATU-SATUNYA tugas latar untuk data rute (v2.16; dulu ada RouteUpdateJob harian yang tumpang tindih).
  * Berjalan tiap jam dan ringan (beberapa KB):
  *  1) Umpan perubahan dari GitHub (data/route_changes.json), diisi GitHub Actions yang memeriksa
  *     GTFS resmi Transjakarta tiap jam → notifikasi langsung walau HP belum mengunduh GTFS.
@@ -185,7 +185,7 @@ public class RouteWatchJob extends JobService {
         String sig = gtfsSignature();
         if (sig != null) {
             String have = p.getString(RouteUpdater.KEY_DATA_SIG, null);
-            if (have == null) have = p.getString("gtfsSig", null);          // data dari versi < 2.15
+            if (have == null) have = p.getString("gtfsSig", null);          // data dari versi < 2.16
             if (have != null && !have.equals(sig)) needUpdate = true;
             p.edit().putString("gtfsSig", sig).apply();
         }

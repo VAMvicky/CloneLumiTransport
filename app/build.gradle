@@ -28,7 +28,7 @@ android {
         targetSdk 35
         versionCode versionCodeOf()
         versionName currentVersion()
-        // v2.15: semua User-Agent & header versi dirakit dari nilai ini (lihat AppInfo.java),
+        // v2.16: semua User-Agent & header versi dirakit dari nilai ini (lihat AppInfo.java),
         // bukan string yang ditulis tangan di banyak tempat.
         buildConfigField "String", "TJ_CLIENT_VERSION", "\"${tjClientVersion()}\""
     }

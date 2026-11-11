@@ -4,7 +4,7 @@ import android.app.job.JobParameters;
 import android.app.job.JobService;
 
 /**
- * Tugas harian LAMA (sampai v2.14). Sejak v2.15 pembaruan data rute hanya lewat RouteWatchJob
+ * Tugas harian LAMA (sampai v2.14). Sejak v2.16 pembaruan data rute hanya lewat RouteWatchJob
  * (tiap jam, dengan penjaga unduhan bersama di RouteUpdater.runGuarded) supaya GTFS penuh tidak
  * pernah diunduh dua kali berdekatan oleh dua tugas yang tumpang tindih.
  *
