@@ -71,6 +71,9 @@
 
 ## ✨ Features
 
+**🆕 New in v2.18.3**
+- 🕒 Bus arrival estimates are checked against the bus's distance to the stop: no more "±5 min" for buses still far away or already past
+
 **🆕 New in v2.18.2**
 - 🛠️ Guidance no longer force-closes: the bus fleet-feed connection no longer writes to the network from the main thread
 

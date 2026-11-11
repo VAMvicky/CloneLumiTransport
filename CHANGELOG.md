@@ -10,6 +10,13 @@
 
 ---
 
+## ✦ v2.18.3 — 12 November 2026 / 12 November 2026
+
+- 🇮🇩 **Perkiraan tiba bus yang masuk akal.** ETA dari feed armada kadang mencocokkan halte lain, sehingga bus yang masih ±13 km jauhnya (atau sudah melewati haltemu) tertulis "tiba ±5 mnt". Kini setiap ETA diperiksa terhadap jarak lurus bus ke halte (paling cepat ±45 km/jam): ETA yang mustahil diganti perkiraan Lumi dari posisi bus di rute, dan bus yang sudah lewat & masih jauh tidak ditampilkan — di detail perjalanan, layar halte, dan notifikasi "bus makin dekat". `versionCode` **21803**
+- 🇬🇧 **Sensible bus arrival estimates.** The fleet feed's ETA sometimes matched a different stop, so a bus still ±13 km away (or already past your stop) showed "arriving ±5 min". Every ETA is now checked against the bus's straight-line distance to the stop (at most ±45 km/h): impossible ETAs are replaced by Lumi's own estimate from the bus's position on the route, and buses that have already passed and are still far away are no longer shown — in trip details, the stop screen and "bus approaching" notifications. `versionCode` **21803**
+
+---
+
 ## ✦ v2.18.2 — 11 November 2026 / 11 November 2026
 
 - 🇮🇩 **Pendampingan tidak lagi tertutup paksa.** Penyebab sebenarnya ditemukan dari log crash: pemantau "bus makin dekat" yang ikut berjalan saat pendampingan dimulai mengirim langganan data armada dari thread utama, dan Android menghentikan aplikasi (`NetworkOnMainThreadException`). Kini semua pengiriman & penutupan koneksi feed bus berjalan di thread tersendiri, sehingga aman dipanggil dari mana pun (juga saat aplikasi ditutup). `versionCode` **21802**

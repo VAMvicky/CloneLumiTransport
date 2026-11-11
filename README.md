@@ -71,6 +71,9 @@
 
 ## ✨ Fitur
 
+**🆕 Baru di v2.18.3**
+- 🕒 Perkiraan tiba bus diperiksa terhadap jarak bus ke halte: tidak ada lagi "±5 mnt" untuk bus yang masih jauh atau sudah lewat
+
 **🆕 Baru di v2.18.2**
 - 🛠️ Pendampingan tidak lagi tertutup paksa: koneksi data armada bus tidak lagi menulis ke jaringan dari thread utama
 

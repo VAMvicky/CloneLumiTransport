@@ -41,6 +41,15 @@ public class BusEtaTest {
         assertEquals(-1, BusEta.minutes(msg("{\"stops\":[]}"), target("Grogol", -6.16, 106.79, null)), 1e-9);
     }
 
+    /** v2.18.3: bus 13 km jauhnya tidak mungkin "tiba 5 menit lagi". */
+    @Test public void implausiblyFastEtaIsRejected() throws Exception {
+        JSONObject m = msg(MSG);
+        m.put("latitude", -6.1300).put("longitude", 106.9000);           // ±13 km dari halte
+        assertEquals(-1, BusEta.minutes(m, target("Cawang Ciliwung", -6.2441, 106.8651, "Semanggi")), 1e-9);
+        m.put("latitude", -6.2470).put("longitude", 106.8690);           // ±500 m: 7 mnt masuk akal
+        assertEquals(7, BusEta.minutes(m, target("Cawang Ciliwung", -6.2441, 106.8651, "Semanggi")), 1e-9);
+    }
+
     @Test public void levels() {
         assertEquals(4, BusEta.level(0));
         assertEquals(3, BusEta.level(2));

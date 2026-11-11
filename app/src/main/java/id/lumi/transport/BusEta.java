@@ -64,8 +64,27 @@ public final class BusEta {
         return -1;
     }
 
-    /** Menit sampai bus tiba di halte naik, atau -1 bila bus ini tidak (lagi) menuju halte itu searah. */
+    /** Kecepatan rata-rata terbaik yang masih masuk akal (km/jam), termasuk lewat tol (v2.18.3). */
+    static final double MAX_KMH = 45;
+
+    /**
+     * Menit sampai bus tiba di halte naik, atau -1 bila bus ini tidak (lagi) menuju halte itu searah.
+     * v2.18.3: ETA yang lebih cepat dari jarak lurus bus→halte pada MAX_KMH dianggap salah cocok
+     * (mis. "5 mnt" untuk bus 13 km jauhnya) dan diabaikan.
+     */
     public static double minutes(JSONObject msg, Target t) {
+        double m = rawMinutes(msg, t);
+        if (m < 0) return m;
+        double la = msg.optDouble("snap_latitude", Double.NaN), lo = msg.optDouble("snap_longitude", Double.NaN);
+        if (Double.isNaN(la) || la == 0) { la = msg.optDouble("latitude", Double.NaN); lo = msg.optDouble("longitude", Double.NaN); }
+        if (!Double.isNaN(la) && la != 0 && !Double.isNaN(t.fromLat)) {
+            double floor = km(la, lo, t.fromLat, t.fromLon) / MAX_KMH * 60;
+            if (m < floor - 0.5) return -1;
+        }
+        return m;
+    }
+
+    static double rawMinutes(JSONObject msg, Target t) {
         JSONArray st = msg.optJSONArray("stops");
         if (st == null || st.length() == 0) return -1;
         int fi = byId(st, t.fromId, 0);

@@ -856,11 +856,22 @@
   }
   /* Gabungkan ETA feed dengan perkiraan Lumi. Feed dipakai bila masuk akal (ia tahu kemacetan);
      bila jauh berbeda, atau bus menurut rute sudah lewat, perkiraan Lumi yang dipakai. */
+  /*
+   * v2.18.3: batas masuk akal. Bus tidak mungkin tiba lebih cepat dari jarak lurusnya pada ±45 km/jam
+   * (rata-rata terbaik, termasuk lewat tol). ETA feed yang lebih cepat dari itu (mis. "5 mnt" untuk bus
+   * 13 km jauhnya, karena feed mencocokkan halte lain) tidak dipakai; bus yang menurut rute sudah lewat
+   * dan masih jauh tidak ditampilkan sama sekali.
+   */
+  var ETA_MAX_KMH = 45;
+  function etaFloor(b, boardP) { return E.hav([b.lat, b.lon], boardP) / ETA_MAX_KMH * 60; }
   function busEta(b, line, boardP, feed) {
     var own = routeEta(b, line, boardP);
-    if (own && own.passed) return own.head || feed == null ? null : feed;
-    if (!own) return feed;
-    if (feed == null) return own.m;
+    var km = E.hav([b.lat, b.lon], boardP), floor = etaFloor(b, boardP);
+    var ok = function (m) { return m != null && isFinite(m) && m >= floor - 0.5; };
+    if (own && own.passed) return km <= 1.5 && ok(feed) && !own.head ? feed : null;
+    if (!own) return ok(feed) ? feed : null;
+    if (!ok(own.m)) own.m = Math.max(own.m, floor);
+    if (!ok(feed)) return own.m;
     return Math.abs(feed - own.m) <= Math.max(4, own.m * 0.6) ? feed : own.m;
   }
   /* Geser penanda dengan halus ke posisi baru (tanpa membuat ulang). */
