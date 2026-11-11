@@ -24,9 +24,13 @@ final class PmTiles implements Closeable {
     final int internalComp, tileComp, tileType, minZoom, maxZoom;
     final double minLon, minLat, maxLon, maxLat;
     private final Entry[] root;
-    private final Map<Long, Entry[]> leaves = new LinkedHashMap<Long, Entry[]>(32, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<Long, Entry[]> e) { return size() > 64; }
-    };
+    private final LeafCache leaves = new LeafCache();
+
+    /** LRU kecil untuk direktori daun (nama kelas sendiri agar "Entry" tidak tertukar dengan LinkedHashMap.Entry). */
+    static final class LeafCache extends LinkedHashMap<Long, PmTiles.Entry[]> {
+        LeafCache() { super(32, 0.75f, true); }
+        @Override protected boolean removeEldestEntry(Map.Entry<Long, PmTiles.Entry[]> e) { return size() > 64; }
+    }
 
     static final class Entry {
         long tileId, offset; int length, runLength;
