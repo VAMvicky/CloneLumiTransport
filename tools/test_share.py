@@ -2,7 +2,7 @@
 """Uji ujung-ke-ujung "Ikuti perjalananku": pesan dienkripsi ShareCrypto.java (sama dengan aplikasi),
 lalu halaman docs/ikuti/index.html mengambilnya dari relay tiruan dan mendekripsi dengan WebCrypto.
    python3 tools/test_share.py        (butuh javac/java + playwright)"""
-import asyncio, json, os, pathlib, subprocess, sys, tempfile
+import asyncio, json, os, pathlib, shutil, subprocess, sys, tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 out = tempfile.mkdtemp()
@@ -14,7 +14,10 @@ topic = "lumi-" + "0123456789abcdef" * 2
 async def main():
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
-        b = await p.chromium.launch()
+        # Sama seperti tools/ui_check.py: pakai Chrome/Chromium yang sudah terpasang di mesin
+        # (runner CI tidak mengunduh peramban Playwright).
+        exe = os.environ.get("CHROME") or shutil.which("google-chrome") or shutil.which("chromium")
+        b = await p.chromium.launch(executable_path=exe) if exe else await p.chromium.launch()
         pg = await b.new_page(locale="id-ID")
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
