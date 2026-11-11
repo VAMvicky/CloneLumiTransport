@@ -11,6 +11,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Terbitkan rilis dari kepala main (tag v<CURRENT> dibuat oleh workflow)"
+        type: boolean
+        default: false
 
 # B-12 (v2.17): token bawaan hanya-baca; izin tulis diberikan per job yang membutuhkannya.
 permissions:
@@ -124,7 +129,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${KS_B64:-}" ] || [ -z "${KS_PASS:-}" ]; then
-            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* || "${{ github.event_name == 'workflow_dispatch' && inputs.release }}" == "true" ]]; then
               echo "::error::Rilis butuh kunci resmi. Isi Secrets LUMI_KEYSTORE_BASE64 dan LUMI_KEYSTORE_PASSWORD."; exit 1
             fi
             echo "::warning::Secrets LUMI_* belum diisi; APK Gradle ditandatangani kunci debug."
@@ -301,8 +306,9 @@ jobs:
 
   release:
     name: Rilis dari tag
-    # Hanya tag v* yang membuat rilis. Tag tidak pernah dipindahkan.
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Tag v* yang membuat rilis — atau workflow_dispatch "release" di main (tag dibuat di sini, v2.17).
+    # Tag tidak pernah dipindahkan.
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main')
     needs: [test, gradle, smoke]
     runs-on: ubuntu-latest
     permissions:
@@ -320,14 +326,20 @@ jobs:
           echo "Tag menunjuk kepala main: $EXPECTED"
 
       - name: Pastikan tag cocok dengan release-notes/CURRENT
+        id: tag
         run: |
           set -euo pipefail
           V=$(tr -d ' \r\n' < release-notes/CURRENT); V=${V#v}
-          TAG="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then TAG="${GITHUB_REF_NAME#v}"; else TAG="$V"; fi
           if [ "$V" != "$TAG" ]; then
             echo "::error::Tag $GITHUB_REF_NAME tidak cocok dengan release-notes/CURRENT ($V). Naikkan CURRENT lewat PR dulu."
             exit 1
           fi
+          if [[ "$GITHUB_REF" != refs/tags/* ]] && git ls-remote --exit-code origin "refs/tags/v$V" >/dev/null; then
+            echo "::error::Tag v$V sudah ada. Naikkan release-notes/CURRENT untuk rilis baru."
+            exit 1
+          fi
+          echo "name=v$V" >> "$GITHUB_OUTPUT"
 
       - name: Unduh APK hasil build Gradle (R8)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -338,9 +350,10 @@ jobs:
       - name: Terbitkan rilis
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "✦ Lumi Transport ${{ github.ref_name }}"
-          body_path: release-notes/${{ github.ref_name }}.md
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: "✦ Lumi Transport ${{ steps.tag.outputs.name }}"
+          body_path: release-notes/${{ steps.tag.outputs.name }}.md
           files: out/LumiTransport-v${{ needs.gradle.outputs.version }}.apk
           draft: false
           prerelease: false
