@@ -71,6 +71,9 @@
 
 ## ✨ Features
 
+**🆕 New in v2.18.2**
+- 🛠️ Guidance no longer force-closes: the bus fleet-feed connection no longer writes to the network from the main thread
+
 **🆕 New in v2.18.1**
 - 🛠️ Guidance no longer force-closes when it starts (the Android 16 Live Update notification style was removed because some ROMs reject it)
 - 🧭 One-way stops: buses going the other way are now filtered using the bus's own list of remaining stops

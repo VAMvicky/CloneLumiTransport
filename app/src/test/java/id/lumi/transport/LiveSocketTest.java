@@ -22,6 +22,22 @@ public class LiveSocketTest {
         } catch (IOException expected) { }
     }
 
+    /** v2.18.2: send/close tidak boleh menyentuh jaringan di thread pemanggil (dulu crash di thread utama). */
+    @Test public void sendAndCloseNeverThrowOnCallerThread() throws Exception {
+        final int[] closes = {0};
+        LiveSocket s = new LiveSocket("wss://contoh.invalid/mqtt", new LiveSocket.Listener() {
+            public void onOpen() { }
+            public void onData(byte[] d) { }
+            public void onClose(String r) { closes[0]++; }
+        });
+        s.send(new byte[]{1, 2, 3});      // belum tersambung: diabaikan, tanpa pengecualian
+        s.close();
+        s.close();                          // dua kali: aman
+        s.send(new byte[]{4});              // sesudah ditutup: diabaikan
+        Thread.sleep(100);
+        assertEquals(0, closes[0]);
+    }
+
     @Test public void normalisesRouteCodes() {
         assertEquals("JAK36", LiveSocket.norm("jak.36"));
         assertEquals("9C", LiveSocket.norm("9 C"));

@@ -164,6 +164,7 @@ public class LiveSocket {
             try { if (socket != null) socket.close(); } catch (IOException ignored) { }
             if (!closed) listener.onClose(reason);
             closed = true;
+            writer.shutdown();
         }
     }
 
@@ -208,8 +209,31 @@ public class LiveSocket {
         return e > 0 ? sb.substring(0, e) : null;
     }
 
-    public synchronized void send(byte[] data) {
-        try { sendFrame(0x2, data); } catch (IOException e) { close(); listener.onClose("gagal mengirim"); }
+    /**
+     * Semua penulisan ke soket lewat satu thread penulis (v2.18.2). Dulu send()/close() menulis langsung di
+     * thread pemanggil; BusWatchService memanggilnya dari thread utama (langganan MQTT, ping, berhenti)
+     * sehingga Android melempar NetworkOnMainThreadException dan aplikasi tertutup saat pendampingan dimulai.
+     */
+    private final java.util.concurrent.ExecutorService writer = java.util.concurrent.Executors.newSingleThreadExecutor(
+            new java.util.concurrent.ThreadFactory() {
+                @Override public Thread newThread(Runnable r) { Thread t = new Thread(r, "lumi-live-write"); t.setDaemon(true); return t; }
+            });
+
+    private void onWriter(Runnable r) {
+        try { writer.execute(r); } catch (java.util.concurrent.RejectedExecutionException ignored) { }   // sudah ditutup
+    }
+
+    /** Kirim satu frame biner. Aman dipanggil dari thread mana pun (termasuk thread utama). */
+    public void send(final byte[] data) {
+        if (closed) return;
+        onWriter(new Runnable() { @Override public void run() {
+            try { sendFrame(0x2, data); }
+            catch (Exception e) {          // IOException, atau RuntimeException dari lapisan TLS
+                boolean was = closed;
+                shutdown();
+                if (!was) listener.onClose(Lang.t("gagal mengirim", "send failed"));
+            }
+        }});
     }
 
     private synchronized void sendFrame(int op, byte[] data) throws IOException {
@@ -228,9 +252,20 @@ public class LiveSocket {
         out.flush();
     }
 
+    /** Tutup koneksi. Aman dari thread mana pun: frame penutup & penutupan soket dikerjakan thread penulis. */
     public void close() {
+        if (closed) return;
         closed = true;
-        try { if (out != null) sendFrame(0x8, new byte[0]); } catch (Exception ignored) { }
-        try { if (socket != null) socket.close(); } catch (IOException ignored) { }
+        onWriter(new Runnable() { @Override public void run() {
+            try { if (out != null) sendFrame(0x8, new byte[0]); } catch (Exception ignored) { }
+            shutdown();
+        }});
+        writer.shutdown();
+    }
+
+    /** Dipanggil di thread penulis / pembaca saja (boleh menyentuh jaringan). */
+    private void shutdown() {
+        closed = true;
+        try { if (socket != null) socket.close(); } catch (Exception ignored) { }
     }
 }

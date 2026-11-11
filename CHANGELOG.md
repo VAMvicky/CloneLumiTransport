@@ -10,6 +10,13 @@
 
 ---
 
+## ✦ v2.18.2 — 11 November 2026 / 11 November 2026
+
+- 🇮🇩 **Pendampingan tidak lagi tertutup paksa.** Penyebab sebenarnya ditemukan dari log crash: pemantau "bus makin dekat" yang ikut berjalan saat pendampingan dimulai mengirim langganan data armada dari thread utama, dan Android menghentikan aplikasi (`NetworkOnMainThreadException`). Kini semua pengiriman & penutupan koneksi feed bus berjalan di thread tersendiri, sehingga aman dipanggil dari mana pun (juga saat aplikasi ditutup). `versionCode` **21802**
+- 🇬🇧 **Guidance no longer force-closes.** The real cause was found in the crash log: the "bus approaching" watcher that starts with guidance sent its fleet-feed subscription from the main thread, and Android killed the app (`NetworkOnMainThreadException`). All sending and closing of the bus-feed connection now runs on its own thread, so it is safe from anywhere (also when the app closes). `versionCode` **21802**
+
+---
+
 ## ✦ v2.18.1 — 11 November 2026 / 11 November 2026
 
 - 🇮🇩 **Perbaikan pendampingan & halte satu arah.** Pendampingan tidak lagi tertutup paksa saat dimulai: gaya notifikasi progres Android 16 ("Live Update") dihapus karena sebagian ROM (mis. HyperOS) gagal menampilkannya lalu sistem menutup aplikasi; notifikasi kini memakai batang progres biasa, dan semua tombol notifikasi punya ikon. Di halte satu arah (mis. "Pancoran Arah Barat"), bus disaring dari daftar sisa halte bus itu sendiri — bus yang hanya menyebut pasangannya ("… Arah Timur") dianggap arah sebaliknya — dan bila nama halte tidak ada di data rute, hanya satu arah terdekat yang dipakai. `versionCode` **21801**

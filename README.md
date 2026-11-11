@@ -71,6 +71,9 @@
 
 ## ✨ Fitur
 
+**🆕 Baru di v2.18.2**
+- 🛠️ Pendampingan tidak lagi tertutup paksa: koneksi data armada bus tidak lagi menulis ke jaringan dari thread utama
+
 **🆕 Baru di v2.18.1**
 - 🛠️ Pendampingan tidak lagi tertutup paksa saat dimulai (gaya notifikasi Live Update Android 16 dihapus karena ditolak sebagian ROM)
 - 🧭 Halte satu arah: bus arah sebaliknya kini disaring dari daftar sisa halte bus itu sendiri
