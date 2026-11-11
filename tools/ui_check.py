@@ -54,10 +54,7 @@ STUB = r"""
     // v2.17
     setVoice: (on) => { st.voice = on; }, exportFile: (n, t) => { st.exported = { name: n, text: t }; cb(() => __lumiExported(true)); },
     importFile: () => cb(() => __lumiImport(st.importText || null)),
-    etaWidgetList: () => JSON.stringify(st.eta || []), etaWidgetPlaced: () => !!st.etaPlaced, etaWidgetPin: () => { st.etaPinAsked = true; return true; },
-    etaWidgetToggle: (j) => { const x = JSON.parse(j), k = x.code + "|" + x.stop.name; st.eta = st.eta || []; const had = st.eta.some(e => e.code + "|" + e.stop.name === k);
-      st.eta = had ? st.eta.filter(e => e.code + "|" + e.stop.name !== k) : st.eta.concat([x]); return !had; },
-    etaWidgetSetList: (j) => { st.eta = JSON.parse(j); },
+    installUpdate: (u, tag, size) => { st.update = { url: u, tag: tag }; cb(() => { __lumiUpdate({ downloading: true, progress: 40, tag: tag }); __lumiUpdate({ downloading: false, needPermission: true, tag: tag }); }); },
     offlineMapState: () => JSON.stringify(st.off || { ready: false, downloading: false, progress: -1 }),
     offlineMapDownload: () => { st.off = { downloading: true, progress: 0 }; cb(() => __lumiOfflineMap({ downloading: true, progress: 45 })); },
     offlineMapDelete: () => { st.off = null; }
@@ -188,12 +185,6 @@ async def main():
             bw = await pg.evaluate("__stub.busWatch && __stub.busWatch.code")
             if await pg.query_selector("[data-bw]") and not bw: raise SystemExit("pemantau bus tidak dimulai")
             await pg.evaluate("__stub.busWatch = null")
-            # v2.17: pasang bus di widget ETA
-            if await pg.query_selector("[data-etaw]"):
-                await pg.evaluate("document.querySelector('[data-etaw]').click()"); await pg.wait_for_timeout(300); await grab("eta-widget", True)
-                if not await pg.evaluate("(__stub.eta || []).length === 1"): raise SystemExit("bus tidak dipasang di widget ETA")
-                await pg.evaluate("document.querySelector('[data-etaw]').click()"); await grab("eta-widget-off")
-                if await pg.evaluate("(__stub.eta || []).length"): raise SystemExit("bus tidak dilepas dari widget ETA")
             await pg.click("#btnGuide"); await pg.wait_for_timeout(500); await grab("guide", True)
             if not await pg.evaluate("!!__stub.busWatch"): raise SystemExit("mulai pendampingan tidak memantau bus pertama")
             await pg.evaluate("__lumiGuide({phase:'ride',title:'TJ 9 · 3 stops to go',text:'Get off at X · now near Y',stopsLeft:3,metersLeft:-1})"); await grab("guide2")
@@ -275,11 +266,10 @@ async def main():
             exp = await pg.evaluate("__stub.exported && JSON.parse(__stub.exported.text)")
             if not exp or exp.get("v") != 2 or "native" not in exp: raise SystemExit("ekspor tidak menghasilkan cadangan format 2")
             await pg.evaluate("""() => { const o = JSON.parse(__stub.exported.text); o.data.routePrefs = {maxTr: 1};
-              o.native = {reminders: [{id: 'r1', leave: '07:05', arrive: '08:00', lead: 5, days: [2,3,4,5,6], to: {name: 'Kantor'}, from: {name: 'Rumah'}}],
-                          etaWidget: [{code: 'JAK36', title: 'JAK36', stop: {name: 'Halte A', lat: -6.2, lon: 106.8}}]};
+              o.native = {reminders: [{id: 'r1', leave: '07:05', arrive: '08:00', lead: 5, days: [2,3,4,5,6], to: {name: 'Kantor'}, from: {name: 'Rumah'}}]};
               __stub.importText = JSON.stringify(o); }""")
             await pg.evaluate("document.querySelector('#btnImport').click()"); await pg.wait_for_timeout(300); await grab("import", True)
-            if not await pg.evaluate("(__stub.rem || []).some(r => r.id === 'r1') && (__stub.eta || []).length === 1"): raise SystemExit("impor tidak memulihkan pengingat / widget ETA")
+            if not await pg.evaluate("(__stub.rem || []).some(r => r.id === 'r1')"): raise SystemExit("impor tidak memulihkan pengingat")
             await pg.select_option("#prefWalk", "1"); await pg.wait_for_timeout(150)
             await pg.evaluate("document.querySelector('[data-avoid]').click()"); await pg.wait_for_timeout(150); await grab("prefs", True)
             await pg.evaluate("document.querySelector('#offDl').click()"); await pg.wait_for_timeout(300); await grab("offline-dl", True)
@@ -295,6 +285,13 @@ async def main():
             await pg.evaluate("document.querySelector('#btnExactAlarm') && document.querySelector('#btnExactAlarm').click()")
         await pg.select_option("#setTheme", "dark"); await pg.wait_for_timeout(200); await grab("set-dark", True)
         await pg.evaluate("document.querySelector('#btnUpdate').click()"); await pg.wait_for_timeout(500); await grab("update")
+        if NATIVE:
+            # v2.18: update langsung — simulasi status unduh & izin pasang
+            await pg.evaluate("__lumiUpdate({downloading: true, progress: 55, tag: 'v9.9.9'})"); await grab("update-dl")
+            await pg.evaluate("__lumiUpdate({downloading: false, needPermission: true, tag: 'v9.9.9'})"); await grab("update-perm", True)
+            await pg.evaluate("__lumiUpdate({needPermission: false, installing: true, tag: 'v9.9.9'})"); await grab("update-inst")
+            await pg.evaluate("__lumiUpdate({installing: false, error: 'HTTP 404', tag: 'v9.9.9'})"); await grab("update-err")
+            if await pg.query_selector("#btnReport") or await pg.query_selector("#btnReportStop"): raise SystemExit("tombol laporkan masih ada")
         await pg.evaluate("document.querySelector('#sheetSettings').hidden = true")
 
         # bagikan dari Google Maps + pilih titik

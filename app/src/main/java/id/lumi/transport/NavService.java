@@ -93,8 +93,22 @@ public class NavService extends Service {
 
     private Notification build(String title, String text) { return build(title, text, null); }
 
-    @SuppressWarnings("deprecation")
+    /**
+     * v2.18: notifikasi dibangun dengan aman. Gaya progres langsung (Android 16) dicoba lebih dulu; bila
+     * sistem/ROM menolaknya (pengecualian saat build), notifikasi dibangun ulang tanpa gaya itu, lalu tanpa
+     * batang progres. Dulu pengecualian di sini menutup aplikasi saat pendampingan dimulai.
+     */
     private Notification build(String title, String text, GuideTracker.State st) {
+        for (int level = 2; level >= 0; level--) {
+            try { return buildAt(title, text, st, level); } catch (RuntimeException ignored) { }
+        }
+        return new Notification.Builder(this, CH_GUIDE).setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                .setContentTitle(title).setOngoing(true).build();
+    }
+
+    /** level 2 = progres + Live Update (API 36), 1 = batang progres biasa, 0 = teks saja. */
+    @SuppressWarnings("deprecation")
+    private Notification buildAt(String title, String text, GuideTracker.State st, int level) {
         Notification.Builder b = new Notification.Builder(this, CH_GUIDE);
         b.setSmallIcon(android.R.drawable.ic_menu_mylocation)
                 .setContentTitle(title).setContentText(text)
@@ -105,11 +119,11 @@ public class NavService extends Service {
                 .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, Lang.t("Berhenti", "Stop"), stopIntent()).build());
         if (Build.VERSION.SDK_INT >= 28) b.setCategory(Notification.CATEGORY_NAVIGATION);
         GuideTracker t = tracker;
-        if (t != null && t.size() > 1) {
+        if (level >= 1 && t != null && t.size() > 1) {
             // v2.17: notifikasi progres langsung. Semua versi: batang progres biasa.
             // Android 16+: ProgressStyle bersegmen per ruas + "Live Update" di layar kunci / status bar.
             b.setProgress(t.size(), t.progress(), false);
-            if (Build.VERSION.SDK_INT >= 36) LiveProgress.apply(b, t, st, title);
+            if (level >= 2 && st != null && Build.VERSION.SDK_INT >= 36) LiveProgress.apply(b, t, st, title);
         }
         return b.build();
     }
@@ -195,9 +209,9 @@ public class NavService extends Service {
         } else lastNetAt = System.currentTimeMillis();
         if (finishing) return;                      // B-08: sudah sampai, tunggu berhenti
         GuideTracker.State s = t.update(loc.getLatitude(), loc.getLongitude(), loc.hasAccuracy() ? loc.getAccuracy() : 30);
-        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, build(s.title, s.text, s));
-        if (s.alert != null) alert(s.alert);
-        voice(s);
+        try { ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIF_ID, build(s.title, s.text, s)); } catch (RuntimeException ignored) { }
+        if (s.alert != null) { try { alert(s.alert); } catch (RuntimeException ignored) { } }
+        try { voice(s); } catch (Throwable ignored) { }   // suara tidak boleh menghentikan pendampingan
         String json = GuideTracker.toJson(s);
         lastJson = json;
         if (listener != null) listener.onGuide(json);
@@ -225,7 +239,7 @@ public class NavService extends Service {
         if (!voiceOn(this)) return;
         String say = null;
         if (s.alert != null) say = s.alert;
-        else if (!s.phase.equals(spokenPhase)) say = s.title + ". " + s.text;
+        else if (s.phase != null && !s.phase.equals(spokenPhase)) say = s.title + ". " + s.text;
         else if ("ride".equals(s.phase) && s.stopsLeft != spokenStops && s.stopsLeft >= 2 && s.stopsLeft <= 3) say = s.title;
         spokenPhase = s.phase;
         if ("ride".equals(s.phase) || "wait".equals(s.phase)) spokenStops = s.stopsLeft;

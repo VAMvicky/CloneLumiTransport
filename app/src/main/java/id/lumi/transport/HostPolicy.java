@@ -39,6 +39,15 @@ final class HostPolicy {
         } catch (Exception e) { return false; }
     }
 
+    /** Unduhan APK update: hanya aset rilis GitHub repo Lumi (v2.18). */
+    static boolean isGithubDownload(String url) {
+        try {
+            URI u = new URI(url);
+            return "https".equalsIgnoreCase(u.getScheme()) && "github.com".equalsIgnoreCase(u.getHost())
+                    && u.getPath() != null && u.getPath().matches("/VAMvicky/(TransportBCK|LumiTransport)/releases/download/[^/]+/[^/]+\\.apk");
+        } catch (Exception e) { return false; }
+    }
+
     static boolean headerAllowed(String name, String value) {
         if (name == null || value == null) return false;
         if (value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0 || value.length() > 4096) return false;

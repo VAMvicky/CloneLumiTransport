@@ -85,7 +85,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        CrashLog.install(this);
         Lang.load(this);
         pendingShortcut = getIntent() == null ? null : getIntent().getStringExtra("lumi_shortcut");
         Window w = getWindow();
@@ -1045,14 +1044,6 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setRemoteTjClientVersion(String v) { AppInfo.setTjClientVersion(MainActivity.this, v); }
 
-        /** Crash terakhir di sisi Android (untuk laporan bug); "" bila tidak ada. */
-        @JavascriptInterface
-        public String lastCrash() { return CrashLog.read(MainActivity.this); }
-
-        /** Hapus catatan crash setelah laporan dibuat. */
-        @JavascriptInterface
-        public void clearCrash() { CrashLog.clear(MainActivity.this); }
-
         /** Panduan suara: ucapkan teks pendampingan. */
         @JavascriptInterface
         public void speak(final String text) { LumiTts.speak(MainActivity.this, text); }
@@ -1092,38 +1083,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String nativeSettings() {
             try {
-                return new JSONObject().put("voice", NavService.voiceOn(MainActivity.this))
-                        .put("etaWidget", EtaWidget.list(MainActivity.this)).toString();
+                return new JSONObject().put("voice", NavService.voiceOn(MainActivity.this)).toString();
             } catch (Exception e) { return "{}"; }
         }
 
-        // ---------------------------------------------------------- v2.17: widget ETA bus favorit
+        // ---------------------------------------------------------- v2.18: update langsung
+        /** Unduh APK rilis terbaru lalu buka pemasang; status ke window.__lumiUpdate(st). */
         @JavascriptInterface
-        public String etaWidgetList() { return EtaWidget.list(MainActivity.this).toString(); }
-
-        /** Pasang/lepas bus favorit di widget; mengembalikan true bila kini terpasang. */
-        @JavascriptInterface
-        public boolean etaWidgetToggle(String spec) {
-            try { return EtaWidget.toggle(MainActivity.this, spec); } catch (Exception e) { return false; }
-        }
-
-        @JavascriptInterface
-        public void etaWidgetSetList(String json) {
-            try { EtaWidget.setList(MainActivity.this, json); } catch (Exception ignored) { }
-        }
-
-        /** Sudah ada widget ETA di layar utama? */
-        @JavascriptInterface
-        public boolean etaWidgetPlaced() { return EtaWidget.ids(MainActivity.this).length > 0; }
-
-        /** Minta peluncur menambahkan widget ETA (Android 8+, bila peluncur mendukung). */
-        @JavascriptInterface
-        public boolean etaWidgetPin() {
-            try {
-                android.appwidget.AppWidgetManager m = android.appwidget.AppWidgetManager.getInstance(MainActivity.this);
-                if (!m.isRequestPinAppWidgetSupported()) return false;
-                return m.requestPinAppWidget(new android.content.ComponentName(MainActivity.this, EtaWidget.class), null, null);
-            } catch (Exception e) { return false; }
+        public void installUpdate(final String url, final String tag, final double size) {
+            UpdateInstaller.start(MainActivity.this, url, tag, (long) size, new UpdateInstaller.Listener() {
+                @Override public void onState(JSONObject st) { js("window.__lumiUpdate && __lumiUpdate(" + st + ")"); }
+            });
         }
 
         // ---------------------------------------------------------- v2.17: peta offline Jabodetabek

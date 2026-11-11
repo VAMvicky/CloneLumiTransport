@@ -1,9 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#46AEF1</color>
-    <!-- Widget Berangkat / Pulang (v2.16: ikut mode gelap lewat values-night) -->
-    <color name="widget_bg">#F2F8FE</color>
-    <color name="widget_text">#0B2545</color>
-    <color name="widget_btn2_bg">#FFFFFF</color>
-    <color name="widget_btn2_text">#1565D8</color>
 </resources>

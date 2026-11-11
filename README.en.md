@@ -71,20 +71,26 @@
 
 ## ✨ Features
 
+**🆕 New in v2.18**
+- ⬇️ **In-app updates**: Settings → About → "Check & install update" downloads the latest APK and opens the installer, no GitHub visit needed
+- 🧭 **Only buses going your way**: at one-way stops (e.g. "Pancoran Arah Timur") and in a route's per-direction view, buses going the other way are no longer shown — in the list or on the map
+- ✨ The permissions screen fits on one screen without scrolling; tidier button spacing on the stop sheet
+- 🛠️ Fixes: guidance with voice on no longer closes the app; the speech engine is found on Android 11+
+- 🧹 Widgets and the "Report a problem" feature were removed
+
 **🆕 New in v2.17**
 - 🗺️ **Jabodetabek offline map**: download once (Settings → Offline map) and the map keeps working without internet — used automatically when you lose signal, or pick it as the map style
 - 🗣️ **Voice guidance from the guidance service**: steps, stops left and "get off now" are read out even with the screen off; navigation audio briefly lowers your music
 - 📊 **Live progress notification**: a per-leg trip progress bar in the notification; on Android 16 it shows as a *Live Update* on the lock screen & status bar
-- 🧩 **"Favourite buses" widget**: arrival estimates for up to 3 buses at your boarding stop, right on the home screen (tap "ETA widget" in a trip's details)
 - ⚙️ **Route preferences**: longest walk, most transfers, modes to avoid, hide ride-hailing, default order
 - 💰 **Monthly spending summary** in History, split by mode
-- 💾 **Export & import** everything to one file (favourites, history, places, reminders, preferences, widget) — switch phones without losing anything
+- 💾 **Export & import** everything to one file (favourites, history, places, reminders, preferences) — switch phones without losing anything
 - 📅 **Fares with effective dates**: announced fare changes apply automatically from their start date (e.g. the 2027 TJ fare)
 - 🛠️ Fixes: reminder notifications no longer wait for the network; guidance no longer crashes if location permission was revoked; notification IDs no longer overwrite each other; the guidance service stops cleanly after arrival; sturdier GTFS download; safer WebSocket client; the HTTP bridge only reaches the services Lumi uses; narrower CI permissions; Java unit tests
 
 **🆕 New in v2.16**
 - 🔔 **Bus-approaching alerts even with the screen off**: ±10/±5/±2 min and on arrival at your boarding stop, automatic when guidance starts (only buses going your way)
-- ⏰ **"Time to leave" reminders** ("leave at 07:05 to arrive by 08:00"), one-off or weekly, shown on the widget; 30 minutes ahead Lumi checks disruptions on your route, and at departure time it starts watching the first bus
+- ⏰ **"Time to leave" reminders** ("leave at 07:05 to arrive by 08:00"), one-off or weekly; 30 minutes ahead Lumi checks disruptions on your route, and at departure time it starts watching the first bus
 - ⚠️ **Service disruption info** on home, results and details — plus **disruption notifications for favourite routes** without opening the app
 - ⭐ **Save & repeat full trips** from favourites, history or a reminder notification
 - 💳 **Card balance check (NFC, experimental)**: Mandiri e-money, BNI TapCash, BRI Brizzi, BCA Flazz gen 2, JakCard, KMT

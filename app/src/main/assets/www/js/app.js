@@ -218,7 +218,7 @@
   var planner = new E.Planner(DATA);
   // B10: kait uji hanya aktif di browser (bukan aplikasi Android) atau bila localStorage "lumi:debug" = "1".
   var DEBUG = !window.LumiNative; try { if (localStorage.getItem("lumi:debug") === "1") DEBUG = true; } catch (e) { lumiLog(e); }
-  if (DEBUG) window.__lumiDebug = { openLive: function (s) { var ls = linesAtStop(s).filter(liveOk); if (!ls.length) ls = planner.lines.filter(function (l) { return l.id === "tj-9"; }); openLiveAt(s.p, s.n, { stop: s, lines: ls }); }, planner: planner, data: DATA, src: function () { return ROUTE_SRC; }, tripZoom: function () { return tripMap ? tripMap.getZoom() : -1; }, liveWalk: function () { return LIVEW; }, busEta: function (b, l, p, f) { return busEta(b, l, p, f); }, routeEta: function (b, l, p) { return routeEta(b, l, p); }, dynKm: function () { return (GT.trip.dyn || []).map(function (d) { return pathKm(d.lines[1].getLatLngs().map(function (q) { return [q.lat, q.lng]; })); }); } };   // untuk pengujian
+  if (DEBUG) window.__lumiDebug = { openLive: function (s) { var ls = linesAtStop(s).filter(liveOk); if (!ls.length) ls = planner.lines.filter(function (l) { return l.id === "tj-9"; }); openLiveAt(s.p, s.n, { stop: s, lines: ls }); }, planner: planner, data: DATA, src: function () { return ROUTE_SRC; }, tripZoom: function () { return tripMap ? tripMap.getZoom() : -1; }, liveWalk: function () { return LIVEW; }, busEta: function (b, l, p, f) { return busEta(b, l, p, f); }, routeEta: function (b, l, p) { return routeEta(b, l, p); }, busEnd: function (b, l) { return busEnd(b, l); }, dynKm: function () { return (GT.trip.dyn || []).map(function (d) { return pathKm(d.lines[1].getLatLngs().map(function (q) { return [q.lat, q.lng]; })); }); } };   // untuk pengujian
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var NATIVE = window.LumiNative || null;
@@ -474,10 +474,9 @@
       var v = store(k);
       if (v !== null && v !== undefined) data[k] = v;
     });
-    // v2.17 (format 2): ditambah data native — pengingat berangkat, suara, bus di widget ETA.
+    // v2.17 (format 2): ditambah data native — pengingat berangkat.
     var nat = {};
     try { if (NATIVE && NATIVE.listReminders) nat.reminders = JSON.parse(NATIVE.listReminders()) || []; } catch (e) { lumiLog(e); }
-    try { if (NATIVE && NATIVE.etaWidgetList) nat.etaWidget = JSON.parse(NATIVE.etaWidgetList()) || []; } catch (e) { lumiLog(e); }
     if (!NATIVE && store("reminders")) nat.reminders = store("reminders");
     return JSON.stringify({ app: "LumiTransport", v: 2, ts: Date.now(), version: appVersion(), data: data, native: nat });
   }
@@ -498,8 +497,8 @@
   function backupCardHTML() {
     var file = !!(NATIVE ? NATIVE.exportFile : window.Blob);
     return '<div class="set-card"><h3>' + tl("Ekspor &amp; impor data", "Export &amp; import data") + "</h3>" +
-      "<p>" + tl("Satu berkas berisi pengaturan, preferensi rute, rute favorit, riwayat & rekap ongkos, tempat tersimpan, pengingat berangkat, dan bus di widget ETA. Simpan di Drive atau kirim ke HP baru, lalu impor di sana.",
-        "One file with your settings, route preferences, favourite routes, trip history & spending, saved places, departure reminders and ETA-widget buses. Save it to Drive or send it to a new phone, then import it there.") + "</p>" +
+      "<p>" + tl("Satu berkas berisi pengaturan, preferensi rute, rute favorit, riwayat & rekap ongkos, tempat tersimpan, dan pengingat berangkat. Simpan di Drive atau kirim ke HP baru, lalu impor di sana.",
+        "One file with your settings, route preferences, favourite routes, trip history & spending, saved places, and departure reminders. Save it to Drive or send it to a new phone, then import it there.") + "</p>" +
       (file ? '<div class="btn-row"><button class="btn-sec" id="btnExport" type="button">' + tl("Ekspor ke berkas", "Export to file") + '</button><button class="btn-sec" id="btnImport" type="button">' + tl("Impor dari berkas", "Import from file") + "</button></div>" : "") +
       '<details class="restore-more"><summary>' + tl("Lewat teks (cara lama)", "As text (old way)") + "</summary>" +
       '<button class="btn-sec" id="btnBackup" type="button">' + tl("Bagikan sebagai teks", "Share as text") + "</button>" +
@@ -780,6 +779,52 @@
     return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
   }
   function angDiff(a, b) { var d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+  /*
+   * v2.18: ke terminus mana bus ini menuju (kunci nama halte akhir arah rute), atau null bila tidak bisa
+   * dipastikan. Dipakai agar bus arah sebaliknya tidak tampil di layar halte satu arah dan di detail rute.
+   * Urutan bukti: (1) headsign feed cocok dengan tepat satu terminus, (2) urutan sisa halte bus mengikuti
+   * urutan halte salah satu arah, (3) arah hadap (bearing) bus searah ruas rute terdekat.
+   */
+  function endKey(d) { var st = d && d.s || []; return st.length ? nmKey(st[st.length - 1].n) : ""; }
+  function looseEq(a, b) { return !!(a && b && (a === b || a.indexOf(b) >= 0 || b.indexOf(a) >= 0)); }
+  function busEnd(b, line) {
+    var dirs = (line && line.dirs || []).filter(function (d) { return d.s && d.s.length >= 2; });
+    if (!dirs.length) return null;
+    var ends = {}; dirs.forEach(function (d) { ends[endKey(d)] = 1; });
+    if (Object.keys(ends).length < 2) return null;            // rute satu arah / memutar: tidak bisa dibedakan
+    var hk = nmKey(b.head);
+    if (hk) {
+      var hit = Object.keys(ends).filter(function (e) { return looseEq(e, hk); });
+      if (hit.length === 1) return hit[0];
+    }
+    // (2) urutan sisa halte bus
+    var rest = (b.stops || []).filter(function (x) { return isFinite(+x.eta) && +x.eta >= 0; }).slice(0, 10);
+    var bestEnd = null, bestScore = 0;
+    dirs.forEach(function (d) {
+      var idx = [];
+      rest.forEach(function (x) {
+        var k = nmKey(x.name), p = x.latitude && x.longitude ? [+x.latitude, +x.longitude] : null, at = -1;
+        for (var i = 0; i < d.s.length; i++) if (nmKey(d.s[i].n) === k || (p && E.hav(p, d.s[i].p) <= 0.04)) { at = i; break; }
+        if (at >= 0) idx.push(at);
+      });
+      var up = 0; for (var i = 1; i < idx.length; i++) if (idx[i] > idx[i - 1]) up++; else if (idx[i] < idx[i - 1]) up -= 2;
+      if (up > bestScore) { bestScore = up; bestEnd = endKey(d); }
+    });
+    if (bestEnd && bestScore >= 1) return bestEnd;
+    // (3) arah hadap terhadap ruas terdekat
+    if (b.bearing > 0) {
+      var bp = [b.lat, b.lon], pick = null, pd = 0.12;
+      var main = dirs.filter(function (d) { return !d.v; });   // pola utama dulu; varian hanya bila tidak ada
+      (main.length >= 2 ? main : dirs).forEach(function (d) {
+        for (var j = 0; j < d.s.length - 1; j++) {
+          var r = projOn(bp, d.s[j].p, d.s[j + 1].p);
+          if (r.d < pd && angDiff(b.bearing, brgOf(d.s[j].p, d.s[j + 1].p)) <= 60) { pd = r.d; pick = endKey(d); }
+        }
+      });
+      if (pick) return pick;
+    }
+    return null;
+  }
   function routeEta(b, line, boardP) {
     if (!line || !line.dirs || !boardP) return null;
     var bp = [b.lat, b.lon], hk = nmKey(b.head), useBrg = b.bearing > 0, best = null;
@@ -1021,12 +1066,17 @@
         var minD = byDist.reduce(function (m, y) { return Math.min(m, y.d); }, 1);
         stopDirs[LumiLive.norm(x.l.code)] = byName.length ? byName : byDist.filter(function (y) { return y.d <= minD + 0.015; });
       });
+      var oneWay = stop && /arah/.test(nmKey(stop.n));
       var stopEta = function (b) {
         var key = LumiLive.norm(b.code), ln = lineOfBus[key], ds = stopDirs[key];
         if (!ln) return null;
-        if (!ds || !ds.length) return busEta(b, ln, stop.p, etaTo(b, stop.n, null, stop.p));
+        var be = busEnd(b, ln);
+        // v2.18: halte satu arah tanpa arah rute yang dikenali / bus yang arahnya tidak bisa dipastikan: jangan ditebak.
+        if (!ds || !ds.length) return oneWay ? null : busEta(b, ln, stop.p, etaTo(b, stop.n, null, stop.p));
+        if (oneWay && !be) return null;
         var best = null;
         ds.forEach(function (x) {
+          if (be && endKey(x.dir) !== be) return;               // bus arah sebaliknya
           var nx = x.next;
           var feed = etaTo(b, stop.n, nx ? nx.n : null, stop.p, nx ? nx.p : null);
           var e = busEta(b, { mode: ln.mode, brt: ln.brt, dirs: [x.dir] }, stop.p, feed);
@@ -2598,8 +2648,7 @@
           (l.variant ? '<div class="alt">' + esc(T(l.variant)) + "</div>" : "") +
           (l.fareNote ? '<div class="alt">' + tl("Tarif: ", "Fare: ") + esc(T(l.fareNote)) + "</div>" : "") +
           (liveOk(l.line) ? '<div class="live-eta" data-leg="' + i + '"><i class="live-dot"></i>' + tl("Mencari posisi bus ", "Finding bus ") + esc(l.line.code) + "…</div>" +
-            (NATIVE && NATIVE.busWatchStart ? '<button class="bw-btn" type="button" data-bw="' + i + '"></button>' : "") +
-            (NATIVE && NATIVE.etaWidgetToggle ? '<button class="bw-btn etaw-btn" type="button" data-etaw="' + i + '"></button>' : "") : "") +
+            (NATIVE && NATIVE.busWatchStart ? '<button class="bw-btn" type="button" data-bw="' + i + '"></button>' : "") : "") +
           disruptionsFor(l.line).map(function (x) { return disruptionHTML(x, true); }).join("") +
           (S.filt && S.filt.access || cfg().accessible ? accessLegHTML(l) : "") +
           '<div class="meta"><span>' + stopWord(l.stops.length - 1, RAIL[l.line.mode]) + "</span><span>±" + mins(l.min) + "</span><span>" + (l.farePaid === 0 && l.fare > 0 ? tl("sudah termasuk", "already paid") : fareText(l.farePaid, l.farePaid)) + "</span><span>" + tl("tunggu ±", "wait ±") + mins(l.wait) + "</span></div>" +
@@ -2614,13 +2663,10 @@
     html += step("dest", "#38BDF8", clock(addMin(dep, it.min)), S.to.name, '<div class="st-desc">Sampai tujuan</div>');
     html += "</div>";
     html += '<div class="trip-foot"><button class="btn-sec" id="btnShare2" type="button">Bagikan rute (gambar)</button>' +
-      '<button class="btn-sec" id="btnReportStop" type="button">Laporkan halte/rute salah</button>' +
       '<p class="disclaim">' + tl("Jadwal tidak real-time. Cek pengumuman operator untuk gangguan atau perubahan rute.", "Times are not real-time. Check operator notices for disruptions or route changes.") + "</p></div>";
     var body = $("#tripBody"); body.innerHTML = tr(html); body.scrollTop = 0;
     tripExtrasBind(it, body);
     bindBusWatch(it, body);
-    bindEtaWidget(it, body);
-    $("#btnReportStop").addEventListener("click", reportStopIssue);
     $$("[data-tog]", body).forEach(function (b) {
       b.addEventListener("click", function () { var ul = b.closest(".st-card").querySelector(".st-stops"); ul.hidden = !ul.hidden; b.textContent = ul.hidden ? showStopsText(+b.dataset.tog) : tl("Sembunyikan pemberhentian", "Hide stops"); });
     });
@@ -3065,19 +3111,19 @@
     bindDisLinks(body);
     if (lineBoard) { lineBoard.stop(); lineBoard = null; }
     if (liveOk(line)) {
-      var endName = d.s[d.s.length - 1].n;
+      var myEnd = endKey(d), twoWay = line.dirs.some(function (x) { return x.s && x.s.length >= 2 && endKey(x) !== myEnd; });
+      var sameWay = function (b) { if (!twoWay) return true; var e = busEnd(b, line); return e === myEnd; };
       var renderL = function () {
         if (!$("#lineLiveList")) return;
-        var bs = Object.keys(lineBoard.buses).map(function (k) { return lineBoard.buses[k]; });
-        // bus searah dengan arah yang dipilih ditaruh di atas
-        bs.forEach(function (b) { b.same = nmKey(b.head) === nmKey(endName) || nmKey(b.head).indexOf(nmKey(endName)) >= 0; });
-        bs.sort(function (a, b) { return (b.same - a.same) || (a.key < b.key ? -1 : 1); });
+        // v2.18: hanya bus yang menuju arah yang dipilih (bus arah sebaliknya disembunyikan, juga di peta).
+        var bs = Object.keys(lineBoard.buses).map(function (k) { return lineBoard.buses[k]; }).filter(sameWay);
+        bs.sort(function (a, b) { return a.key < b.key ? -1 : 1; });
         $("#lineLiveSt").textContent = liveStatusText(LumiLive.state(), bs.length);
         $("#lineLiveList").innerHTML = bs.length ? bs.slice(0, 12).map(function (b) {
           var ns = nextStop(b);
           return '<li data-bus="' + esc(b.key) + '"><span class="bus-dot" style="--c:' + line.color + '"></span><div><b>' + tl("Menuju ", "Towards ") + esc(b.head || "-") + "</b><span>" +
             (ns ? tl("Berikutnya ", "Next ") + esc(ns.name) + " · " + fmtEta(ns.eta) : "Bus " + esc(b.key)) + "</span></div><em>" + esc(b.key) + "</em></li>";
-        }).join("") : '<li class="muted">' + (LumiLive.state() === "connected" ? tl("Belum ada bus " + esc(line.code) + " yang mengirim posisi. Mungkin di luar jam operasi.", "No " + esc(line.code) + " bus is reporting its position yet. It may be outside operating hours.") :
+        }).join("") : '<li class="muted">' + (lineBoard.count() > 0 ? tl("Belum ada bus " + esc(line.code) + " menuju " + esc(d.s[d.s.length - 1].n) + " yang terpantau. Bus arah sebaliknya disembunyikan.", "No " + esc(line.code) + " bus heading to " + esc(d.s[d.s.length - 1].n) + " spotted yet. Buses going the other way are hidden.") : LumiLive.state() === "connected" ? tl("Belum ada bus " + esc(line.code) + " yang mengirim posisi. Mungkin di luar jam operasi.", "No " + esc(line.code) + " bus is reporting its position yet. It may be outside operating hours.") :
           /error|reconnecting/.test(LumiLive.state()) ? tl("Belum bisa terhubung ke data armada.", "Can't connect to the fleet feed yet.") + (LumiLive.lastError() ? " (" + esc(LumiLive.lastError()) + ")" : "") + ' <button class="st-toggle" data-tjapp>' + tl("Buka aplikasi TJ", "Open the TJ app") + "</button>" :
           tl("Menghubungkan ke data armada…", "Connecting to the fleet feed…")) + "</li>";
         bindTjApp($("#lineLiveList"));
@@ -3087,6 +3133,7 @@
       };
       var lT = null;
       lineBoard = new LiveBoard(lineMap, [line.code], function () { return line.color; }, function () { if (!lT) lT = setTimeout(function () { lT = null; renderL(); }, 700); });
+      lineBoard.setPredicate(sameWay);
       stopWhenHidden($("#sheetLine"), lineBoard);
       renderL();
     }
@@ -3156,63 +3203,59 @@
       '<p><b>Lumi Transport</b> v' + esc(appVersion()) + ". " + tl("Perencana rute bekerja offline di ponsel; internet hanya dipakai untuk peta, pencarian alamat, dan jarak jalan untuk estimasi ojol.",
         "Route planning works offline on the phone; the internet is only used for maps, address search and road distances for ride-hailing estimates.") + "</p>" +
       '<p>Lisensi <a data-url="https://github.com/VAMvicky/LumiTransport/blob/main/LICENSE">GPL-3.0</a> · <a data-url="https://github.com/VAMvicky/LumiTransport">Repo GitHub</a></p>' +
-      '<p><button type="button" class="about-btn" id="btnUpdate">Cek update</button><button type="button" class="about-btn" id="btnReport">Laporkan masalah</button></p></div>';
+      '<p><button type="button" class="about-btn" id="btnUpdate">' + tl("Cek &amp; pasang update", "Check &amp; install update") + "</button></p>" + updateStatusHTML() + "</div>";
   }
 
-  /* ------------------------------------------------------- tentang, update, laporan */
+  /* ------------------------------------------------------- tentang & update */
   function appVersion() {
     try { if (NATIVE && NATIVE.versionName) { var v = NATIVE.versionName(); if (v && v !== "0") return v; } } catch (e) { lumiLog(e); }
     return (window.LUMI_BUILD && LUMI_BUILD.version) || "?";   // browser: dari js/build.js (satu sumber)
   }
   function openExt(url) { if (NATIVE && NATIVE.openUrl) NATIVE.openUrl(url); else window.open(url); }
 
+  /*
+   * v2.18: "Cek & pasang update" langsung mengunduh APK rilis terbaru dari GitHub (repo TransportBCK, tempat
+   * rilis diterbitkan) lalu membuka pemasang Android — tidak perlu membuka halaman GitHub.
+   */
+  var RELEASES_API = "https://api.github.com/repos/VAMvicky/TransportBCK/releases/latest";
+  var UPD = { st: null };
+  function verNum(v) { return String(v || "").replace(/^v/, "").split(".").map(function (x) { return +x || 0; }); }
+  function newer(a, b) {
+    var x = verNum(a), y = verNum(b);
+    for (var i = 0; i < Math.max(x.length, y.length); i++) { var d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; }
+    return false;
+  }
+  function updateStatusHTML() {
+    var u = UPD.st;
+    if (!u) return '<div id="updStatus"></div>';
+    if (u.downloading) return '<div id="updStatus"><p>' + tl("Mengunduh ", "Downloading ") + esc(u.tag || "") + "… " + Math.max(0, u.progress | 0) + '%</p><div class="off-bar"><i style="width:' + Math.max(2, u.progress | 0) + '%"></i></div></div>';
+    if (u.error) return '<div id="updStatus"><div class="set-status err">' + tl("Update gagal: ", "Update failed: ") + esc(u.error) + "</div></div>";
+    if (u.needPermission) return '<div id="updStatus"><div class="set-status info">' + tl("Izinkan Lumi memasang aplikasi (\u201cInstal aplikasi tak dikenal\u201d), lalu ketuk tombol update lagi.", "Allow Lumi to install apps (\u201cInstall unknown apps\u201d), then tap the update button again.") + "</div></div>";
+    if (u.installing) return '<div id="updStatus"><div class="set-status ok">' + tl("Membuka pemasang… ketuk \u201cPerbarui\u201d untuk memasang ", "Opening the installer… tap \u201cUpdate\u201d to install ") + esc(u.tag || "") + ".</div></div>";
+    return '<div id="updStatus"></div>';
+  }
+  function paintUpdate() {
+    var el = $("#updStatus"); if (!el) return;
+    var t = document.createElement("div"); t.innerHTML = tr(updateStatusHTML()); el.replaceWith(t.firstChild);
+    var btn = $("#btnUpdate"); if (btn) btn.disabled = !!(UPD.st && UPD.st.downloading);
+  }
+  window.__lumiUpdate = function (st) { UPD.st = Object.assign({}, UPD.st || {}, st || {}); paintUpdate(); };
   function checkUpdate() {
     var btn = $("#btnUpdate");
-    if (btn) { btn.disabled = true; btn.textContent = "Memeriksa…"; }
-    var done = function () { if (btn) { btn.disabled = false; btn.textContent = tl("Cek update", "Check for updates"); } };
-    http("https://api.github.com/repos/VAMvicky/LumiTransport/releases/latest", 12000).then(function (r) {
+    if (btn) { btn.disabled = true; btn.textContent = tl("Memeriksa…", "Checking…"); }
+    var done = function () { if (btn) { btn.disabled = !!(UPD.st && UPD.st.downloading); btn.textContent = tl("Cek & pasang update", "Check & install update"); } };
+    http(RELEASES_API, 12000).then(function (r) {
       var tag = (r && r.tag_name) || "";
-      var cur = "v" + appVersion();
-      if (!tag) { toast("Belum ada rilis untuk dibandingkan"); return; }
-      if (tag === cur) { toast(tl("Lumi sudah versi terbaru (", "Lumi is up to date (") + cur + ")"); return; }
-      toast(tl("Versi baru tersedia: ", "New version available: ") + tag);
-      setTimeout(function () { openExt("https://github.com/VAMvicky/LumiTransport/releases/latest"); }, 900);
-    }).catch(function () { toast("Tidak bisa memeriksa update (offline?)"); }).then(done);
-  }
-
-  function reportStopIssue() {
-    var it = S.openTrip, v = appVersion();
-    var lines = [], seen = {};
-    if (it && it.legs) it.legs.forEach(function (l) {
-      if (l.type === "ride" && l.line && !seen[l.line.code]) { seen[l.line.code] = 1; lines.push(l.line.code); }
-    });
-    var body = tl("### Halte / rute yang salah\n\n", "### Wrong stop / route\n\n") +
-      tl("- Dari: ", "- From: ") + (S.from ? S.from.name + " (" + ((S.from.p || []).join(", ")) + ")" : "-") + "\n" +
-      tl("- Ke: ", "- To: ") + (S.to ? S.to.name + " (" + ((S.to.p || []).join(", ")) + ")" : "-") + "\n" +
-      (lines.length ? tl("- Rute: ", "- Routes: ") + lines.join(" · ") + "\n" : "") +
-      tl("\n### Apa yang salah\n\n(halte tidak ada / urutan salah / tarif salah / lainnya)\n\n", "\n### What is wrong\n\n(missing stop / wrong order / wrong fare / other)\n\n") +
-      tl("### Lingkungan\n", "### Environment\n") + "- Lumi Transport v" + v + "\n- " + (navigator.userAgent || "") + "\n";
-    openExt("https://github.com/VAMvicky/LumiTransport/issues/new?title=" + encodeURIComponent("[halte/rute] ") + "&body=" + encodeURIComponent(body));
-  }
-
-  function reportIssue() {
-    var v = appVersion();
-    var body = tl("### Apa yang terjadi\n\n\n### Langkah mengulang\n1. \n2. \n\n### Lingkungan\n", "### What happened\n\n\n### Steps to reproduce\n1. \n2. \n\n### Environment\n") + "- Lumi Transport v" + v + "\n- " + (navigator.userAgent || "") + "\n";
-    // R5: lampirkan galat terakhir (aplikasi web + crash Android) supaya laporan bisa ditindaklanjuti.
-    var pad2 = function (n) { return (n < 10 ? "0" : "") + n; };
-    var errs = (window.lumiErrors ? lumiErrors() : []).slice(-12);
-    if (errs.length) {
-      body += "\n<details><summary>" + tl("Galat terakhir", "Recent errors") + " (" + errs.length + ")</summary>\n\n```\n" + errs.map(function (x) {
-        var d = wibOf(x.t); return pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + (x.n > 1 ? " ×" + x.n : "") + " " + x.m + (x.a ? "  @" + x.a : "");
-      }).join("\n") + "\n```\n</details>\n";
-    }
-    var crash = ""; try { crash = NATIVE && NATIVE.lastCrash ? NATIVE.lastCrash() : ""; } catch (e) { lumiLog(e); }
-    if (crash) body += "\n<details><summary>" + tl("Crash terakhir (Android)", "Last crash (Android)") + "</summary>\n\n```\n" + crash.slice(0, 2500) + "\n```\n</details>\n";
-    var url = "https://github.com/VAMvicky/LumiTransport/issues/new?title=" + encodeURIComponent("[v" + v + "] ") + "&body=";
-    var enc = encodeURIComponent(body);
-    if (enc.length > 7000) enc = encodeURIComponent(body.slice(0, 3000) + "\n…");   // batas panjang URL GitHub
-    openExt(url + enc);
-    try { if (crash && NATIVE.clearCrash) NATIVE.clearCrash(); } catch (e) { lumiLog(e); }
+      var cur = appVersion();
+      if (!tag) { toast(tl("Belum ada rilis untuk dibandingkan", "No release to compare with yet")); return; }
+      if (!newer(tag, cur)) { toast(tl("Lumi sudah versi terbaru (v", "Lumi is up to date (v") + cur + ")"); return; }
+      var apk = (r.assets || []).filter(function (a) { return /\.apk$/i.test(a.name || ""); })[0];
+      if (!apk) { toast(tl("Rilis " + tag + " belum punya APK", "Release " + tag + " has no APK yet")); return; }
+      if (!NATIVE || !NATIVE.installUpdate) { openExt(apk.browser_download_url); return; }
+      UPD.st = { tag: tag, downloading: true, progress: 0 }; paintUpdate();
+      toast(tl("Versi baru " + tag + " — mengunduh…", "New version " + tag + " — downloading…"));
+      NATIVE.installUpdate(apk.browser_download_url, tag, +apk.size || 0);
+    }).catch(function () { toast(tl("Tidak bisa memeriksa update (offline?)", "Couldn't check for updates (offline?)")); }).then(done);
   }
 
   /* ------------------------------------------------------- pilih titik di peta */
@@ -3345,9 +3388,8 @@
     html += langCardHTML();
     html += aboutCardHTML();
     $("#settingsBody").innerHTML = tr(html);
-    var aboutUp = $("#btnUpdate"), aboutRep = $("#btnReport");
+    var aboutUp = $("#btnUpdate");
     if (aboutUp) aboutUp.addEventListener("click", checkUpdate);
-    if (aboutRep) aboutRep.addEventListener("click", reportIssue);
     $$("#settingsBody [data-url]").forEach(function (a) { a.addEventListener("click", function () { openExt(a.dataset.url); }); });
     var langSel = $("#setLang");
     if (langSel) langSel.addEventListener("change", function () {
@@ -3763,7 +3805,8 @@
   function accessLineHTML(s, isStation) {
     var lines = linesAtStop(s), mode = lines.length ? lines[0].mode : (isStation ? "KRL" : "TJ");
     var a = accessOf(s.n, s.p, mode);
-    return '<div class="acc-line acc-' + (a.wc || "unk") + '">' + ICO_WC + "<span>" + esc(accessText(a)) + (a.note ? "<small>" + esc(a.note) + "</small>" : "") + "</span></div>";
+    var t = accessText(a); t = t.charAt(0).toUpperCase() + t.slice(1);
+    return '<div class="acc-line acc-' + (a.wc || "unk") + '">' + ICO_WC + "<span>" + esc(t) + (a.note ? "<small>" + esc(a.note) + "</small>" : "") + "</span></div>";
   }
   /*
    * Saringan "Ramah kursi roda": tanpa Mikrotrans & ojol motor, jalan kaki total ≤ 1,2 km (satu ruas ≤ 800 m),
@@ -4172,6 +4215,7 @@
         '<button class="ob-oem-btn" id="obAuto" type="button">Buka pengaturan Mulai otomatis</button></div>' : "") +
       '</div><div class="ob-bottom"><button class="ob-cta' + (allOk ? "" : " is-locked") + '" id="obDone" type="button" aria-disabled="' + !allOk + '">Mulai cari rute</button>' +
       '<p class="ob-foot" id="obNeed"' + (allOk ? " hidden" : "") + '>Izinkan ketiga akses di atas dulu untuk melanjutkan.</p></div>';
+    fitOnboarding(ob);
     $$("[data-perm]", ob).forEach(function (b) {
       b.addEventListener("click", function () {
         if (b.classList.contains("ok")) return;
@@ -4193,6 +4237,26 @@
       store("onboarded", 2); ob.remove();
     });
   }
+  /*
+   * v2.18: layar izin harus muat SATU layar tanpa digulir, juga di HP dengan huruf sistem besar. Setelah
+   * digambar, bila isi daftar meluap, tampilan dipadatkan bertahap: c0 = jarak dirapatkan, c1 = keterangan izin disembunyikan,
+   * c2 = paragraf pembuka & catatan bawah disembunyikan + ikon lebih kecil, c3 = kotak "Mulai otomatis" ringkas.
+   */
+  function fitOnboarding(ob) {
+    var fit = function () {
+      var list = $(".ob-list", ob), bottom = $(".ob-bottom", ob);
+      if (!list || !ob.isConnected || !ob.clientHeight) return;
+      ob.classList.remove("c0", "c1", "c2", "c3");
+      var over = function () {
+        return list.scrollHeight > list.clientHeight + 1 ||
+          (bottom && bottom.getBoundingClientRect().bottom > ob.getBoundingClientRect().bottom + 1);
+      };
+      ["c0", "c1", "c2", "c3"].forEach(function (c) { if (over()) ob.classList.add(c); });
+    };
+    setTimeout(fit, 0);
+    try { document.fonts && document.fonts.ready.then(fit); } catch (e) { lumiLog(e); }
+  }
+  window.addEventListener("resize", function () { var ob = $("#onboard"); if (ob && $(".ob-list", ob)) fitOnboarding(ob); });
   window.__lumiPerm = function () { if ($("#onboard") && $("#obDone")) showOnboarding(2); };
   var obStage = store("onboarded");
   if (obStage !== 2) showOnboarding(obStage === 1 ? 2 : 1);
@@ -4200,7 +4264,7 @@
 
   /* =======================================================================================
    * v2.17 — panduan suara native, ekspor/impor berkas, preferensi rute, rekap ongkos bulanan,
-   * widget ETA bus favorit, tarif dengan tanggal berlaku, dan peta offline Jabodetabek.
+   * tarif dengan tanggal berlaku, dan peta offline Jabodetabek.
    * ======================================================================================= */
 
   /* ---------------------------------------------------------------- panduan suara (layanan native) */
@@ -4255,7 +4319,6 @@
       if (!NATIVE) store("reminders", nat.reminders);
       if (okR) n++;
     }
-    if (Array.isArray(nat.etaWidget)) { try { NATIVE && NATIVE.etaWidgetSetList && NATIVE.etaWidgetSetList(JSON.stringify(nat.etaWidget.slice(0, 3))); n++; } catch (e) { lumiLog(e); } }
     try { var c = cfg(); if (NATIVE && NATIVE.setLang) NATIVE.setLang(c.lang); } catch (e) { lumiLog(e); }
     syncVoice(); syncWatched(); applyAccessible(); applyTheme(); applyBasemap();
     renderSettings(["backup", "ok", tl("Dipulihkan: " + n + " bagian data.", "Restored: " + n + " data sections.")]);
@@ -4374,44 +4437,6 @@
       return '<span class="chip">' + esc(modeName(x)) + " " + rp(cur.fm[x]) + "</span>";
     }).join("") + (cur.rest > 0 ? '<span class="chip">' + tl("lainnya ", "other ") + rp(cur.rest) + "</span>" : "") + "</div>";
     return html + "</div>";
-  }
-
-  /* ---------------------------------------------------------------- widget ETA bus favorit */
-  var ICO_WIDGET = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="13.5" width="17" height="7" rx="1.6" fill="currentColor"/></svg>';
-  function etaKey(spec) { return LumiLive.norm(spec.code) + "|" + (spec.stop ? spec.stop.name : ""); }
-  function etaPinned() {
-    var o = {};
-    try { (JSON.parse(NATIVE.etaWidgetList() || "[]") || []).forEach(function (x) { o[etaKey(x)] = 1; }); } catch (e) { lumiLog(e); }
-    return o;
-  }
-  function bindEtaWidget(it, body) {
-    if (!NATIVE || !NATIVE.etaWidgetToggle) return;
-    var paint = function () {
-      var pinned = etaPinned();
-      $$("[data-etaw]", body).forEach(function (b) {
-        var l = it.legs[+b.dataset.etaw], on = !!(l && l.fromP && l.toP) && !!pinned[etaKey(busSpec(l))];
-        b.classList.toggle("on", on);
-        b.setAttribute("aria-pressed", on);
-        b.innerHTML = ICO_WIDGET + "<span>" + (on ? tl("Ada di widget ETA · ketuk untuk melepas", "On the ETA widget · tap to remove")
-          : tl("Pasang di widget ETA (layar utama)", "Add to the ETA widget (home screen)")) + "</span>";
-      });
-    };
-    $$("[data-etaw]", body).forEach(function (b) {
-      b.addEventListener("click", function () {
-        var l = it.legs[+b.dataset.etaw]; if (!l || !l.fromP || !l.toP) return;
-        var on = false;
-        try { on = !!NATIVE.etaWidgetToggle(JSON.stringify(busSpec(l))); } catch (e) { lumiLog(e); }
-        if (on) {
-          var placed = false; try { placed = !!(NATIVE.etaWidgetPlaced && NATIVE.etaWidgetPlaced()); } catch (e) { lumiLog(e); }
-          var pin = false; if (!placed) { try { pin = !!(NATIVE.etaWidgetPin && NATIVE.etaWidgetPin()); } catch (e) { lumiLog(e); } }
-          toast(placed ? tl("Bus " + l.line.code + " dipasang di widget ETA", "Bus " + l.line.code + " added to the ETA widget")
-            : pin ? tl("Pilih “Tambahkan” untuk menaruh widget di layar utama", "Choose “Add” to put the widget on your home screen")
-            : tl("Tersimpan. Tambahkan widget “Lumi · ETA bus” dari menu widget layar utama.", "Saved. Add the “Lumi · ETA bus” widget from your home screen's widget menu."));
-        } else toast(tl("Dilepas dari widget ETA", "Removed from the ETA widget"));
-        paint();
-      });
-    });
-    paint();
   }
 
   /* ---------------------------------------------------------------- tarif dengan tanggal berlaku */

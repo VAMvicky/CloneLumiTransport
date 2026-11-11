@@ -18,7 +18,7 @@
     } catch (e) { }
     /* Sambutan belum selesai: sembunyikan beranda sejak awal agar tidak tampil sekilas sebelum sambutan dipasang. */
     try { if (localStorage.getItem("lumi:onboarded") !== "2") document.documentElement.classList.add("ob-pending"); } catch (e) { }
-    /* Catatan galat: 100 galat terakhir (tanpa data pribadi), ikut terlampir di Pengaturan → Laporkan masalah. */
+    /* Catatan galat: 100 galat terakhir (tanpa data pribadi), untuk pengujian & pemeriksaan. */
     (function () {
       var K = "lumi:errlog", log = [];
       try { log = JSON.parse(localStorage.getItem(K) || "[]"); } catch (e) { }

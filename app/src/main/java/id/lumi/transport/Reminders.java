@@ -24,7 +24,7 @@ import java.util.TimeZone;
  * 08.00") lalu menyimpannya di sini. Alarm membangunkan ReminderReceiver beberapa menit sebelumnya
  * (sesuai pilihan pengguna) dan menampilkan notifikasi; mengetuknya membuka Lumi dengan rute yang sama.
  * Pengingat bisa sekali atau berulang (hari tertentu, mis. Senin–Jumat). Jadwal dipasang ulang setelah
- * HP dinyalakan ulang / aplikasi diperbarui. Pengingat terdekat juga tampil di widget Berangkat/Pulang.
+ * HP dinyalakan ulang / aplikasi diperbarui.
  *
  * Mengecek kondisi terbaru (v2.16):
  *  - 30 menit sebelum notifikasi: gangguan layanan di rute pengingat (data/disruptions.json) → notifikasi
@@ -64,7 +64,6 @@ public final class Reminders {
         if (out.length() > 20) throw new IllegalArgumentException("maks. 20 pengingat");
         save(c, out);
         long at = schedule(c, r);
-        LumiWidgetProvider.refresh(c);
         return at;
     }
 
@@ -76,7 +75,6 @@ public final class Reminders {
             else out.put(a.opt(i));
         }
         save(c, out);
-        LumiWidgetProvider.refresh(c);
     }
 
     static JSONObject find(Context c, String id) {
@@ -146,22 +144,6 @@ public final class Reminders {
             if (schedule(c, r) >= 0) keep.put(r);           // pengingat sekali yang sudah lewat dibuang
         }
         save(c, keep);
-        LumiWidgetProvider.refresh(c);
-    }
-
-    /** Pengingat terdekat untuk widget: {"leave":"07:05","to":"Kantor","at":ms} atau null. */
-    static JSONObject nextForWidget(Context c) {
-        JSONArray a = list(c);
-        JSONObject best = null; long bestAt = Long.MAX_VALUE, now = System.currentTimeMillis();
-        for (int i = 0; i < a.length(); i++) {
-            JSONObject r = a.optJSONObject(i);
-            if (r == null) continue;
-            long t = nextFire(r, now);
-            if (t > 0 && t < bestAt) { bestAt = t; best = r; }
-        }
-        if (best == null) return null;
-        try { return new JSONObject().put("leave", best.optString("leave")).put("to", best.optJSONObject("to") != null ? best.optJSONObject("to").optString("name") : "").put("at", bestAt).put("id", best.optString("id")); }
-        catch (Exception e) { return null; }
     }
 
     static String disruptionLine(List<JSONObject> dis) {
@@ -218,7 +200,7 @@ public final class Reminders {
         notifyFire(c, id, r, busStarted, null);
         JSONArray days = r.optJSONArray("days");
         if (days == null || days.length() == 0) remove(c, id);   // sekali: selesai
-        else { schedule(c, r); LumiWidgetProvider.refresh(c); }
+        else schedule(c, r);
         List<JSONObject> dis;
         try { dis = currentDisruptions(c, r, true); } catch (Exception e) { return; }
         if (!dis.isEmpty()) notifyFire(c, id, r, busStarted, dis);

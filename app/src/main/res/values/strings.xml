@@ -8,14 +8,4 @@
     <string name="sc_history_short">Riwayat</string>
     <string name="sc_history_long">Riwayat perjalanan &amp; ongkos</string>
 
-    <string name="widget_title">Lumi Transport</string>
-    <string name="widget_go">Berangkat</string>
-    <string name="widget_home">Pulang</string>
-    <string name="widget_desc">Buka Lumi untuk berangkat atau pulang</string>
-
-    <!-- v2.17: widget perkiraan tiba bus favorit -->
-    <string name="widget_eta_title">Bus favorit</string>
-    <string name="widget_eta_label">Lumi · ETA bus</string>
-    <string name="widget_eta_desc">Perkiraan tiba bus favorit di haltemu</string>
-    <string name="widget_eta_refresh">⟳</string>
 </resources>

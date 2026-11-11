@@ -153,7 +153,7 @@
     "Arah": "Towards", "Turun di sini": "Get off here", "Sampai tujuan": "Arrived at destination", "sudah termasuk": "already paid",
     "Bisa juga naik": "Also possible:", "Bagikan rute (gambar)": "Share route (image)",
     "Jadwal tidak real-time. Cek pengumuman operator untuk gangguan atau perubahan rute.": "Schedules are not real-time. Check operator announcements for disruptions or route changes.",
-    "Laporkan halte/rute salah": "Report a wrong stop/route", "Sembunyikan pemberhentian": "Hide stops",
+    "Sembunyikan pemberhentian": "Hide stops",
     "Mobil": "Car", "Motor": "Bike", "AMARI": "AMARI",
     // daftar & detail rute
     "Semua": "All", "TJ non-BRT": "TJ non-BRT", "Royaltrans & Jabodetabek": "Royaltrans & Jabodetabek",
@@ -235,7 +235,7 @@
     "Bahasa / Language": "Language / Bahasa", "Bahasa aplikasi": "App language", "Bahasa Indonesia": "Bahasa Indonesia", "English": "English",
     "Semua teks aplikasi ikut berganti, termasuk hasil rute, notifikasi, dan panduan suara.": "All app text switches, including route results, notifications and voice guidance.",
     "Language set to English.": "Language set to English.",
-    "Tentang Lumi": "About Lumi", "Lisensi": "Licence", "Repo GitHub": "GitHub repo", "Cek update": "Check for updates", "Laporkan masalah": "Report a problem",
+    "Tentang Lumi": "About Lumi", "Lisensi": "Licence", "Repo GitHub": "GitHub repo", "Cek update": "Check for updates",
     "Lihat": "Show", "Sembunyi": "Hide",
     // sambutan
     "Semua transportasi Jabodetabek dalam satu rute: Transjakarta, Mikrotrans, KRL, MRT, LRT, sampai ojol.": "All Greater Jakarta transport in one route: Transjakarta, Mikrotrans, KRL, MRT, LRT, even ride-hailing.",

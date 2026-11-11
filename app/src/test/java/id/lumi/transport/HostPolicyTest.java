@@ -25,6 +25,15 @@ public class HostPolicyTest {
         assertFalse(HostPolicy.urlAllowed("::::"));
     }
 
+    @Test public void updateDownloadsOnlyFromLumiReleases() {
+        assertTrue(HostPolicy.isGithubDownload("https://github.com/VAMvicky/TransportBCK/releases/download/v2.18.0/LumiTransport-v2.18.0.apk"));
+        assertFalse(HostPolicy.isGithubDownload("http://github.com/VAMvicky/TransportBCK/releases/download/v2.18.0/LumiTransport-v2.18.0.apk"));
+        assertFalse(HostPolicy.isGithubDownload("https://github.com/someone/else/releases/download/v1/x.apk"));
+        assertFalse(HostPolicy.isGithubDownload("https://github.com/VAMvicky/TransportBCK/releases/download/v2.18.0/notes.txt"));
+        assertFalse(HostPolicy.isGithubDownload("https://evil.example/VAMvicky/TransportBCK/releases/download/v1/x.apk"));
+        assertFalse(HostPolicy.isGithubDownload(null));
+    }
+
     @Test public void headers() {
         assertTrue(HostPolicy.headerAllowed("Accept", "application/json"));
         assertTrue(HostPolicy.headerAllowed("x-app-version", "2.11.0"));

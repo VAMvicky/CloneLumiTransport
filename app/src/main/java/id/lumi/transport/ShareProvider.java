@@ -13,7 +13,7 @@ import java.io.FileNotFoundException;
 
 /**
  * Penyedia file sederhana untuk membagikan gambar rute ke aplikasi lain (WhatsApp, IG, dll.)
- * tanpa izin penyimpanan. Hanya melayani file di cache/share/.
+ * tanpa izin penyimpanan. Hanya melayani file di cache/share/ dan APK update di cache/update/ (v2.18).
  * content://id.lumi.transport.share/<namafile>.png
  */
 public class ShareProvider extends ContentProvider {
@@ -25,10 +25,19 @@ public class ShareProvider extends ContentProvider {
         return d;
     }
 
+    /** v2.18: APK update di cache/update/ (content://…/update/&lt;nama&gt;.apk). */
+    static File updateDir(android.content.Context c) { return new File(c.getCacheDir(), "update"); }
+
+    private static boolean isUpdate(Uri uri) {
+        java.util.List<String> p = uri.getPathSegments();
+        return p != null && p.size() == 2 && "update".equals(p.get(0));
+    }
+
     private File fileFor(Uri uri) throws FileNotFoundException {
         String name = uri.getLastPathSegment();
         if (name == null || name.contains("/") || name.contains("..")) throw new FileNotFoundException("invalid");
-        File f = new File(dir(getContext()), name);
+        if (isUpdate(uri) && !name.endsWith(".apk")) throw new FileNotFoundException("invalid");
+        File f = new File(isUpdate(uri) ? updateDir(getContext()) : dir(getContext()), name);
         if (!f.exists()) throw new FileNotFoundException(name);
         return f;
     }
@@ -52,7 +61,7 @@ public class ShareProvider extends ContentProvider {
         }
     }
 
-    @Override public String getType(Uri uri) { return "image/png"; }
+    @Override public String getType(Uri uri) { return isUpdate(uri) ? "application/vnd.android.package-archive" : "image/png"; }
     @Override public Uri insert(Uri uri, ContentValues v) { return null; }
     @Override public int delete(Uri uri, String s, String[] a) { return 0; }
     @Override public int update(Uri uri, ContentValues v, String s, String[] a) { return 0; }

@@ -71,20 +71,26 @@
 
 ## ✨ Fitur
 
+**🆕 Baru di v2.18**
+- ⬇️ **Update langsung dari aplikasi**: Pengaturan → Tentang → "Cek & pasang update" mengunduh APK terbaru dan membuka pemasang, tanpa membuka GitHub
+- 🧭 **Hanya bus searah**: di halte satu arah (mis. "Pancoran Arah Timur") dan di detail rute per arah, bus arah sebaliknya tidak lagi tampil — di daftar maupun di peta
+- ✨ Layar izin muat satu layar tanpa digulir; jarak tombol di lembar halte rapi
+- 🛠️ Perbaikan: pendampingan dengan panduan suara tidak lagi menutup aplikasi; mesin suara terdeteksi di Android 11+
+- 🧹 Widget dan fitur "Laporkan masalah" dihapus
+
 **🆕 Baru di v2.17**
 - 🗺️ **Peta offline Jabodetabek**: unduh sekali (Pengaturan → Peta offline), peta tetap tampil tanpa internet — dipakai otomatis saat sinyal hilang, atau pilih sebagai gaya peta
 - 🗣️ **Panduan suara dari layanan pendampingan**: langkah, sisa pemberhentian, dan "turun sekarang" dibacakan juga saat layar mati; suara navigasi menurunkan volume musik sejenak
 - 📊 **Notifikasi progres langsung**: batang progres perjalanan per ruas di notifikasi; di Android 16 tampil sebagai *Live Update* di layar kunci & status bar
-- 🧩 **Widget "Bus favorit"**: perkiraan tiba hingga 3 bus di halte naikmu, langsung di layar utama (ketuk "Widget ETA" di detail perjalanan)
 - ⚙️ **Preferensi rute**: batas jalan kaki, batas pindah, moda yang dihindari, sembunyikan ojol, urutan bawaan
 - 💰 **Rekap ongkos per bulan** di Riwayat, lengkap dengan rincian per moda
-- 💾 **Ekspor & impor data** ke satu berkas (favorit, riwayat, tempat, pengingat, preferensi, widget) — pindah HP tanpa kehilangan apa pun
+- 💾 **Ekspor & impor data** ke satu berkas (favorit, riwayat, tempat, pengingat, preferensi) — pindah HP tanpa kehilangan apa pun
 - 📅 **Tarif dengan tanggal berlaku**: kenaikan tarif yang sudah diumumkan otomatis dipakai mulai harinya (mis. tarif TJ 2027)
 - 🛠️ Perbaikan: notifikasi pengingat tidak lagi menunggu internet; pendampingan tidak tertutup bila izin lokasi dicabut; ID notifikasi tidak saling menimpa; layanan pendampingan berhenti rapi setelah tiba; unduhan GTFS lebih tahan putus; klien WebSocket lebih aman; jembatan HTTP hanya ke layanan yang dipakai; izin CI dipersempit; uji unit Java
 
 **🆕 Baru di v2.16**
 - 🔔 **Bus makin dekat juga saat layar mati**: notifikasi ±10/±5/±2 menit dan saat bus tiba di halte naikmu, otomatis saat pendampingan dimulai (hanya bus yang searah)
-- ⏰ **Pengingat "waktunya berangkat"** ("berangkat 07.05 agar tiba 08.00"), sekali atau mingguan, tampil di widget; 30 menit sebelumnya Lumi mengecek gangguan di rutemu, dan saat waktunya langsung memantau bus pertama
+- ⏰ **Pengingat "waktunya berangkat"** ("berangkat 07.05 agar tiba 08.00"), sekali atau mingguan; 30 menit sebelumnya Lumi mengecek gangguan di rutemu, dan saat waktunya langsung memantau bus pertama
 - ⚠️ **Info gangguan layanan** di beranda, hasil, dan detail — plus **notifikasi gangguan untuk rute favorit** tanpa membuka aplikasi
 - ⭐ **Simpan & ulangi perjalanan lengkap** dari favorit, riwayat, atau notifikasi pengingat
 - 💳 **Cek saldo kartu (NFC, eksperimental)**: Mandiri e-money, BNI TapCash, BRI Brizzi, BCA Flazz generasi 2, JakCard, KMT
@@ -322,7 +328,7 @@ app/src/main/
 │   ├── BusWatchService.java  # Bus makin dekat saat layar mati (MQTT native + BusEta)
 │   ├── Disruptions.java      # Gangguan rute favorit di latar
 │   ├── CardReader.java       # Cek saldo kartu NFC (eksperimental)
-│   ├── Reminders.java        # Pengingat "waktunya berangkat" (AlarmManager + widget)
+│   ├── Reminders.java        # Pengingat "waktunya berangkat" (AlarmManager)
 │   ├── Lang.java             # Bahasa teks native (notifikasi, pendampingan, suara)
 │   └── ShareProvider.java    # Berbagi gambar rute tanpa izin penyimpanan
 └── assets/www/

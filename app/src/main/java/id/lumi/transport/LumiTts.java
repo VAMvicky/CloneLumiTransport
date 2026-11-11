@@ -18,6 +18,10 @@ final class LumiTts {
 
     /** Diucapkan sekarang (menggantikan antrean): peringatan turun tidak boleh menunggu kalimat sebelumnya. */
     static synchronized void speak(final Context ctx, final String text) {
+        try { speakNow(ctx, text); } catch (Throwable e) { tts = null; ready = false; pending = null; }   // v2.18: tak pernah menutup aplikasi
+    }
+
+    private static void speakNow(final Context ctx, final String text) {
         if (text == null || text.trim().isEmpty()) return;
         if (tts == null) {
             pending = text;
@@ -25,6 +29,7 @@ final class LumiTts {
                 @Override public void onInit(int status) {
                     if (status != TextToSpeech.SUCCESS) return;
                     synchronized (LumiTts.class) {
+                      try {
                         applyLang();
                         // v2.17: suara navigasi (menurunkan volume musik sejenak, bukan ikut volume media).
                         try {
@@ -37,6 +42,7 @@ final class LumiTts {
                             String p = pending; pending = null;
                             try { tts.speak(p, TextToSpeech.QUEUE_FLUSH, null, "lumi"); } catch (Exception ignored) { }
                         }
+                      } catch (Throwable ignored) { }
                     }
                 }
             });
