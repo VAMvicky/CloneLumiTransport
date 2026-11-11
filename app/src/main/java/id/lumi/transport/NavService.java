@@ -101,9 +101,9 @@ public class NavService extends Service {
                 .setStyle(new Notification.BigTextStyle().bigText(text))
                 .setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false)
                 .setColor(0xFF1565D8)
-                .setCategory(Notification.CATEGORY_NAVIGATION)
                 .setContentIntent(openApp())
                 .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, Lang.t("Berhenti", "Stop"), stopIntent()).build());
+        if (Build.VERSION.SDK_INT >= 28) b.setCategory(Notification.CATEGORY_NAVIGATION);
         GuideTracker t = tracker;
         if (t != null && t.size() > 1) {
             // v2.17: notifikasi progres langsung. Semua versi: batang progres biasa.
