@@ -24,3 +24,9 @@ app/src/main/assets/www/js/gtfs.js
 # Log galat pipeline data (dulu ikut ter-commit, mis. "overpass gagal 502"); kini hanya di log Actions
 data/stop_fix_error.txt
 data/*.err
+
+# Cache audit halte (yang di-commit hanya data/stop_check.json)
+data/stop_check_cache.json
+
+# Tangkapan layar uji UI lokal
+ui-shots*/

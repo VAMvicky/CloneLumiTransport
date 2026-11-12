@@ -10,6 +10,15 @@
 
 ---
 
+## ✦ v2.19.0 — 13 November 2026 / 13 November 2026
+
+- 🇮🇩 **Foto halte, halte di sekitar, dan peta di gambar rute.** Lembar halte kini menampilkan foto tempatnya bila Google punya (dengan kredit kecil di pojok). Tab **Halte** dapat tombol **Halte di sekitar saya**: satu ketuk, Lumi memakai GPS lalu menampilkan halte Transjakarta terdekat dalam 1,5 km — lengkap dengan jarak, foto, dan pasangan nama halte Lumi (`≈ Bundaran HI · 24 m`). Gambar rute yang dibagikan sekarang memuat peta asli: garis rute, titik A dan B, plus atribusi. Semua tambahan ini pelengkap — bila kunci Google ditolak atau tidak ada jaringan, ketiganya hilang sendiri dan aplikasi berjalan seperti biasa. `versionCode` **21900**
+- 🇮🇩 **Audit titik halte.** Alat baru `tools/validate_stops.py` membandingkan 3.277 titik halte Lumi dengan Google Places. Hasilnya dipakai sebagai lencana jujur di lembar halte: *cocok* (≤ 60 m), *mungkin pindah* (60–400 m), atau *tidak ditemukan*. Halte yang bergeser jadi kelihatan sebelum pengguna yang menemukannya.
+- 🇬🇧 **Stop photos, nearby stops, and a map on the shared route image.** The stop sheet now shows a photo when Google has one (small credit in the corner). The **Stops** tab gains a **Stops around me** button: one tap, Lumi reads GPS and lists the nearest Transjakarta stops within 1.5 km — with distance, photo, and the matching Lumi stop name (`≈ Bundaran HI · 24 m`). The shared route image now carries a real map: route line, points A and B, and attribution. All three are extras — if the Google key is rejected or there is no network, they disappear on their own and the app works as before. `versionCode` **21900**
+- 🇬🇧 **Stop audit.** A new tool, `tools/validate_stops.py`, compares Lumi's 3,277 stop points against Google Places. The result is an honest badge in the stop sheet: *matches* (≤ 60 m), *may have moved* (60–400 m), or *not found*. Stops that drifted show up before a passenger finds them.
+
+---
+
 ## ✦ v2.18.3 — 12 November 2026 / 12 November 2026
 
 - 🇮🇩 **Perkiraan tiba bus yang masuk akal.** ETA dari feed armada kadang mencocokkan halte lain, sehingga bus yang masih ±13 km jauhnya (atau sudah melewati haltemu) tertulis "tiba ±5 mnt". Kini setiap ETA diperiksa terhadap jarak lurus bus ke halte (paling cepat ±45 km/jam): ETA yang mustahil diganti perkiraan Lumi dari posisi bus di rute, dan bus yang sudah lewat & masih jauh tidak ditampilkan — di detail perjalanan, layar halte, dan notifikasi "bus makin dekat". `versionCode` **21803**

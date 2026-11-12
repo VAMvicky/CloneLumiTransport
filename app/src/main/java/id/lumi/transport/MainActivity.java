@@ -853,7 +853,15 @@ public class MainActivity extends Activity {
             String type = c.getContentType();
             String mime = type == null ? "image/png" : type.split(";")[0].trim();
             if (mime.isEmpty()) mime = "image/png";
-            return new WebResourceResponse(mime, "utf-8", c.getInputStream());
+            WebResourceResponse r = new WebResourceResponse(mime, "utf-8", c.getInputStream());
+            // v2.19: beri izin baca lintas asal supaya halaman bisa mengambil petak/foto
+            // untuk digambar ke <canvas> (gambar rute yang dibagikan). Tanpa header ini,
+            // canvas menjadi "ternoda" dan toDataURL() gagal.
+            java.util.HashMap<String, String> h = new java.util.HashMap<>();
+            h.put("Access-Control-Allow-Origin", "*");
+            h.put("Cache-Control", "public, max-age=86400");
+            r.setResponseHeaders(h);
+            return r;
         } catch (Exception e) {
             if (c != null) c.disconnect();
             return null;

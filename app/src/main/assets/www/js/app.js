@@ -435,7 +435,145 @@
     $("#stopActTo").onclick = function () { use("to"); };
     $("#stopActLive").onclick = function () { m.hidden = true; openLiveAt(s.p, s.n, { stop: s, lines: bus }); };
     $("#stopActAccess") && ($("#stopActAccess").innerHTML = accessLineHTML(s, isStation));
+    setStopVerify(s);
+    loadStopPhoto(s);
     m.hidden = false; raiseSheet(m);   // tampil di atas peta/lembar yang sedang terbuka
+  }
+
+  /* --------------------------------------------- Google: foto halte & audit titik */
+  /*
+   * Foto dan lencana audit memakai kunci Google yang sama dengan saran alamat
+   * (js/gmaps.js). Keduanya pelengkap: bila kunci ditolak atau jaringan mati,
+   * lembar halte tetap terbuka seperti biasa — tanpa foto, tanpa lencana.
+   */
+  var STOP_META = {};                                  // "lat,lng" -> { ref, name } | null
+  var STOP_META_MAX = 240;                             // batas cache supaya memori tetap kecil
+  function stopKey(p) { return (+p[0]).toFixed(4) + "," + (+p[1]).toFixed(4); }
+
+  function applyStopPhoto(r) {
+    var box = $("#stopActPhotoBox"), img = $("#stopActPhoto"), cre = $("#stopActPhotoCredit");
+    if (!box || !img) return;
+    if (!r || !r.ref) { box.hidden = true; return; }
+    var url = LumiGoogle.photoUrl(r.ref, 640);
+    if (!url) { box.hidden = true; return; }
+    if (cre) cre.textContent = tl("Foto: Google", "Photo: Google");
+    img.onload = function () { box.hidden = false; };
+    img.onerror = function () { box.hidden = true; };
+    img.src = url;
+  }
+
+  function loadStopPhoto(s) {
+    var box = $("#stopActPhotoBox");
+    if (box) box.hidden = true;
+    if (!window.LumiGoogle || LumiGoogle.isDown() || !s || !s.p) return;
+    var k = stopKey(s.p), hit = STOP_META[k];
+    if (hit !== undefined) { applyStopPhoto(hit); return; }
+    if (Object.keys(STOP_META).length > STOP_META_MAX) STOP_META = {};
+    STOP_META[k] = null;                               // cegah dua permintaan bersamaan
+    LumiGoogle.nearby(s.p, "transit_station", 150).then(function (list) {
+      if (list && list.length) return list[0];
+      return LumiGoogle.search(s.n, s.p).then(function (r) { return (r && r[0]) || null; });
+    }).then(function (p) {
+      if (!p) return null;
+      if (p.ref) return { ref: p.ref, name: p.name };
+      if (!p.id) return null;
+      return LumiGoogle.details(p.id).then(function (d) { return d && d.ref ? { ref: d.ref, name: d.name } : null; });
+    }).then(function (r) {
+      STOP_META[k] = r;
+      var name = $("#stopActName");
+      if (!name || name.textContent !== s.n) return;   // pengguna sudah pindah halte
+      applyStopPhoto(r);
+    }).catch(function () { /* diam: foto hanya pelengkap */ });
+  }
+
+  /* Lencana hasil audit halte (tools/validate_stops.py → data/stop_check.json).
+     Kunci memakai nama yang dinormalkan (nmKey), bukan koordinat, supaya lencana
+     tidak hilang saat GTFS memperbarui titik halte sedikit. */
+  function setStopVerify(s) {
+    var vf = $("#stopActVerify");
+    if (!vf) return;
+    vf.hidden = true; vf.className = "stop-verify"; vf.innerHTML = "";
+    var db = window.LUMI_STOPCHECK;
+    if (!db || !db.stops || !s || !s.n) return;
+    var e = db.stops[nmKey(s.n)];
+    if (!e) return;
+    var cls = e.v === "ok" ? "ok" : e.v === "moved" ? "warn" : "bad";
+    var txt = e.v === "ok"
+      ? tl("Titik cocok dengan Google · selisih " + e.d + " m", "Matches Google · " + e.d + " m apart")
+      : e.v === "moved"
+        ? tl("Mungkin sudah pindah · " + e.d + " m dari titik Lumi", "May have moved · " + e.d + " m from Lumi's pin")
+        : tl("Tidak ditemukan di Google · terdekat " + e.d + " m", "Not found on Google · nearest is " + e.d + " m");
+    vf.className = "stop-verify " + cls;
+    vf.innerHTML = '<i class="v-dot"></i><span>' + esc(txt) + "</span>";
+    vf.hidden = false;
+  }
+
+  /* --------------------------------------------- Google: halte di sekitar posisi */
+  var NEAR_ORIGIN = null;
+  function fmtMeters(m) { return m < 1000 ? m + " m" : (m / 1000).toFixed(1).replace(".", ",") + " km"; }
+  function nearestLumiStop(p) {
+    var best = null, bd = 9;
+    stopIndex().forEach(function (s) {
+      var d = E.hav(p, s.p);
+      if (d < bd) { bd = d; best = s; }
+    });
+    return best && bd <= 0.12 ? { s: best, m: Math.round(bd * 1000) } : null;
+  }
+  function renderNearbyStops(list) {
+    var box = $("#stopNear");
+    if (!box) return;
+    if (!list || !list.length) {
+      box.innerHTML = '<p class="fav-empty">' + esc(tl("Tidak ada halte dalam 1,5 km.", "No stops within 1.5 km.")) + "</p>";
+      box.hidden = false;
+      return;
+    }
+    box.innerHTML = list.slice(0, 12).map(function (p, i) {
+      var match = nearestLumiStop(p.p);
+      var dist = NEAR_ORIGIN ? Math.round(E.hav(NEAR_ORIGIN, p.p) * 1000) : 0;
+      var thumb = p.ref ? '<img src="' + LumiGoogle.photoUrl(p.ref, 160) + '" alt="" loading="lazy">' : "<img alt=''>";
+      var sub = match
+        ? esc(tl("≈ " + match.s.n, "≈ " + match.s.n) + " · " + fmtMeters(match.m))
+        : esc(p.sub || "");
+      return '<button class="stop-near-card" type="button" data-near="' + i + '">' + thumb +
+        '<span class="stop-near-main"><span class="stop-near-name">' + esc(p.name) + '</span>' +
+        '<span class="stop-near-sub">' + sub + "</span></span>" +
+        '<span class="stop-near-dist">' + (dist ? fmtMeters(dist) : "") + "</span></button>";
+    }).join("");
+    box.hidden = false;
+    $$("#stopNear .stop-near-card").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var p = list[+b.dataset.near];
+        if (p) openStopActions({ n: p.name, p: p.p });
+      });
+    });
+  }
+  function bindNearbyStops() {
+    var btn = $("#btnNearStops"), box = $("#stopNear");
+    if (!btn) return;
+    if (!window.LumiGoogle || LumiGoogle.isDown()) { btn.hidden = true; if (box) box.hidden = true; return; }
+    btn.hidden = false;
+    btn.textContent = tl("Halte di sekitar saya", "Stops around me");
+    btn.onclick = function () {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = tl("Mencari halte…", "Finding stops…");
+      locate().then(function (o) {
+        NEAR_ORIGIN = [+o.lat, +o.lon];
+        return LumiGoogle.nearby(NEAR_ORIGIN, "transit_station", 1500);
+      }).then(function (list) {
+        renderNearbyStops(list);
+        var n = (list || []).length;
+        toast(tl(n + " halte dalam 1,5 km", n + " stops within 1.5 km"));
+      }).catch(function (e) {
+        if (box) {
+          box.innerHTML = '<p class="fav-empty">' + esc(e && e.message ? e.message : tl("Gagal mencari halte.", "Could not find stops.")) + "</p>";
+          box.hidden = false;
+        }
+      }).then(function () {
+        btn.disabled = false;
+        btn.textContent = tl("Halte di sekitar saya", "Stops around me");
+      });
+    };
   }
   function renderHistoryTab() {
     var box = $("#historyBody");
@@ -1955,7 +2093,7 @@
     hideSuggest();
     if (t === "lines" && !$("#lineList").childElementCount) renderLines();
     if (t === "info" && !$("#infoBody").childElementCount) renderInfo();
-    if (t === "stops" && !$("#stopList").childElementCount) renderStops("");
+    if (t === "stops") { if (!$("#stopList").childElementCount) renderStops(""); bindNearbyStops(); }
     if (t === "history") renderHistoryTab();
   }
   $$(".nav-btn").forEach(function (b) { b.addEventListener("click", function () { setTab(b.dataset.tab); }); });
@@ -2789,7 +2927,7 @@
     if (line) out.push(line);
     return out;
   }
-  function tripImage(it) {
+  function tripImage(it, mapImg) {
     var W = 1080, P = 64, F = '"PJS", system-ui, sans-serif';
     var dep = S.dep || nowWib();
     var c = document.createElement("canvas"), ctx = c.getContext("2d");
@@ -2824,8 +2962,9 @@
       ctx.font = "500 30px " + F; st.sl = (st.sub ? wrap(ctx, st.sub, textW) : []).concat(st.sub2 ? wrap(ctx, st.sub2, textW) : []).slice(0, 4);
       st.h = 34 + st.tl.length * 46 + st.sl.length * 40 + 30;
     });
+    var mapH = mapImg ? 420 : 0;
     var headH = 250, sumH = 330, footH = 150;
-    var H = headH + sumH + steps.reduce(function (a, st) { return a + st.h; }, 0) + footH + 40;
+    var H = headH + mapH + sumH + steps.reduce(function (a, st) { return a + st.h; }, 0) + footH + 40;
     c.width = W; c.height = H;
     // latar
     ctx.fillStyle = "#EEF6FC"; ctx.fillRect(0, 0, W, H);
@@ -2845,8 +2984,23 @@
     ctx.restore();
     ctx.fillStyle = "#fff"; ctx.font = "800 52px " + F; ctx.fillText("Lumi Transport", P + 140, 112);
     ctx.font = "500 30px " + F; ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillText(tl("Rute perjalanan · ", "Trip route · ") + dayWord(dep) + clock(dep), P + 140, 158);
+    // peta rute (bila petak Google berhasil diambil)
+    if (mapImg) {
+      var mh = 380, mx = P - 20, mw = W - (P - 20) * 2, my = headH - 30;
+      ctx.save();
+      rr(ctx, mx, my, mw, mh, 40); ctx.clip();
+      var iw = mapImg.width || mw, ih = mapImg.height || mh;
+      var sc = Math.max(mw / iw, mh / ih);           // "cover": isi penuh, potong tepi
+      ctx.drawImage(mapImg, mx + (mw - iw * sc) / 2, my + (mh - ih * sc) / 2, iw * sc, ih * sc);
+      ctx.restore();
+      ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 6;
+      rr(ctx, mx, my, mw, mh, 40); ctx.stroke();
+      ctx.fillStyle = "rgba(15,39,64,.55)"; rr(ctx, mx + mw - 214, my + mh - 46, 204, 36, 12); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = "500 22px " + F; ctx.textAlign = "center";
+      ctx.fillText(tl("Peta © Google", "Map © Google"), mx + mw - 112, my + mh - 21); ctx.textAlign = "left";
+    }
     // kartu ringkasan
-    var y = headH - 40;
+    var y = headH + mapH - 40;
     ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(14,72,150,.18)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 12;
     rr(ctx, P - 20, y, W - (P - 20) * 2, sumH - 20, 40); ctx.fill(); ctx.shadowColor = "transparent";
     ctx.fillStyle = "#0F2740"; ctx.font = "700 36px " + F;
@@ -2872,7 +3026,7 @@
       gx += w + 10;
     });
     // langkah
-    y = headH + sumH;
+    y = headH + mapH + sumH;
     var railX = P + 118;
     steps.forEach(function (st, i) {
       var top = y, nodeY = top + 44;
@@ -2927,12 +3081,45 @@
     ctx.fillText(tl("Waktu & tarif perkiraan · cek info operator", "Times & fares are estimates · check operator info"), P, H - footH + 104);
     return c.toDataURL("image/png");
   }
+  /* Titik gambar peta untuk sebuah perjalanan: ujung, lalu halte tiap ruas naik.
+     Diencerkan ke maksimal 40 titik supaya URL Static Maps tetap pendek. */
+  function routePoints(it) {
+    var out = [];
+    var push = function (p) { if (p && isFinite(p[0]) && isFinite(p[1])) out.push([+p[0], +p[1]]); };
+    push(S.from && S.from.p);
+    (it.legs || []).forEach(function (l) {
+      if (l.type === "ride" && l.stops) l.stops.forEach(function (st) { push(st.p); });
+    });
+    push(S.to && S.to.p);
+    if (out.length <= 40) return out;
+    var step = (out.length - 1) / 39, thin = [];
+    for (var i = 0; i < 40; i++) thin.push(out[Math.round(i * step)]);
+    return thin;
+  }
+
+  /* Ambil gambar rute dari Static Maps. Gagal = gambar tetap dibuat tanpa peta. */
+  function loadRouteMap(it) {
+    if (!window.LumiGoogle || LumiGoogle.isDown()) return Promise.resolve(null);
+    var pts = routePoints(it);
+    if (pts.length < 2) return Promise.resolve(null);
+    var url = LumiGoogle.staticRouteUrl(pts, { w: 600, h: 360 });
+    if (!url) return Promise.resolve(null);
+    return new Promise(function (res) {
+      var img = new Image(), done = false;
+      var t = setTimeout(function () { if (!done) { done = true; res(null); } }, 4500);
+      img.crossOrigin = "anonymous";                 // perlu CORS dari penyadap di MainActivity
+      img.onload = function () { if (!done) { done = true; clearTimeout(t); res(img); } };
+      img.onerror = function () { if (!done) { done = true; clearTimeout(t); res(null); } };
+      img.src = url;
+    });
+  }
+
   function shareTrip(it) {
     it = it && it.legs ? it : S.openTrip;
     if (!it) return;
-    var go = function () {
+    var go = function (mapImg) {
       var url;
-      try { url = tripImage(it); } catch (e) { url = null; }
+      try { url = tripImage(it, mapImg); } catch (e) { url = null; }
       var text = tl("Rute ", "Route ") + S.from.name + " → " + S.to.name + tl(" · dibuat dengan Lumi Transport", " · made with Lumi Transport");
       if (url && NATIVE && NATIVE.shareImage) { NATIVE.shareImage(url, text); return; }
       if (url && navigator.canShare) {
@@ -2950,7 +3137,8 @@
     function download(url) { var a = document.createElement("a"); a.href = url; a.download = "rute-lumi.png"; document.body.appendChild(a); a.click(); a.remove(); toast("Gambar rute diunduh"); }
     toast("Membuat gambar rute…");
     var ready = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('800 40px "PJS"'), document.fonts.load('500 30px "PJS"'), document.fonts.load('700 36px "PJS"')]) : Promise.resolve();
-    ready.then(go, go);
+    ready.then(function () { return loadRouteMap(it); }).then(function (img) { go(img); },
+                                                                  function () { go(null); });
   }
   window.__lumiTripImage = function (i) { return tripImage(S.results[i]); };   // untuk pengujian
   window.__lumiOpenTrip = function (it, f, t) { if (f) S.from = f; if (t) S.to = t; S.dep = S.dep || nowWib(); S.results = [colorize(it)]; openTrip(it); };   // untuk pengujian

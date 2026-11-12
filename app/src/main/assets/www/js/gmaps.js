@@ -1,4 +1,4 @@
-﻿/* =============================================================================
+/* =============================================================================
  * Lumi â€” lapisan Google Maps.
  *
  * Kunci di bawah diekstrak dari APK Google Maps 26.44.06 (lihat
@@ -86,17 +86,36 @@ var LumiGoogle = (function () {
     });
   }
 
-  /* Koordinat & nama satu tempat dari place_id. */
+  /* Koordinat & nama satu tempat dari place_id, plus rujukan fotonya bila ada. */
   function details(id) {
     return call("place/details/json", {
       place_id: id,
-      fields: "name,geometry,formatted_address,vicinity",
+      fields: "name,geometry,formatted_address,vicinity,photos",
       language: "id"
     }).then(function (j) {
       var r = j.result || {}, loc = r.geometry && r.geometry.location;
       if (!loc) throw new Error("tempat tanpa koordinat");
-      return { name: r.name || "", sub: r.formatted_address || r.vicinity || "", p: [loc.lat, loc.lng] };
+      return {
+        name: r.name || "",
+        sub: r.formatted_address || r.vicinity || "",
+        p: [loc.lat, loc.lng],
+        ref: photoRef(r),
+        types: r.types || [],
+        status: r.business_status || null
+      };
     });
+  }
+
+  /* Rujukan foto pertama sebuah hasil Places (kalau ada). */
+  function photoRef(r) {
+    var ph = r && r.photos && r.photos[0];
+    return ph && ph.photo_reference ? ph.photo_reference : null;
+  }
+
+  /* URL berkas foto. Dipakai sebagai <img src>, jadi lewat penyadap header di MainActivity. */
+  function photoUrl(ref, px) {
+    if (!ref) return null;
+    return API + "place/photo?maxwidth=" + (px || 512) + "&photo_reference=" + encodeURIComponent(ref) + "&key=" + KEY;
   }
 
   /* Cari tempat dengan kata bebas (Place Text Search) â€” cadangan bila autocomplete kosong. */
@@ -123,7 +142,12 @@ var LumiGoogle = (function () {
     }).then(function (j) {
       return (j.results || []).map(function (x) {
         var g = x.geometry && x.geometry.location;
-        return g ? { id: x.place_id, name: x.name || "", sub: x.vicinity || "", p: [g.lat, g.lng] } : null;
+        return g ? {
+          id: x.place_id, name: x.name || "", sub: x.vicinity || "",
+          p: [g.lat, g.lng], ref: photoRef(x), types: x.types || [],
+          open: x.opening_hours ? !!x.opening_hours.open_now : null,
+          status: x.business_status || null
+        } : null;
       }).filter(Boolean);
     });
   }
@@ -171,6 +195,33 @@ var LumiGoogle = (function () {
     });
   }
 
+  /*
+   * Gambar rute siap tempel: Static Maps dengan garis polyline dan dua penanda
+   * ujung. `points` = [[lat,lng], ...] mengikuti urutan perjalanan.
+   * Ukuran dijaga <= 640 px supaya tetap di jalur gratis; URL dibatasi 8192
+   * karakter, jadi titik yang dikirim sudah diencerkan oleh pemanggil.
+   */
+  function staticRouteUrl(points, opts) {
+    var o = opts || {};
+    var w = Math.max(200, Math.min(640, o.w || 600));
+    var h = Math.max(160, Math.min(640, o.h || 360));
+    var pts = (points || []).filter(function (p) {
+      return p && isFinite(p[0]) && isFinite(p[1]) && Math.abs(p[0]) <= 85 && Math.abs(p[1]) <= 180;
+    });
+    if (pts.length < 2) return null;
+    var parts = [];
+    var a = pts[0], b = pts[pts.length - 1];
+    parts.push("markers=" + encodeURIComponent("size:mid|color:0x1565D8|label:A") + "|" + a[0].toFixed(6) + "," + a[1].toFixed(6));
+    parts.push("markers=" + encodeURIComponent("size:mid|color:0x00A651|label:B") + "|" + b[0].toFixed(6) + "," + b[1].toFixed(6));
+    parts.push("path=" + encodeURIComponent("color:0x1565D8ff|weight:6") +
+      "|" + pts.map(function (p) { return p[0].toFixed(5) + "," + p[1].toFixed(5); }).join("|"));
+    parts.push("size=" + w + "x" + h);
+    parts.push("scale=1");
+    parts.push("language=id");
+    parts.push("key=" + KEY);
+    return API + "staticmap?" + parts.join("&");
+  }
+
   return {
     KEY: KEY,
     OWNER_PACKAGE: PKG,
@@ -185,7 +236,10 @@ var LumiGoogle = (function () {
     details: details,
     search: search,
     nearby: nearby,
+    photoRef: photoRef,
+    photoUrl: photoUrl,
     staticUrl: staticUrl,
+    staticRouteUrl: staticRouteUrl,
     tileLayer: tileLayer
   };
 })();
