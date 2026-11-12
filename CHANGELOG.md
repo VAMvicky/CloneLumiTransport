@@ -10,6 +10,13 @@
 
 ---
 
+## ✦ v2.19.1 — 13 November 2026 / 13 November 2026
+
+- 🇮🇩 **Peta gaya Google diperbaiki, dua fitur dicabut.** Peta raster Google dulu disusun dari petak 256 px, dan tiap petak dihitung dari **sudut** petak bukan tengahnya — hasilnya titik bergeser dan makin ngawur tiap zoom, plus watermark "Map data ©… Google" berulang di setiap kotak. Kini gaya itu memakai **satu gambar per layar** yang digeoreferensi sebagai overlay: posisi tepat, satu atribusi, disegarkan setiap peta berhenti bergerak. Gambar rute yang dibagikan juga tidak lagi terpotong — pusat dan zoom dihitung sendiri, dan titik A/B digambar langsung di kartu supaya tidak terpotong tepi. Fitur **foto halte** dan **halte di sekitar saya** dicabut sesuai keputusan. `versionCode` **21901**
+- 🇬🇧 **Google-style map fixed, two features removed.** The Google raster map used to be assembled from 256 px tiles, and each tile was centred on the tile's **corner** instead of its middle — so points drifted and got worse at every zoom, and the "Map data ©… Google" watermark repeated in every square. It now uses **one image per screen** georeferenced as an overlay: correct position, a single attribution, refreshed whenever the map settles. The shared route image is no longer cut either — centre and zoom are computed explicitly, and the A/B dots are drawn onto the card so the edges can't clip them. The **stop photo** and **stops around me** features are removed as decided. `versionCode` **21901**
+
+---
+
 ## ✦ v2.19.0 — 13 November 2026 / 13 November 2026
 
 - 🇮🇩 **Foto halte, halte di sekitar, dan peta di gambar rute.** Lembar halte kini menampilkan foto tempatnya bila Google punya (dengan kredit kecil di pojok). Tab **Halte** dapat tombol **Halte di sekitar saya**: satu ketuk, Lumi memakai GPS lalu menampilkan halte Transjakarta terdekat dalam 1,5 km — lengkap dengan jarak, foto, dan pasangan nama halte Lumi (`≈ Bundaran HI · 24 m`). Gambar rute yang dibagikan sekarang memuat peta asli: garis rute, titik A dan B, plus atribusi. Semua tambahan ini pelengkap — bila kunci Google ditolak atau tidak ada jaringan, ketiganya hilang sendiri dan aplikasi berjalan seperti biasa. `versionCode` **21900**

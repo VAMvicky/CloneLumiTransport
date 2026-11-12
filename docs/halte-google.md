@@ -1,58 +1,50 @@
-# Foto halte, halte sekitar, dan audit titik
+# Peta gaya Google & audit titik halte
 
-Dokumen ini menjelaskan tiga fitur v2.19 yang memakai kunci Google Maps yang sama
-dengan saran alamat (lihat [google-api-keys.md](google-api-keys.md)). Semuanya
-**pelengkap**: tanpa kunci, tanpa jaringan, atau saat kuota habis, fitur hilang
-sendiri dan aplikasi tetap berjalan.
+Dua hal di v2.19 yang memakai kunci Google Maps yang sama dengan saran alamat
+(lihat [google-api-keys.md](google-api-keys.md)). Keduanya pelengkap: tanpa kunci,
+tanpa jaringan, atau saat kuota habis, aplikasi tetap berjalan seperti biasa.
 
-## 1. Foto halte di lembar halte
+## 1. Peta dasar gaya Google — satu gambar per layar
 
-Alur: buka lembar halte → `LumiGoogle.nearby(p, "transit_station", 150)` →
-bila tidak ada hasil, `LumiGoogle.search(nama, p)` → `photo_reference` →
-`place/photo?maxwidth=640`.
+`LumiGoogle.overlayLayer()` di `js/gmaps.js`.
 
-- Hasil disimpan di cache memori `STOP_META` (maksimal 240 titik) dengan kunci
-  `lat,lng` 4 desimal, jadi membuka halte yang sama dua kali hanya satu panggilan.
-- Foto dipasang lewat `<img>`; header penyamaran ditambahkan oleh
-  `shouldInterceptRequest` di `MainActivity`, bukan oleh JavaScript.
-- Kredit "Foto: Google" selalu tampil bersama foto.
-- Bila `img.onerror` menyala (kunci mati/kuota habis), kotak foto disembunyikan
-  dan lembar halte tampil seperti versi lama.
+Static Maps **bukan tile server**. Setiap gambar yang diminta adalah render peta
+utuh lengkap dengan logo dan "Map data ©… Google" miliknya sendiri. Menyusunnya
+sebagai petak 256 px menghasilkan dua cacat:
 
-## 2. Halte di sekitar saya
+- titik bergeser, karena pusat petak harus `(x+0.5, y+0.5)` di skema slippy —
+  memakai `(x, y)` menggeser gambar setengah petak, dan besar geserannya berubah
+  di setiap tingkat zoom;
+- watermark berulang di setiap kotak.
 
-Tab **Halte** → tombol **Halte di sekitar saya** → `locate()` (GPS) →
-`place/nearbysearch` `type=transit_station`, radius 1.500 m.
-
-Tiap kartu menampilkan: foto, nama tempat Google, jarak dari posisi, dan —
-bila ada halte Lumi dalam 120 m — nama halte Lumi beserta selisihnya
-(`≈ Bundaran HI · 24 m`). Ketuk kartu untuk membuka lembar halte biasa, sehingga
-"berangkat dari sini" dan "pergi ke sini" bekerja sama seperti pada halte Lumi.
-
-Nama halte dari Google **tidak** dipakai sebagai nama resmi; itu hanya pembanding.
-Data rute dan tarif tetap dari GTFS Transjakarta.
-
-## 3. Peta di gambar rute yang dibagikan
-
-`shareTrip()` kini mengambil Static Maps lebih dulu:
+Karena itu gaya ini sekarang memakai **satu gambar 640 px per layar**:
 
 ```
-path=color:0x1565D8ff|weight:6|lat1,lng1|lat2,lng2|...
-markers=...label:A|latA,lngA      (titik berangkat)
-markers=...label:B|latB,lngB      (titik tujuan)
-size=600x360&scale=1
+zoom gambar = floor(zoom peta + log2(640 / sisiTerpanjang))
 ```
 
-- Titik diambil dari halte tiap ruas naik (`leg.stops`), lalu diencerkan ke
-  maksimal 40 titik supaya URL tetap di bawah batas 8.192 karakter.
-- Gambar dimuat dengan `crossOrigin="anonymous"`. Agar `<canvas>` tidak "ternoda",
-  `MainActivity.googleFetch()` mengirim `Access-Control-Allow-Origin: *`
-  pada jawaban Google. Tanpa header itu `toDataURL()` gagal dan peta tidak bisa
-  ditempel ke kartu.
-- Batas waktu 4,5 detik: kalau petak tidak datang, kartu tetap dibuat tanpa peta.
-- Atribusi "Peta © Google" digambar di pojok peta, sesuai ketentuan Static Maps.
+Batas geografis gambar dihitung dari pusat peta + zoom gambar itu, lalu dipasang
+sebagai `L.ImageOverlay`. Hasilnya: satu atribusi per layar, posisi tepat, dan
+gambar disegarkan setiap `moveend` / `zoomend`. Biayanya satu permintaan per
+gerakan peta yang berhenti — bukan satu per petak.
 
-## 4. Audit titik halte
+## 2. Peta pada gambar rute yang dibagikan
+
+`LumiGoogle.staticRouteUrl()` + `tripImage()`.
+
+- `center` dan `zoom` **dihitung sendiri** (`fitView`), tidak mengandalkan auto-fit
+  Static Maps — auto-fit tidak selalu memasukkan `path` ke perhitungan bounds,
+  sehingga rute bisa terpotong.
+- Ukuran gambar 640×246, rasio yang sama dengan pita peta di kartu (992×380),
+  jadi tidak ada piksel yang dipotong.
+- Titik **A** dan **B** digambar di kanvas kartu, bukan sebagai `markers` Static
+  Maps: pin di ujung rute selalu terpotong tepi pita.
+- Gambar diambil dengan `crossOrigin="anonymous"`; `MainActivity.googleFetch()`
+  mengirim `Access-Control-Allow-Origin: *` supaya kanvas tidak "ternoda" dan
+  `toDataURL()` tetap bekerja.
+- Batas waktu 4,5 detik: kalau gambar tidak datang, kartu tetap dibuat tanpa peta.
+
+## 3. Audit titik halte
 
 ```bash
 python3 tools/validate_stops.py --limit 120    # bawaan: 120 halte per jalan
@@ -63,9 +55,7 @@ python3 tools/validate_stops.py --dry-run      # lihat rencana saja
 
 Alur: baca halte unik dari `js/data.js` → `place/nearbysearch` radius 400 m →
 jarak terdekat ke titik Lumi → tulis `data/stop_check.json`
-(dan cache `data/stop_check_cache.json`).
-
-Klasifikasi:
+(cache: `data/stop_check_cache.json`, tidak di-commit).
 
 | nilai | arti | ambang |
 |---|---|---|
@@ -74,21 +64,20 @@ Klasifikasi:
 | `missing` | tidak ada halte Google di sekitar | > 400 m |
 
 `build_data.py` menyalin berkas itu ke `js/stopcheck.js`
-(`window.LUMI_STOPCHECK`), dan lembar halte menampilkan lencananya. Kunci
-menggunakan **nama yang dinormalkan** (`nmKey`), bukan koordinat, supaya lencana
-tidak hilang saat GTFS sedikit menggeser titik halte.
+(`window.LUMI_STOPCHECK`), dan lembar halte menampilkan lencananya. Kunci memakai
+**nama yang dinormalkan** (`nmKey`), bukan koordinat, supaya lencana tidak hilang
+saat GTFS menggeser titik halte sedikit.
 
-Audit ini tidak dijalankan di CI: butuh jaringan dan memakai kuota proyek Google
+Audit tidak dijalankan di CI: butuh jaringan dan memakai kuota proyek Google
 pemilik kunci. Jalankan manual bila data GTFS berubah banyak, lalu commit
 `data/stop_check.json`.
 
 ## Batas yang disadari
 
-- Kunci bukan milik Lumi dan bisa dicabut kapan saja. Semua fitur di atas punya
-  jalur mundur tanpa kunci.
-- `nearbysearch` hanya mengembalikan tempat yang dikenal Google; halte baru yang
-  belum masuk Google akan berstatus `missing` — itu informasi, bukan vonis.
-- Foto berasal dari kontributor Google dan ditampilkan sesuai ketentuan Places;
-  jangan disimpan permanen atau dipakai di luar aplikasi.
-- Static Maps dihitung per panggilan. Satu gambar rute = satu panggilan; tidak ada
-  pemakaian sebagai peta dasar.
+- Kunci bukan milik Lumi dan bisa dicabut kapan saja.
+- `nearbysearch` hanya mengenal tempat yang ada di Google; halte baru bisa
+  berstatus `missing` — itu informasi, bukan vonis.
+- Static Maps dihitung per panggilan. Satu gambar rute = satu panggilan, dan peta
+  dasar gaya Google = satu panggilan per gerakan peta yang berhenti.
+- `path=` pada gambar rute adalah garis lurus antar halte, bukan geometri jalan.
+  Untuk garis yang mengikuti aspal, titiknya harus diambil dari shape GTFS.
