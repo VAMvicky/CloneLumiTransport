@@ -19,6 +19,7 @@ Terakhir diperiksa: v2.20.0.
 | P-01 | `gtfs.js` 4,14 MB diparse saat boot | SELESAI (2.20.0) | gtfs.js dimuat setelah layar pertama; boot 1472 ms → 477 ms |
 | P-02 | 12 script eager, termasuk `data.js` 605 KB dan `stopfix.js` 40 KB | SELESAI (2.20.0) | gtfs.js keluar dari jalur boot; data.js tetap (dibutuhkan layar pertama) |
 | P-03 | tidak ada anggaran ukuran/parse di CI | SELESAI (2.20.0) | tools/boot_budget.py, gagal bila >1500 ms |
+| P-04 | parse 4,1 MB + bangun ulang graf tetap di main thread setelah paint | TERBUKA | boot cepat, tapi ada jeda ±0,4–1 dtk sesaat setelah layar tampil; usul Web Worker atau tetap tidak membundel GTFS |
 
 ## S — keamanan
 
@@ -29,6 +30,7 @@ Terakhir diperiksa: v2.20.0.
 | S-03 | `UpdateInstaller.check()` tidak membandingkan sertifikat | SELESAI (2.20.0) | bandingkan SHA-256 sertifikat penandatangan |
 | S-04 | tidak ada penangkap crash / laporan | SELESAI (2.20.0) | CrashLog.java + tombol bagikan di Pengaturan |
 | S-05 | WebView utama `setAllowFileAccess(true)` | DITOLAK | diperlukan untuk aset `file://`; alternatif WebViewAssetLoader dinilai tidak sepadan |
+| S-06 | `probeNow()` memuat URL tanpa validasi skema | TERBUKA | URL dari teks bagikan; `javascript:`/`file:` belum disaring sebelum `loadUrl` |
 
 ## K — kode & ketahanan
 
@@ -44,6 +46,7 @@ Terakhir diperiksa: v2.20.0.
 | K-08 | 84 `catch` di Java, sebagian menelan error | SELESAI (2.20.0) | sebagian: crash handler menutup kebutuhan diagnosa |
 | K-09 | 6 tombol berikon tanpa `aria-label` | BENAR | ditinjau: tombol berikon punya teks label, tidak perlu aria-label |
 | K-10 | `lumi:pcache` tidak ikut `BACKUP_KEYS` | SELESAI (2.20.0) | `pcache` masuk BACKUP_KEYS |
+| K-11 | hasil rute yang dihitung sebelum GTFS resmi masuk tidak dihitung ulang | TERBUKA | `applyOfficial()` hanya membangun ulang graf; layar hasil yang sudah tampil tetap memakai data lama |
 
 ## G — lapisan Google
 
@@ -94,6 +97,7 @@ Terakhir diperiksa: v2.20.0.
 |---|---|---|---|
 | D-01 | arah rute tanpa `shape` | SELESAI (2.20.0) | `data/route_shape_report.txt` ditulis build_data; 207 arah | garis jatuh ke fallback lurus; perlu laporan mana saja |
 | D-02 | 42 nama halte kembar dengan titik >1,5 km | SELESAI (2.20.0) | baris kembar diberi penanda koordinat | terjauh "Jembatan Merah" 8.369 m; perlu disambiguasi di pencarian |
+| D-03 | model rail memakai satu angka tunggu (`KRL wait 8`) | TERBUKA | jam sibuk KRL 5–10 mnt, siang/malam 20–30; ETA pagi terlalu optimis, malam terlalu pesimis |
 | D-03 | 6.991 titik halte, 3.277 unik | BENAR | bukan cacat |
 | D-04 | koordinat di luar Jabodetabek | BENAR | 0 |
 | D-05 | rute dengan <2 halte | BENAR | 0 |
