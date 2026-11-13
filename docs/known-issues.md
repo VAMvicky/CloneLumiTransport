@@ -87,11 +87,11 @@ Terakhir diperiksa: v2.20.2.
 | R-01 | APK rilis tidak membawa GTFS | DITOLAK | dibatalkan atas keputusan P-04: build sengaja tanpa GTFS, data diunduh saat berjalan |
 | R-02 | jalur rilis tanpa gerbang tes | SELESAI | 2.19.6: job `Uji sebelum terbit` + `needs` |
 | R-03 | tanda tangan rilis memakai kunci debug | DI LUAR | butuh `LUMI_KEYSTORE_BASE64` + password |
-| R-04 | push (dan `schedule`) tidak memicu CI | DI LUAR | 11 run, semuanya `workflow_dispatch`; `gh api .../actions/permissions` = enabled, semua workflow `active`. Penyebab di tingkat akun/repo |
+| R-04 | pemicu CI pada push | BENAR | pengamatan sebelumnya keliru: push memicu run (ce0be3c). Yang tidak pernah tercatat hanya schedule |
 | R-05 | `ui_check` (4 mnt) belum ikut gerbang rilis | SELESAI (2.20.1) | ui_check en+id masuk job uji gerbang rilis |
 | R-06 | label "Latest" tidak dipindah otomatis | SELESAI (2.20.0) | langkah `gh release edit --latest` di backfill |
 | R-07 | commit kosong `f4261f7` di histori | DITOLAK | commit kosong dibiarkan; menulis ulang histori main lebih berisiko daripada manfaatnya |
-| R-08 | workflow terjadwal tidak pernah berjalan (route-watch, stop-fix, offline-map) | SELESAI (2.20.2) | 11 run tercatat, semuanya `workflow_dispatch`; `schedule` dan `push` nol. Ditambah `data-maintenance.yml` sebagai tombol manual untuk ketiganya |
+| R-08 | workflow terjadwal belum pernah berjalan | SELESAI (2.20.2) | dispatcher data-maintenance.yml sudah diuji: route-watch jalan dari satu tombol. schedule sendiri belum terbukti |
 
 ## D — data
 
