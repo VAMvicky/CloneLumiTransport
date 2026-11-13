@@ -169,6 +169,12 @@ async def main():
                 await pg.evaluate("document.querySelector('#sheetTrip').hidden = true")
             await pg.evaluate("document.querySelectorAll('#results .it-share')[0] && document.querySelectorAll('#results .it-share')[0].click()")
             await pg.wait_for_timeout(400); await grab(f"share{i}")
+            if i == 0:
+                # kartu menunggu peta sampai 4,5 dtk sebelum jatuh ke gambar tanpa peta
+                await pg.wait_for_timeout(5200)
+                shared = await pg.evaluate("window.__stub && (__stub.sharedImg || __stub.shared) || ''")
+                if not shared:
+                    raise SystemExit("GAGAL: tombol bagikan tidak menghasilkan gambar/teks")
         if NATIVE:
             # v2.16: detail perjalanan kereta (jadwal pasti, posisi kereta, gangguan), favorit lengkap, pengingat
             await pg.evaluate("a => { __lumiSet('from', {name: a[0], p: a[1]}); __lumiSet('to', {name: a[2], p: a[3]}); }", ["Stasiun Bogor", [-6.595, 106.79], "Lebak Bulus", [-6.2894, 106.7745]])
@@ -243,6 +249,10 @@ async def main():
         await pg.click('.nav-btn[data-tab="stops"]'); await grab("stops", True)
         await pg.fill("#inStop", "zzzz"); await grab("stops-empty")
         await pg.fill("#inStop", "Monas"); await pg.wait_for_timeout(200)
+        await pg.fill("#inStop", "Monumen"); await pg.wait_for_timeout(250)
+        n_stop = await pg.evaluate("document.querySelectorAll('#stopList .stop-row').length")
+        if n_stop < 1:
+            raise SystemExit("GAGAL: pencarian halte 'Monumen' tidak menghasilkan baris")
         await pg.evaluate("document.querySelector('#stopList .stop-row') && document.querySelector('#stopList .stop-row').click()")
         await pg.wait_for_timeout(600); await grab("stop-sheet")
         # Lembar aksi halte (Berangkat dari sini / Pergi ke sini / Lihat posisi bus)
