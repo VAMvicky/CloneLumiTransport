@@ -20,6 +20,7 @@
 
   /* ------------------------------------------------------------ kamus: teks utuh */
   var D = {
+    "© OpenStreetMap contributors · Peta © Google": "© OpenStreetMap contributors · Map © Google",
     // header, nav, tab
     "Semua moda Jabodetabek, satu rute": "Every Greater Jakarta mode, one route",
     "Dari": "From", "Ke": "To", "Cari rute": "Find route", "Lokasi saya": "My location", "Pakai lokasi saya": "Use my location",

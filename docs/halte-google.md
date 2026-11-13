@@ -1,62 +1,48 @@
 # Peta gaya Google & audit titik halte
 
-Catatan v2.19: apa yang dipakai dari Google, dan apa yang sengaja tidak.
+Catatan v2.19: apa yang dipakai dari Google, dan apa yang tidak.
 
-## Peta interaktif: petak asli, bukan Static Maps
+## Peta interaktif: petak asli, HD
 
 Pilihan **Google Maps** di Pengaturan memakai petak resmi Google:
 
 ```
-https://mt{s}.google.com/vt?lyrs=m&hl=id&x={x}&y={y}&z={z}&scale=1     s = 0..3
+https://mt{s}.google.com/vt?lyrs=m&hl=id&x={x}&y={y}&z={z}&scale=2     s = 0..3
 ```
 
-Kenapa ini, dan bukan Static Maps:
+- `scale=2` mengembalikan **512×512** untuk satu petak 256 px, jadi tajam di layar
+  berkerapatan tinggi. Leaflet tetap memakai `tileSize` 256 dan mengecilkan
+  gambarnya — hasilnya sama seperti petak retina.
+- Skema slippy standar: posisi titik, halte, dan rute tepat karena Leaflet yang
+  memproyeksikan, dan geser/zoom mulus karena tiap petak dimuat sendiri.
+- Tidak ada watermark di dalam petak.
 
-| | Static Maps (lama) | Petak `mt*.google.com` (sekarang) |
-|---|---|---|
-| geser/zoom | kabur (gambar di-scale) lalu berkedip saat di-fetch ulang | mulus, standar slippy, tiap petak dimuat sendiri |
-| posisi | meleset, karena pusat petak dihitung sendiri | tepat, Leaflet yang memproyeksikan |
-| watermark | berulang di tiap kotak | tidak ada di dalam petak; atribusi dipasang aplikasi |
-| biaya | 1 panggilan per petak / per layar | tidak memakai kunci Google sama sekali |
+**Atribusi** tidak lagi digambar di atas peta. Kreditnya ada di halaman
+Pengaturan (`© OpenStreetMap contributors · Peta © Google`, kelas `.set-credit`),
+supaya peta bersih tanpa menghilangkan kewajiban atribusi.
 
-`lyrs=m` = peta jalan. Kalau butuh citra, `lyrs=s` (satelit) dan `lyrs=s,h` (hibrida)
-tersedia dari endpoint yang sama, tapi aplikasi hanya memakai `m`.
-
-**Risiko yang disadari**: endpoint ini milik Google dan tidak disediakan untuk
-pihak ketiga; pemakaiannya melanggar ToS dan bisa ditolak kapan saja. Karena itu
-`baseLayer()` menghitung `tileerror`: setelah 8 petak gagal, aplikasi memberi tahu
-sekali dan memindahkan `cfg().basemap` ke `osm`, lalu menggambar ulang. Peta tidak
-pernah dibiarkan kosong.
-
-Static Maps tetap dipakai untuk **gambar rute yang dibagikan** — di sana ia memang
-alat yang benar: satu potret, bukan permukaan yang digeser.
+**Risiko**: endpoint ini milik Google dan tidak disediakan untuk pihak ketiga.
+Kalau Google menolak petaknya (`tileerror` 8 kali), aplikasi memberi tahu sekali,
+memindahkan `cfg().basemap` ke `osm`, lalu menggambar ulang — peta tidak kosong.
 
 ## Gambar rute berwarna per ruas
 
 `LumiGoogle.staticRouteSegs()` + `tripImage()`.
 
-- `segs` = satu entri per ruas naik: `{ pts, color, weight }`. Tiap ruas jadi satu
-  parameter `path=` dengan warna trayeknya, jadi perpindahan kelihatan sebagai
-  pergantian warna (merah TJ, biru MRT, ungu LRT, cokelat KRL).
-- `center` dan `zoom` dihitung sendiri (`fitView`) — auto-fit Static Maps tidak
-  selalu memasukkan `path` ke bounds, sehingga rute bisa terpotong.
-- Gambar 640×298 dengan pita kartu 992×460: rasio sama, tidak ada piksel dipotong.
-- Titik **A** dan **B** digambar di kanvas kartu, bukan `markers` Static Maps —
-  pin di ujung rute selalu terpotong tepi pita.
-- `crossOrigin="anonymous"` + `Access-Control-Allow-Origin: *` dari
-  `MainActivity.googleFetch()` supaya kanvas tidak ternoda.
-- Batas waktu 4,5 detik: tanpa gambar, kartu tetap dibuat.
+- Satu `path=` per ruas naik, warna mengikuti trayek (merah TJ, biru MRT, ungu
+  LRT, cokelat KRL) — jumlah pindah terbaca dari gambar.
+- `center`/`zoom` dihitung sendiri (`fitView`); auto-fit Static Maps bisa
+  memotong rute.
+- Gambar 640×298, pita kartu 992×460 — rasio sama, tanpa crop.
+- Titik A/B digambar di kanvas kartu, bukan pin Static Maps.
+- `crossOrigin="anonymous"` + CORS dari `MainActivity.googleFetch()`.
 
-## Ketuk peta: asal / tujuan
+## Ketuk peta: dihapus (v2.19.4)
 
-`mapTapActions()` di `app.js`, dipasang di `makeMap()`.
+Popup "Berangkat dari sini / Pergi ke sini" dicabut atas permintaan. `reverse()`
+(Photon) tetap ada dan masih dipakai layar **Pilih titik di peta**.
 
-Ketuk mana pun (kecuali di peta pemilih `#pickMap` dan di atas penanda/popup)
-memunculkan popup berisi nama tempat + dua tombol. Nama diambil dari Photon
-`/reverse` (tanpa kunci); kalau gagal, dipakai koordinat. Tombol mengisi kolom
-asal/tujuan lewat `setPoint()` lalu `afterPick()`.
-
-## Audit titik halte
+## Audit titik halte (alat, tanpa UI)
 
 ```bash
 python3 tools/validate_stops.py --limit 120    # bawaan: 120 halte per jalan
@@ -65,24 +51,14 @@ python3 tools/validate_stops.py --refresh      # abaikan cache
 python3 tools/validate_stops.py --dry-run      # lihat rencana saja
 ```
 
-Alur: baca halte unik dari `js/data.js` → `place/nearbysearch` radius 400 m →
-jarak terdekat ke titik Lumi → tulis `data/stop_check.json`
-(cache: `data/stop_check_cache.json`, tidak di-commit).
-
-| nilai | arti | ambang |
-|---|---|---|
-| `ok` | titik cocok dengan halte Google | ≤ 60 m |
-| `moved` | kemungkinan halte sudah pindah | 60–400 m |
-| `missing` | tidak ada halte Google di sekitar | > 400 m |
-
-`build_data.py` menyalinnya ke `js/stopcheck.js` (`window.LUMI_STOPCHECK`) dan
-lembar halte menampilkan lencananya. Kunci memakai nama yang dinormalkan
-(`nmKey`), bukan koordinat, supaya lencana tidak hilang saat GTFS menggeser titik.
+Menulis `data/stop_check.json` + cache lokal. Sejak v2.19.4 hasilnya **tidak**
+lagi ditanam ke APK dan lencananya dicabut dari lembar halte; berkasnya tetap
+berguna sebagai laporan audit manual bila data GTFS berubah banyak.
 
 ## Batas yang disadari
 
-- Petak Google dan kunci Places bukan milik Lumi; keduanya bisa dicabut/ditolak
-  kapan saja, dan keduanya punya jalur mundur (OSM, Photon, gambar tanpa peta).
+- Petak Google dan kunci Places bukan milik Lumi; keduanya bisa ditolak kapan saja,
+  dan keduanya punya jalur mundur (OSM, Photon, gambar tanpa peta).
 - `path=` pada gambar rute adalah garis lurus antar halte, bukan geometri jalan.
 - Static Maps dihitung per panggilan: satu gambar rute = satu panggilan.
-- Photon `/reverse` bisa lambat; UI memakai koordinat lebih dulu, nama menyusul.
+- Photon `/reverse` bisa lambat; layar pemilih memakai koordinat lebih dulu.

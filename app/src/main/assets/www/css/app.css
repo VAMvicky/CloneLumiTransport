@@ -1087,7 +1087,6 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 #sheetStop .stop-acts { gap: 12px; }
 #sheetStop .stop-act-live { margin-top: 12px; }
 /* Layar izin: dipadatkan bertahap oleh fitOnboarding() agar muat satu layar */
-.ob.c1 .ob-item span:not(.ob-ico):not(.ob-ok) { display: none; }
 .ob.c1 .ob-lead { font-size: 13px; margin-top: 6px; }
 .ob.c1 .ob-list { gap: 8px; margin-top: 10px; }
 .ob.c2 .ob-lead, .ob.c2 .ob-foot { display: none; }
@@ -1104,31 +1103,12 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 .ob.c0 .ob-bottom { margin-top: 8px; }
 .ob.c0 .ob-foot { margin-top: 6px; }
 
-/* ============================================================================
- * v2.19.1 — lencana audit titik halte (data Google)
  * Hanya tampil bila data/stop_check.json ada; tanpa data, tata letak lama utuh.
  * ========================================================================== */
-.stop-verify { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 12px; padding: 10px 12px; border-radius: 14px; background: #F2F7FC; font-size: 12.5px; line-height: 1.4; color: #3C5A73; }
-.stop-verify .v-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; margin-top: 4px; background: #89A2B8; }
-.stop-verify.ok { background: #EDF9F1; color: #1C5C3A; }
-.stop-verify.ok .v-dot { background: #00A651; }
-.stop-verify.warn { background: #FFF6E6; color: #7A5310; }
-.stop-verify.warn .v-dot { background: #E8A317; }
-.stop-verify.bad { background: #FDEEEC; color: #8A2B22; }
-.stop-verify.bad .v-dot { background: #D93025; }
 
 /* Peta dasar gaya Google: satu gambar Static Maps per layar (bukan petak). */
-.lm-google { pointer-events: none; }
 
-/* ============================================================================
- * v2.19.2 — ketuk peta: pilih "berangkat dari sini" / "pergi ke sini"
  * ========================================================================== */
-.lm-pop .leaflet-popup-content-wrapper { border-radius: 16px; padding: 0; box-shadow: 0 10px 28px rgba(14,72,150,.22); }
-.lm-pop .leaflet-popup-content { margin: 0; }
-.map-act { position: relative; padding: 12px 14px 13px; min-width: 208px; }
-.map-act-close { position: absolute; top: 2px; right: 7px; border: 0; background: none; padding: 2px 4px; font-size: 20px; line-height: 1; color: #527089; cursor: pointer; }
-.map-act-name { font-weight: 700; font-size: 13px; line-height: 1.35; color: #0F2740; padding-right: 20px; margin-bottom: 10px; }
-.map-act-btns { display: flex; gap: 8px; }
-.map-act-btns button { flex: 1; border: 0; border-radius: 10px; padding: 10px 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.map-act-btns button[data-a="from"] { background: #EAF3FC; color: #1565D8; }
-.map-act-btns button[data-a="to"] { background: #1565D8; color: #fff; }
+
+/* v2.19.4 - atribusi peta di Pengaturan (bukan tulisan di atas peta) */
+.set-credit { margin: 10px 0 0; font-size: 11.5px; color: #7A93A8; text-align: center; }

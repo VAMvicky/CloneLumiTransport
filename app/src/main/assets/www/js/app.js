@@ -435,33 +435,7 @@
     $("#stopActTo").onclick = function () { use("to"); };
     $("#stopActLive").onclick = function () { m.hidden = true; openLiveAt(s.p, s.n, { stop: s, lines: bus }); };
     $("#stopActAccess") && ($("#stopActAccess").innerHTML = accessLineHTML(s, isStation));
-    setStopVerify(s);
     m.hidden = false; raiseSheet(m);   // tampil di atas peta/lembar yang sedang terbuka
-  }
-
-  /* --------------------------------------------- Google: audit titik halte */
-  /*
-   * Lencana hasil audit halte (tools/validate_stops.py -> data/stop_check.json).
-   * Kunci memakai nama yang dinormalkan (nmKey), bukan koordinat, supaya
-   * lencana tidak hilang saat GTFS memperbarui titik halte sedikit.
-   */
-  function setStopVerify(s) {
-    var vf = $("#stopActVerify");
-    if (!vf) return;
-    vf.hidden = true; vf.className = "stop-verify"; vf.innerHTML = "";
-    var db = window.LUMI_STOPCHECK;
-    if (!db || !db.stops || !s || !s.n) return;
-    var e = db.stops[nmKey(s.n)];
-    if (!e) return;
-    var cls = e.v === "ok" ? "ok" : e.v === "moved" ? "warn" : "bad";
-    var txt = e.v === "ok"
-      ? tl("Titik cocok dengan Google \u00b7 selisih " + e.d + " m", "Matches Google \u00b7 " + e.d + " m apart")
-      : e.v === "moved"
-        ? tl("Mungkin sudah pindah \u00b7 " + e.d + " m dari titik Lumi", "May have moved \u00b7 " + e.d + " m from Lumi's pin")
-        : tl("Tidak ditemukan di Google \u00b7 terdekat " + e.d + " m", "Not found on Google \u00b7 nearest is " + e.d + " m");
-    vf.className = "stop-verify " + cls;
-    vf.innerHTML = '<i class="v-dot"></i><span>' + esc(txt) + "</span>";
-    vf.hidden = false;
   }
 
   function renderHistoryTab() {
@@ -2547,7 +2521,7 @@
     positron: { name: "Positron (terang, polos)", gl: "https://tiles.openfreemap.org/styles/positron" },
     osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" },
     google: { name: "Google Maps", subs: "0123", google: true,
-              raster: "https://mt{s}.google.com/vt?lyrs=m&hl=id&x={x}&y={y}&z={z}&scale=1" },
+              raster: "https://mt{s}.google.com/vt?lyrs=m&hl=id&x={x}&y={y}&z={z}&scale=2" },
     offline: { name: tl("Offline Jabodetabek (tersimpan di HP)", "Offline Jabodetabek (saved on phone)"), offline: true }
   };
   var ATTR_OFM = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
@@ -2605,47 +2579,9 @@
     return L.tileLayer(MAPSTYLES.osm.raster, { maxZoom: 20, maxNativeZoom: 19, keepBuffer: 4, attribution: ATTR_OSM });
   }
   var allMaps = [];
-  /* Ketuk peta: tawarkan titik itu sebagai asal atau tujuan (bukan di peta pemilih). */
-  function mapTapActions(map, ll) {
-    var p = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)];
-    var el = document.createElement("div");
-    el.className = "map-act";
-    el.innerHTML = '<button class="map-act-close" type="button" aria-label="' + esc(tl("Tutup", "Close")) + '">\u00d7</button>' +
-      '<div class="map-act-name">' + p[0].toFixed(5) + ", " + p[1].toFixed(5) + "</div>" +
-      '<div class="map-act-btns">' +
-      '<button type="button" data-a="from">' + esc(tl("Berangkat dari sini", "Start here")) + "</button>" +
-      '<button type="button" data-a="to">' + esc(tl("Pergi ke sini", "Go here")) + "</button>" +
-      "</div>";
-    var pop = L.popup({ closeButton: false, autoPan: true, offset: [0, -6], className: "lm-pop" })
-      .setLatLng(ll).setContent(el).openOn(map);
-    var nameEl = el.querySelector(".map-act-name");
-    reverse(p).then(function (nm) {
-      if (pop.isOpen && pop.isOpen()) nameEl.textContent = nm;
-    });
-    el.querySelector(".map-act-close").addEventListener("click", function (e) {
-      e.preventDefault(); e.stopPropagation(); map.closePopup(pop);
-    });
-    el.querySelectorAll(".map-act-btns button").forEach(function (b) {
-      b.addEventListener("click", function (e) {
-        e.preventDefault(); e.stopPropagation();
-        var which = b.dataset.a;
-        map.closePopup(pop);
-        setPoint(which, { name: nameEl.textContent, p: p });
-        afterPick(which);
-      });
-    });
-  }
-
   function makeMap(el) {
-    var m = L.map(el, { zoomControl: false, attributionControl: true, maxZoom: 20, zoomSnap: 0.25, wheelPxPerZoomLevel: 90 }).setView(JKT, 12);
+    var m = L.map(el, { zoomControl: false, attributionControl: false, maxZoom: 20, zoomSnap: 0.25, wheelPxPerZoomLevel: 90 }).setView(JKT, 12);
     m._lumiTiles = baseLayer().addTo(m);
-    m.attributionControl.setPrefix(false);
-    m.on("click", function (e) {
-      if (el.id === "pickMap") return;            // peta pemilih punya alurnya sendiri
-      var t = e.originalEvent && e.originalEvent.target;
-      if (t && t.closest && t.closest(".leaflet-marker-icon,.leaflet-popup")) return;
-      mapTapActions(m, e.latlng);
-    });
     allMaps.push(m);
     return m;
   }
@@ -3514,6 +3450,11 @@
     $$(".gtfs-status").forEach(function (el) { el.textContent = state === "error" ? tl("Gagal: ", "Failed: ") + msg : state === "done" ? tl("Selesai. Memuat ulang…", "Done. Reloading…") : msg; });
     if (state === "done") {
       store("gtfsDate", msg);
+      // Kartu unduhan tidak boleh menetap setelah selesai; data baru dipakai saat
+      // halaman dimuat ulang, jadi kartunya disembunyikan lebih dulu.
+      var gb = $("#gtfsBanner");
+      if (gb) gb.hidden = true;
+      $$(".gtfs-card").forEach(function (el) { el.hidden = true; });
       if (changes > 0) toast(changes + tl(" rute Transjakarta berubah — lihat di beranda", changes === 1 ? " Transjakarta route changed — see the home screen" : " Transjakarta routes changed — see the home screen"));
       // Jangan muat ulang saat pengguna sedang memakai layar lain — termasuk layar sambutan:
       // muat ulang membuat beranda tampil sekilas lalu sambutan muncul lagi (berkedip).
@@ -3591,6 +3532,7 @@
     html += accessCardHTML();
     html += langCardHTML();
     html += aboutCardHTML();
+    html += '<p class="set-credit">\u00a9 OpenStreetMap contributors \u00b7 Peta \u00a9 Google</p>';
     $("#settingsBody").innerHTML = tr(html);
     var aboutUp = $("#btnUpdate");
     if (aboutUp) aboutUp.addEventListener("click", checkUpdate);
@@ -4454,7 +4396,7 @@
         return list.scrollHeight > list.clientHeight + 1 ||
           (bottom && bottom.getBoundingClientRect().bottom > ob.getBoundingClientRect().bottom + 1);
       };
-      ["c0", "c1", "c2", "c3"].forEach(function (c) { if (over()) ob.classList.add(c); });
+      ["c0", "c2", "c3"].forEach(function (c) { if (over()) ob.classList.add(c); });
     };
     setTimeout(fit, 0);
     try { document.fonts && document.fonts.ready.then(fit); } catch (e) { lumiLog(e); }
