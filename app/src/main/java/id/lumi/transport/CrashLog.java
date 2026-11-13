@@ -30,33 +30,49 @@ final class CrashLog {
     }
 
     private static void write(Context c, Thread t, Throwable e) {
-        StringWriter sw = new StringWriter();
-        sw.write(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
-        sw.write("\nLumi " + AppInfo.version() + " · Android " + android.os.Build.VERSION.SDK_INT
-                + " · " + android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
-        sw.write("\nthread " + t.getName() + "\n");
-        e.printStackTrace(new PrintWriter(sw));
-        byte[] b = sw.toString().getBytes("UTF-8");
-        File f = new File(c.getCacheDir(), NAME);
-        FileOutputStream o = new FileOutputStream(f);
-        try { o.write(b, 0, Math.min(b.length, MAX)); } finally { o.close(); }
+        try {
+            StringWriter sw = new StringWriter();
+            sw.write(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+            sw.write("\nLumi " + AppInfo.version() + " · Android " + android.os.Build.VERSION.SDK_INT
+                    + " · " + android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
+            sw.write("\nthread " + t.getName() + "\n");
+            e.printStackTrace(new PrintWriter(sw));
+            byte[] b = sw.toString().getBytes("UTF-8");
+            File f = new File(c.getCacheDir(), NAME);
+            FileOutputStream o = new FileOutputStream(f);
+            try {
+                o.write(b, 0, Math.min(b.length, MAX));
+            } finally {
+                o.close();
+            }
+        } catch (Throwable ignored) {
+            // penangan crash tidak boleh melempar
+        }
     }
 
     static String read(Context c) {
-        File f = new File(c.getCacheDir(), NAME);
-        if (!f.isFile() || f.length() == 0) return null;
         try {
+            File f = new File(c.getCacheDir(), NAME);
+            if (!f.isFile() || f.length() == 0) return null;
             FileInputStream in = new FileInputStream(f);
             byte[] b = new byte[(int) Math.min(f.length(), MAX)];
-            int n = in.read(b);
-            in.close();
+            int n;
+            try {
+                n = in.read(b);
+            } finally {
+                in.close();
+            }
             return n > 0 ? new String(b, 0, n, "UTF-8") : null;
-        } catch (Exception e) { return null; }
+        } catch (Throwable e) {
+            return null;
+        }
     }
 
     static void clear(Context c) {
-        File f = new File(c.getCacheDir(), NAME);
-        if (f.isFile()) f.delete();
+        try {
+            File f = new File(c.getCacheDir(), NAME);
+            if (f.isFile()) f.delete();
+        } catch (Throwable ignored) { }
     }
 
     private CrashLog() { }
