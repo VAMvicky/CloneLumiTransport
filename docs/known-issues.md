@@ -20,6 +20,7 @@ Terakhir diperiksa: v2.20.0.
 | P-02 | 12 script eager, termasuk `data.js` 605 KB dan `stopfix.js` 40 KB | SELESAI (2.20.0) | gtfs.js keluar dari jalur boot; data.js tetap (dibutuhkan layar pertama) |
 | P-03 | tidak ada anggaran ukuran/parse di CI | SELESAI (2.20.0) | tools/boot_budget.py, gagal bila >1500 ms |
 | P-04 | parse 4,1 MB + bangun ulang graf tetap di main thread setelah paint | TERBUKA | boot cepat, tapi ada jeda ±0,4–1 dtk sesaat setelah layar tampil; usul Web Worker atau tetap tidak membundel GTFS |
+| P-05 | anggaran boot hanya mengukur DCL | TERBUKA | jeda pasca-idle tidak terjaga; usul ukur juga waktu sampai graf selesai dibangun |
 
 ## S — keamanan
 
