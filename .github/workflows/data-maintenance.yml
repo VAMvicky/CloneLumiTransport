@@ -1,0 +1,65 @@
+name: Perawatan data (manual)
+
+# Repositori ini tidak menerima run dari `push` maupun `schedule` (hanya
+# workflow_dispatch yang pernah tercatat). Selama penyebabnya belum beres di
+# tingkat akun/repo, jalur ini menyediakan satu tombol untuk menjalankan
+# pekerjaan data yang biasanya dijadwalkan:
+#   - route-watch  (tiap jam)   : memeriksa perubahan rute resmi
+#   - stop-fix     (mingguan)   : menyelaraskan titik halte dengan OSM
+#   - offline-map  (bulanan)    : membangun ulang paket peta offline
+#
+# Dispatch dari GITHUB_TOKEN tetap diizinkan GitHub untuk workflow_dispatch,
+# jadi tombol ini bekerja tanpa perlu token pribadi.
+
+on:
+  workflow_dispatch:
+    inputs:
+      route_watch:
+        description: "Pemeriksaan perubahan rute (biasanya tiap jam)"
+        type: boolean
+        default: true
+      stop_fix:
+        description: "Penyelarasan titik halte dengan OpenStreetMap (mingguan)"
+        type: boolean
+        default: true
+      offline_map:
+        description: "Bangun ulang paket peta offline (bulanan)"
+        type: boolean
+        default: false
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: data-maintenance
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Jalankan pekerjaan data
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Dispatch yang dipilih
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.route_watch }}" = "true" ]; then
+            echo "dispatch route-watch"
+            gh workflow run route-watch.yml --repo "$GITHUB_REPOSITORY"
+          fi
+          if [ "${{ inputs.stop_fix }}" = "true" ]; then
+            echo "dispatch stop-fix"
+            gh workflow run stop-fix.yml --repo "$GITHUB_REPOSITORY"
+          fi
+          if [ "${{ inputs.offline_map }}" = "true" ]; then
+            echo "dispatch offline-map"
+            gh workflow run offline-map.yml --repo "$GITHUB_REPOSITORY"
+          fi
+
+      - name: Ringkasan
+        run: |
+          set -euo pipefail
+          sleep 5
+          gh run list --repo "$GITHUB_REPOSITORY" --limit 6
