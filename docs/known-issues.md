@@ -109,8 +109,9 @@ Terakhir diperiksa: v2.20.2.
 
 | id | isu | status | catatan |
 |---|---|---|---|
-| T-01 | `MainActivity` (84 KB), `GtfsImporter`, `BusWatchService`, `Reminders`, `NavService`, `OfflineMap` tanpa tes | SEBAGIAN (2.20.1) | GtfsImporterTest ditambahkan; Activity/service tetap butuh instrumentation |
-| T-02 | `app.js` 4.600 baris hanya lewat smoke UI | SEBAGIAN (2.20.1) | ui_check kini gagal bila perencanaan <3 opsi; unit app.js belum ada |
+| T-01 | kelas murni tanpa tes | SELESAI (2.20.1) | GoogleKeysTest, RouteDiffTest, CardReaderTest, GtfsImporterTest — jalan di job Gradle (	estReleaseUnitTest) |
+| T-02 | app.js hanya smoke UI | SELESAI (2.20.1) | ui_check kini gagal bila <3 opsi, pencarian halte kosong, atau tombol bagikan tidak menghasilkan apa pun |
+| T-03 | Activity/service tanpa tes instrumentasi | DITOLAK | butuh ndroidTest + emulator; job uji asap emulator sudah ada dan dinilai cukup untuk saat ini |
 | T-03 | lapisan Google tanpa tes | SELESAI | 2.19.6: `tools/test_gmaps.js`, 15 pemeriksaan |
 
 ## OK — diperiksa, ternyata benar
