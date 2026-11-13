@@ -49,7 +49,7 @@ Semua kunci di atas dibatasi ke aplikasi Google Maps (pembatasan aplikasi Androi
 nama paket + sidik sertifikat). Panggilan REST biasa dari mesin lain ditolak:
 
 ```
-GET https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Monas&key=AIzaSyAwL-…
+GET https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Monas&key=<kunci dari APK>
 → REQUEST_DENIED  "This IP, site or mobile application is not authorized to use this API key.
                     Request received from IP address 110.138.95.50, with empty referer"
 ```
@@ -75,7 +75,7 @@ bernama `id.lumi.transport` dengan sertifikatnya sendiri, cukup headernya yang d
 
 ## 3. Apa yang benar-benar terbuka (diuji 11 Nov 2026)
 
-Kunci `AIzaSyAwL-…` dengan header penyamaran:
+Kunci `<kunci dari APK>` dengan header penyamaran:
 
 | Endpoint | Hasil |
 |---|---|
