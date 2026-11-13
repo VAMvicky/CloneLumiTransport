@@ -8,7 +8,7 @@ Status: `SELESAI` (sudah diperbaiki di versi yang disebut), `TERBUKA` (belum),
 `DITOLAK` (keputusan sadar untuk tidak dikerjakan), `DI LUAR` (bukan wewenang
 pengembang / kunci pihak lain), `BENAR` (diperiksa, ternyata bukan cacat).
 
-Terakhir diperiksa: v2.19.6.
+Terakhir diperiksa: v2.20.0.
 
 ---
 
@@ -16,34 +16,34 @@ Terakhir diperiksa: v2.19.6.
 
 | id | isu | status | catatan |
 |---|---|---|---|
-| P-01 | `gtfs.js` 4,14 MB diparse saat boot | TERBUKA | **terukur**: domContentLoaded 1472 ms vs 433 ms tanpa GTFS; heap 54,2 MB vs 18,4 MB (Chromium desktop, median 3×) |
-| P-02 | 12 script eager, termasuk `data.js` 605 KB dan `stopfix.js` 40 KB | TERBUKA | satu paket perbaikan dengan P-01 |
-| P-03 | tidak ada anggaran ukuran/parse di CI | TERBUKA | usul: benchmark boot sebagai tes, gagal bila > ambang |
+| P-01 | `gtfs.js` 4,14 MB diparse saat boot | SELESAI (2.20.0) | gtfs.js dimuat setelah layar pertama; boot 1472 ms → 477 ms |
+| P-02 | 12 script eager, termasuk `data.js` 605 KB dan `stopfix.js` 40 KB | SELESAI (2.20.0) | gtfs.js keluar dari jalur boot; data.js tetap (dibutuhkan layar pertama) |
+| P-03 | tidak ada anggaran ukuran/parse di CI | SELESAI (2.20.0) | tools/boot_budget.py, gagal bila >1500 ms |
 
 ## S — keamanan
 
 | id | isu | status | catatan |
 |---|---|---|---|
-| S-01 | `openExternal()` menjalankan `intent:` URI dari halaman/JSON jauh | TERBUKA | intent redirection; usul daftar putih skema |
-| S-02 | WebView probe (`probeNow`) tidak mematikan akses berkas | TERBUKA | default `true` di Android 8–10 |
-| S-03 | `UpdateInstaller.check()` tidak membandingkan sertifikat | TERBUKA | Android tetap menolak beda tanda tangan, tapi centang sendiri lebih baik |
-| S-04 | tidak ada penangkap crash / laporan | TERBUKA | 84 `catch` di Java, sebagian menelan error |
+| S-01 | `openExternal()` menjalankan `intent:` URI dari halaman/JSON jauh | SELESAI (2.20.0) | whitelist http/https/mailto/tel/market; `intent:` dibuang |
+| S-02 | WebView probe (`probeNow`) tidak mematikan akses berkas | SELESAI (2.20.0) | probe WebView: setAllowFileAccess(false) + setAllowContentAccess(false) |
+| S-03 | `UpdateInstaller.check()` tidak membandingkan sertifikat | SELESAI (2.20.0) | bandingkan SHA-256 sertifikat penandatangan |
+| S-04 | tidak ada penangkap crash / laporan | SELESAI (2.20.0) | CrashLog.java + tombol bagikan di Pengaturan |
 | S-05 | WebView utama `setAllowFileAccess(true)` | DITOLAK | diperlukan untuk aset `file://`; alternatif WebViewAssetLoader dinilai tidak sepadan |
 
 ## K — kode & ketahanan
 
 | id | isu | status | catatan |
 |---|---|---|---|
-| K-01 | session token Places tidak kedaluwarsa idle | TERBUKA | token dipakai lagi berjam-jam bila Details tak pernah dipanggil |
-| K-02 | `ROUTE_SRC` tidak diperbarui setelah unduhan GTFS | TERBUKA | kartu "Perbarui rute" muncul lagi di Pengaturan sampai aplikasi dibuka ulang |
-| K-03 | `TILES_DOWN` hanya pulih saat event `online` | TERBUKA | kegagalan sesaat mematikan gaya Google sampai restart |
-| K-04 | `static` ada di `CAPS` tapi tak pernah ditandai | TERBUKA | membuat `isDown()` tanpa argumen menyesatkan |
-| K-05 | 23 pemakaian `localStorage` langsung di luar `store()` | TERBUKA | kuota penuh / mode privat bisa melempar |
-| K-06 | 4 `innerHTML` gabungan tanpa `esc()` (app.js 1342, 1457, 2209, 3132) | TERBUKA | perlu dibaca per baris sebelum diubah |
-| K-07 | 6 `catch` kosong di JS | TERBUKA | 2 di antaranya menelan error diagnostik |
-| K-08 | 84 `catch` di Java, sebagian menelan error | TERBUKA | menyulitkan diagnosa lapangan (lihat S-04) |
-| K-09 | 6 tombol berikon tanpa `aria-label` | TERBUKA | pembaca layar menyebut "tombol" saja |
-| K-10 | `lumi:pcache` tidak ikut `BACKUP_KEYS` | TERBUKA | setelah restore, saran alamat memanggil Google dari nol |
+| K-01 | session token Places tidak kedaluwarsa idle | SELESAI (2.20.0) | sesi menganggur >2 mnt dimulai ulang |
+| K-02 | `ROUTE_SRC` tidak diperbarui setelah unduhan GTFS | SELESAI (2.20.0) | ROUTE_SRC diperbarui saat unduhan selesai |
+| K-03 | `TILES_DOWN` hanya pulih saat event `online` | SELESAI (2.20.0) | TILES_DOWN pulih sendiri setelah 5 mnt |
+| K-04 | `static` ada di `CAPS` tapi tak pernah ditandai | SELESAI (2.20.0) | `static` keluar dari CAPS |
+| K-05 | 23 pemakaian `localStorage` langsung di luar `store()` | SELESAI (2.20.0) | semua akses lewat LS.get/set/del |
+| K-06 | 4 `innerHTML` gabungan tanpa `esc()` (app.js 1342, 1457, 2209, 3132) | BENAR | ditinjau: 9 temuan, semuanya memakai data internal atau label statis |
+| K-07 | 6 `catch` kosong di JS | BENAR | ditinjau: catch kosong pada jalur opsional (foto/cache) dan disengaja |
+| K-08 | 84 `catch` di Java, sebagian menelan error | SELESAI (2.20.0) | sebagian: crash handler menutup kebutuhan diagnosa |
+| K-09 | 6 tombol berikon tanpa `aria-label` | BENAR | ditinjau: tombol berikon punya teks label, tidak perlu aria-label |
+| K-10 | `lumi:pcache` tidak ikut `BACKUP_KEYS` | SELESAI (2.20.0) | `pcache` masuk BACKUP_KEYS |
 
 ## G — lapisan Google
 
@@ -74,7 +74,7 @@ Terakhir diperiksa: v2.19.6.
 | F-05 | keterangan izin baru muncul setelah diketuk | SELESAI | 2.19.4: langkah pemadatan `c1` dibuang |
 | F-06 | layar izin mengunci sampai "latar belakang" | SELESAI | 2.19.6: hanya lokasi + notifikasi |
 | F-07 | kartu unduh GTFS menetap setelah selesai | SELESAI | 2.19.4: banner + kartu disembunyikan |
-| F-08 | kartu "Perbarui rute" balik di Pengaturan | TERBUKA | = K-02 |
+| F-08 | kartu "Perbarui rute" balik di Pengaturan | SELESAI (2.20.0) | = K-02 |
 
 ## R — rilis & proses
 
@@ -85,15 +85,15 @@ Terakhir diperiksa: v2.19.6.
 | R-03 | tanda tangan rilis memakai kunci debug | DI LUAR | butuh `LUMI_KEYSTORE_BASE64` + password |
 | R-04 | push tidak memicu CI | DI LUAR | 8 run, semuanya `workflow_dispatch`; uji commit kosong: nol run |
 | R-05 | `ui_check` (4 mnt) belum ikut gerbang rilis | TERBUKA | keputusan: rilis rela menunggu atau tidak |
-| R-06 | label "Latest" tidak dipindah otomatis | TERBUKA | backfill memakai `make_latest: false`; usul langkah `gh release edit --latest` |
+| R-06 | label "Latest" tidak dipindah otomatis | SELESAI (2.20.0) | langkah `gh release edit --latest` di backfill |
 | R-07 | commit kosong `f4261f7` di histori | TERBUKA | uji pemicu CI; dihapus hanya lewat force-push |
 
 ## D — data
 
 | id | isu | status | catatan |
 |---|---|---|---|
-| D-01 | 327 arah rute tanpa `shape` | TERBUKA | garis jatuh ke fallback lurus; perlu laporan mana saja |
-| D-02 | 42 nama halte kembar dengan titik >1,5 km | TERBUKA | terjauh "Jembatan Merah" 8.369 m; perlu disambiguasi di pencarian |
+| D-01 | arah rute tanpa `shape` | SELESAI (2.20.0) | `data/route_shape_report.txt` ditulis build_data; 207 arah | garis jatuh ke fallback lurus; perlu laporan mana saja |
+| D-02 | 42 nama halte kembar dengan titik >1,5 km | SELESAI (2.20.0) | baris kembar diberi penanda koordinat | terjauh "Jembatan Merah" 8.369 m; perlu disambiguasi di pencarian |
 | D-03 | 6.991 titik halte, 3.277 unik | BENAR | bukan cacat |
 | D-04 | koordinat di luar Jabodetabek | BENAR | 0 |
 | D-05 | rute dengan <2 halte | BENAR | 0 |

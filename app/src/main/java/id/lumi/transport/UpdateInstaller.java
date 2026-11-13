@@ -107,14 +107,31 @@ final class UpdateInstaller {
         }
     }
 
+    /** Sidik SHA-256 sertifikat penandatangan pertama, atau null. */
+    private static String sigHash(PackageInfo p) {
+        try {
+            if (p.signatures == null || p.signatures.length == 0) return null;
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest(p.signatures[0].toByteArray());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) { return null; }
+    }
+
     /** null bila APK layak dipasang; selain itu alasan penolakan. */
     @SuppressWarnings("deprecation")
     static String check(Activity a, File apk) {
         try {
-            PackageInfo p = a.getPackageManager().getPackageArchiveInfo(apk.getPath(), 0);
+            PackageInfo p = a.getPackageManager().getPackageArchiveInfo(apk.getPath(), android.content.pm.PackageManager.GET_SIGNATURES);
             if (p == null) return Lang.t("APK rusak", "corrupt APK");
             if (!a.getPackageName().equals(p.packageName)) return Lang.t("APK bukan Lumi Transport", "not a Lumi Transport APK");
-            PackageInfo cur = a.getPackageManager().getPackageInfo(a.getPackageName(), 0);
+            PackageInfo cur = a.getPackageManager().getPackageInfo(a.getPackageName(), android.content.pm.PackageManager.GET_SIGNATURES);
+            // v2.20: pastikan APK ditandatangani kunci yang sama dengan yang terpasang.
+            String sc = sigHash(cur), sn = sigHash(p);
+            if (sc == null || sn == null || !sc.equals(sn)) {
+                return Lang.t("APK bukan dari pengembang yang sama", "APK is not signed by the same developer");
+            }
             long nv = android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode;
             long cv = android.os.Build.VERSION.SDK_INT >= 28 ? cur.getLongVersionCode() : cur.versionCode;
             if (nv <= cv) return Lang.t("versi APK tidak lebih baru", "APK version is not newer");

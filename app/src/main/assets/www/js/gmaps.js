@@ -41,7 +41,7 @@ var LumiGoogle = (function () {
    * sendiri, dan OVER_QUERY_LIMIT hanya menidurkan sementara (cooldown
    * berlipat), bukan mematikan permanen.
    */
-  var CAPS = ["autocomplete", "details", "search", "nearby", "static"];
+  var CAPS = ["autocomplete", "details", "search", "nearby"];
   var fault = {};                       // cap -> { why, until, n }; until 0 = permanen
   var COOL_BASE = 60000, COOL_MAX = 15 * 60000;
   function capKey(cap) { return CAPS.indexOf(cap) >= 0 ? cap : "autocomplete"; }
@@ -116,15 +116,16 @@ var LumiGoogle = (function () {
    * + satu Details sebagai satu unit, bukan satu panggilan per ketukan.
    * Sesi ditutup setelah Details dipakai.
    */
-  var sess = null;
+  var sess = null, sessAt = 0;
   function sessionToken() {
-    if (!sess) {
-      sess = "lumi-" + Date.now().toString(36) + "-" +
-        Math.random().toString(36).slice(2, 10);
+    var now = Date.now();
+    if (!sess || now - sessAt > 120000) {          // v2.20: sesi menganggur >2 mnt dianggap selesai
+      sess = "lumi-" + now.toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+      sessAt = now;
     }
     return sess;
   }
-  function endSession() { sess = null; }
+  function endSession() { sess = null; sessAt = 0; }
 
   /* place_id -> koordinat di localStorage: panggilan berulang tidak perlu
      menyentuh Google lagi. Cache hanya bonus; penuh/gagal = dilewati. */

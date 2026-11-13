@@ -2,6 +2,13 @@
 (function () {
   "use strict";
   var E = window.LumiEngine, DATA = window.LUMI_DATA;
+  /* v2.20 — satu pintu ke localStorage: kuota penuh / mode privat tidak boleh melempar. */
+  var LS = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { lumiLog(e, "ls"); } },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) { lumiLog(e, "ls"); } }
+  };
+
   var MODES = E.MODES, RAIL = E.RAIL;
   /* ----------------------------------------------------------------
    * Data rute Transjakarta hasil unduhan GTFS resmi (diproses di HP) menggantikan data bawaan.
@@ -33,14 +40,13 @@
     var b = { h: d.s[d.s.length - 1].n, dir: d.dir, main: true, s: d.s.slice(t), shape: cutShape(t, d.s.length - 1) };
     return [a, b];
   }
-  (function mergeOfficial() {
-    var raw = null;
-    try { raw = window.LumiNative && window.LumiNative.getRouteData && window.LumiNative.getRouteData(); } catch (e) { lumiLog(e); }
-    if (!raw) { try { raw = localStorage.getItem("lumi:gtfsTest"); } catch (e) { lumiLog(e); } }   // untuk uji di browser
-    // R6: belum ada unduhan → pakai ringkasan GTFS resmi yang ikut di APK (js/gtfs.js).
-    var g = null, bundled = false;
-    if (raw) { try { g = JSON.parse(raw); } catch (e) { lumiLog(e, "gtfs"); } }
-    if (!g && window.LUMI_GTFS) { g = window.LUMI_GTFS; bundled = true; }
+  /*
+   * GTFS resmi digabung ke DATA.lines. Sejak v2.20 sumbernya dua:
+   *  - unduhan harian (getRouteData / localStorage), tersedia saat boot;
+   *  - ringkasan bawaan js/gtfs.js (±4 MB) yang dimuat SETELAH layar pertama tampil.
+   * Dulu berkas itu <script> eager dan menambah ±1 detik boot serta ±36 MB heap.
+   */
+  function applyOfficial(g, bundled) {
     window.LUMI_GTFS = null;   // lepaskan memori; DATA.lines sudah memegang yang dipakai
     if (!g || !g.lines || !g.lines.length) return;
     var MAIN = {}; for (var i = 1; i <= 14; i++) MAIN[String(i)] = 1;
@@ -146,7 +152,60 @@
     DATA.lines = lines;
     var n = 0; lines.forEach(function (l) { if (/^GTFS resmi/.test(String(l.note).replace("Halte: ", ""))) n++; });
     ROUTE_SRC = { kind: "gtfs", date: g.date, count: g.lines.length, bundled: bundled };
-  })();
+    // v2.20: graf rute dibangun dari DATA saat start; setelah penggabungan data resmi
+    // graf itu harus dibangun ulang, kalau tidak rute resmi hanya tampil di daftar.
+    try {
+      planner = new E.Planner(DATA);
+      STOP_INDEX = null;
+    } catch (e) { lumiLog(e, "gtfs"); }
+    setTimeout(function () {
+      try { renderGtfsBanner(); } catch (e) { lumiLog(e, "gtfs"); }
+      try { STOP_INDEX = null; } catch (e) {}
+    }, 0);
+  }
+
+  /* Data unduhan lebih baru daripada bawaan; kalau ada, tidak perlu memuat berkas besar. */
+  function bootOfficial() {
+    var raw = null;
+    try { raw = window.LumiNative && window.LumiNative.getRouteData && window.LumiNative.getRouteData(); } catch (e) { lumiLog(e); }
+    if (!raw) { try { raw = LS.get("lumi:gtfsTest"); } catch (e) { lumiLog(e); } }   // untuk uji di browser
+    if (!raw) return false;
+    var g = null;
+    try { g = JSON.parse(raw); } catch (e) { lumiLog(e, "gtfs"); }
+    if (!g) return false;
+    applyOfficial(g, false);
+    return true;
+  }
+
+  function loadBundledGtfs() {
+    if (window.LUMI_GTFS) { applyOfficial(window.LUMI_GTFS, true); return; }
+    var el = document.createElement("script");
+    el.src = "js/gtfs.js";
+    el.async = true;
+    el.onload = function () {
+      try { applyOfficial(window.LUMI_GTFS, true); } catch (e) { lumiLog(e, "gtfs"); }
+      __gtfsFinish();
+    };
+    el.onerror = function () { lumiLog(new Error("gtfs.js gagal dimuat"), "gtfs"); __gtfsFinish(); };
+    (document.head || document.documentElement).appendChild(el);
+  }
+
+  /* Janji kesiapan GTFS resmi: dipakai uji UI supaya tidak menilai layar
+     sebelum data bawaan selesai digabung. */
+  var __gtfsDone = false, __gtfsResolve = null;
+  window.__lumiGtfsReady = new Promise(function (res) { __gtfsResolve = res; });
+  function __gtfsFinish() {
+    if (__gtfsDone) return;
+    __gtfsDone = true;
+    try { __gtfsResolve(true); } catch (e) { lumiLog(e); }
+  }
+
+  var __officialReady = bootOfficial();
+  if (__officialReady) __gtfsFinish();
+  if (!__officialReady) {
+    var __idle = window.requestIdleCallback || function (f) { return setTimeout(f, 1200); };
+    setTimeout(function () { __idle(function () { loadBundledGtfs(); }, { timeout: 3000 }); }, 400);
+  }
   /*
    * Titik halte/stasiun diselaraskan dengan OpenStreetMap (peta yang kamu lihat). Berlaku untuk data bawaan
    * maupun GTFS resmi yang diunduh harian: dicocokkan per nama + jarak ≤80 m dari titik asal.
@@ -193,13 +252,13 @@
   /* Tarif terbaru dari repo (data/fares.json) menggantikan tarif bawaan bila lebih baru (R8). */
   (function applyFares() {
     try {
-      var f = JSON.parse(localStorage.getItem("lumi:fares") || "null");
+      var f = JSON.parse(LS.get("lumi:fares") || "null");
       if (f && validFares(f) && f.updated > ((DATA.fares || {}).updated || "")) DATA.fares = f;
     } catch (e) { lumiLog(e); }
   })();
   (function applyStopFix() {
     var F = window.LUMI_STOPFIX;
-    try { var c = JSON.parse(localStorage.getItem("lumi:stopfix") || "null"); if (c && validStopFix(c) && (!F || c.date > F.date)) F = c; } catch (e) { lumiLog(e); }
+    try { var c = JSON.parse(LS.get("lumi:stopfix") || "null"); if (c && validStopFix(c) && (!F || c.date > F.date)) F = c; } catch (e) { lumiLog(e); }
     if (!F || !F.fix || F.v !== 2) return;
     var n = 0;
     DATA.lines.forEach(function (l) {
@@ -217,7 +276,7 @@
   })();
   var planner = new E.Planner(DATA);
   // B10: kait uji hanya aktif di browser (bukan aplikasi Android) atau bila localStorage "lumi:debug" = "1".
-  var DEBUG = !window.LumiNative; try { if (localStorage.getItem("lumi:debug") === "1") DEBUG = true; } catch (e) { lumiLog(e); }
+  var DEBUG = !window.LumiNative; try { if (LS.get("lumi:debug") === "1") DEBUG = true; } catch (e) { lumiLog(e); }
   if (DEBUG) window.__lumiDebug = { openLive: function (s) { var ls = linesAtStop(s).filter(liveOk); if (!ls.length) ls = planner.lines.filter(function (l) { return l.id === "tj-9"; }); openLiveAt(s.p, s.n, { stop: s, lines: ls }); }, planner: planner, data: DATA, src: function () { return ROUTE_SRC; }, tripZoom: function () { return tripMap ? tripMap.getZoom() : -1; }, liveWalk: function () { return LIVEW; }, busEta: function (b, l, p, f) { return busEta(b, l, p, f); }, routeEta: function (b, l, p) { return routeEta(b, l, p); }, busEnd: function (b, l) { return busEnd(b, l); }, dynKm: function () { return (GT.trip.dyn || []).map(function (d) { return pathKm(d.lines[1].getLatLngs().map(function (q) { return [q.lat, q.lng]; })); }); } };   // untuk pengujian
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
@@ -302,7 +361,7 @@
       window.__lumiInsets(in0.top, in0.bottom, in0.ime);
     }
   } catch (e) { lumiLog(e); }
-  function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem("lumi:" + k)); localStorage.setItem("lumi:" + k, JSON.stringify(v)); } catch (e) { return null; } }
+  function store(k, v) { try { if (v === undefined) return JSON.parse(LS.get("lumi:" + k)); LS.set("lumi:" + k, JSON.stringify(v)); } catch (e) { return null; } }
 
   /* ------------------------------------------------------- riwayat perjalanan */
   function trips() { var t = store("trips"); return Array.isArray(t) ? t : []; }
@@ -383,6 +442,26 @@
     STOP_INDEX = out.sort(function (a, b) { return a.n.localeCompare(b.n); });
     return STOP_INDEX;
   }
+  /* D-02: nama halte kembar yang titiknya berjauhan diberi penanda koordinat,
+     supaya daftar tidak menampilkan dua baris yang tampak identik. */
+  var DUP_TAG = null;
+  function dupTags() {
+    if (DUP_TAG) return DUP_TAG;
+    var g = {};
+    stopIndex().forEach(function (s) {
+      var k = nmKey(s.n), e = g[k];
+      if (!e) { g[k] = { n: 1, lo: [s.p[0], s.p[1]], hi: [s.p[0], s.p[1]] }; return; }
+      e.n++;
+      e.lo = [Math.min(e.lo[0], s.p[0]), Math.min(e.lo[1], s.p[1])];
+      e.hi = [Math.max(e.hi[0], s.p[0]), Math.max(e.hi[1], s.p[1])];
+    });
+    DUP_TAG = {};
+    Object.keys(g).forEach(function (k) {
+      if (g[k].n > 1 && E.hav(g[k].lo, g[k].hi) > 1.5) DUP_TAG[k] = true;
+    });
+    return DUP_TAG;
+  }
+
   function renderStops(q) {
     q = (q || "").toLowerCase();
     var list = stopIndex().filter(function (s) { return !q || s.n.toLowerCase().indexOf(q) >= 0; }).slice(0, 200);
@@ -391,7 +470,10 @@
     if (!list.length) { box.innerHTML = '<p class="fav-empty">' + tl("Tidak ada halte atau stasiun yang cocok.", "No matching stop or station.") + "</p>"; return; }
     box.innerHTML = list.map(function (s, i) {
       var codes = Object.keys(s.codes).slice(0, 5).join(", ");
-      return '<button class="stop-row" data-stop="' + i + '"><b>' + esc(s.n) + '</b><span>' + esc(codes) + "</span></button>";
+      var where = dupTags()[nmKey(s.n)]
+        ? '<span class="stop-where">' + s.p[0].toFixed(3) + ", " + s.p[1].toFixed(3) + "</span>"
+        : "";
+      return '<button class="stop-row" data-stop="' + i + '"><b>' + esc(s.n) + '</b><span>' + esc(codes) + where + "</span></button>";
     }).join("");
     $$("#stopList .stop-row").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -468,7 +550,7 @@
   }
 
   /* ------------------------------------------------------- cadangkan & pulihkan */
-  var BACKUP_KEYS = ["cfg", "favs", "trips", "places", "recent", "onboarded", "guide", "remindLead", "routePrefs"];
+  var BACKUP_KEYS = ["cfg", "favs", "trips", "places", "recent", "onboarded", "guide", "remindLead", "routePrefs", "pcache"];
   function backupText() {
     var data = {};
     BACKUP_KEYS.forEach(function (k) {
@@ -1248,7 +1330,7 @@
   /* ------------------------------------------------------- info perubahan rute */
   function getChanges() {
     var raw = null;
-    try { raw = NATIVE && NATIVE.getChanges ? NATIVE.getChanges() : localStorage.getItem("lumi:changesTest"); } catch (e) { lumiLog(e); }
+    try { raw = NATIVE && NATIVE.getChanges ? NATIVE.getChanges() : LS.get("lumi:changesTest"); } catch (e) { lumiLog(e); }
     try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
   function fmtDate(d) {
@@ -2572,6 +2654,7 @@
         layer.on("tileerror", function () {
           if (++errs !== 8 || TILES_DOWN) return;
           TILES_DOWN = true;
+          setTimeout(function () { TILES_DOWN = false; if (mapStyleKey() === "google") applyBasemap(); }, 5 * 60000);
           lumiLog(new Error("petak Google ditolak"), "map");
           toast(tl("Peta Google tidak bisa dimuat — beralih ke OpenStreetMap.", "Google tiles failed — switching to OpenStreetMap."));
           var c = cfg(); c.basemap = "osm"; store("cfg", c);
@@ -3454,6 +3537,8 @@
     $$(".gtfs-status").forEach(function (el) { el.textContent = state === "error" ? tl("Gagal: ", "Failed: ") + msg : state === "done" ? tl("Selesai. Memuat ulang…", "Done. Reloading…") : msg; });
     if (state === "done") {
       store("gtfsDate", msg);
+      // v2.20: UI harus tahu unduhan berhasil tanpa menunggu aplikasi dibuka ulang.
+      try { ROUTE_SRC = { kind: "gtfs", date: msg, count: ROUTE_SRC.count || 0, bundled: false }; } catch (e) { lumiLog(e); }
       // Kartu unduhan tidak boleh menetap setelah selesai; data baru dipakai saat
       // halaman dimuat ulang, jadi kartunya disembunyikan lebih dulu.
       var gb = $("#gtfsBanner");
@@ -3537,7 +3622,19 @@
     html += langCardHTML();
     html += aboutCardHTML();
     html += '<p class="set-credit">\u00a9 OpenStreetMap contributors \u00b7 Peta \u00a9 Google</p>';
-    $("#settingsBody").innerHTML = tr(html);
+    var crashText = null;
+    try { if (NATIVE && NATIVE.lastCrash) crashText = NATIVE.lastCrash(); } catch (e) { lumiLog(e); }
+    if (crashText) {
+      html += '<div class="set-card"><h3>' + tl("Laporan crash terakhir", "Last crash report") + "</h3><p>" +
+        tl("Lumi terakhir berhenti mendadak. Bagikan laporan ini bila mau ditelusuri.", "Lumi stopped unexpectedly. Share this report if you want it looked into.") +
+        '</p><button class="btn-sec" id="btnCrash" type="button">' + tl("Bagikan laporan", "Share report") + "</button></div>";
+    }
+    $("#settingsBody").innerHTML = tr(html);    var bc = $("#btnCrash");
+    if (bc) bc.addEventListener("click", function () {
+      try { NATIVE.share(crashText); if (NATIVE.clearCrash) NATIVE.clearCrash(); toast(tl("Laporan dibagikan", "Report shared")); }
+      catch (e) { lumiLog(e); }
+    });
+
     var aboutUp = $("#btnUpdate");
     if (aboutUp) aboutUp.addEventListener("click", checkUpdate);
     $$("#settingsBody [data-url]").forEach(function (a) { a.addEventListener("click", function () { openExt(a.dataset.url); }); });
@@ -3607,7 +3704,7 @@
   /* Perbarui koreksi titik halte (OpenStreetMap) dan tarif dari GitHub, paling sering tiap 3 hari.
    * Isi diperiksa (ukuran, bentuk, rentang) sebelum disimpan; dipakai sejak aplikasi dibuka berikutnya. */
   (function refreshRemoteData() {
-    var last = 0; try { last = +localStorage.getItem("lumi:stopfixAt") || 0; } catch (e) { lumiLog(e); }
+    var last = 0; try { last = +LS.get("lumi:stopfixAt") || 0; } catch (e) { lumiLog(e); }
     if (Date.now() - last < 3 * 864e5) return;
     var BASE = "https://raw.githubusercontent.com/VAMvicky/LumiTransport/main/data/";
     function fetchJson(name, maxBytes) {
@@ -3618,14 +3715,14 @@
       });
     }
     setTimeout(function () {
-      try { localStorage.setItem("lumi:stopfixAt", String(Date.now())); } catch (e) { lumiLog(e); }
+      try { LS.set("lumi:stopfixAt", String(Date.now())); } catch (e) { lumiLog(e); }
       fetchJson("stop_fix.json", 3000000).then(function (j) {
         if (!validStopFix(j)) throw new Error("stop_fix.json tidak valid");
-        try { localStorage.setItem("lumi:stopfix", JSON.stringify(j)); } catch (e) { lumiLog(e); }
+        try { LS.set("lumi:stopfix", JSON.stringify(j)); } catch (e) { lumiLog(e); }
       }).catch(function (e) { lumiLog(e, "stopfix"); });
       fetchJson("fares.json", 100000).then(function (f) {
         if (!validFares(f)) throw new Error("fares.json tidak valid");
-        try { localStorage.setItem("lumi:fares", JSON.stringify(f)); } catch (e) { lumiLog(e); }
+        try { LS.set("lumi:fares", JSON.stringify(f)); } catch (e) { lumiLog(e); }
       }).catch(function (e) { lumiLog(e, "fares"); });
     }, 8000);
   })();

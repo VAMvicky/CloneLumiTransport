@@ -1112,3 +1112,6 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 
 /* v2.19.4 - atribusi peta di Pengaturan (bukan tulisan di atas peta) */
 .set-credit { margin: 10px 0 0; font-size: 11.5px; color: #7A93A8; text-align: center; }
+
+/* D-02 — penanda lokasi untuk nama halte kembar */
+.stop-where { margin-left: 8px; font-size: 11px; color: #7A93A8; letter-spacing: .2px; }

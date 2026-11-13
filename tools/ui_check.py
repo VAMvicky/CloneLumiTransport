@@ -111,7 +111,12 @@ async def main():
             for k in ["loc", "notif", "battery"]:
                 await pg.click(f'[data-perm="{k}"]'); await pg.wait_for_timeout(120)
             await grab("onboard2-ok", True)
-        await pg.evaluate("document.querySelector('#obDone').click()"); await grab("home", True)
+        await pg.evaluate("document.querySelector('#obDone').click()")
+        try:
+            await pg.evaluate("window.__lumiGtfsReady ? window.__lumiGtfsReady : null")
+        except Exception:
+            pass
+        await grab("home", True)
 
         # seed data
         await pg.evaluate("""() => {

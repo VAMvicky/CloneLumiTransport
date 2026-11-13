@@ -73,6 +73,9 @@ jobs:
       - name: Pasang Playwright (memakai Chrome bawaan runner)
         run: pip install --quiet playwright==1.63.0
 
+      - name: Anggaran waktu boot
+        run: python3 tools/boot_budget.py
+
       - name: Uji semua layar + terjemahan Inggris (gagal = ada galat JS / teks belum diterjemahkan)
         run: |
           set -euo pipefail

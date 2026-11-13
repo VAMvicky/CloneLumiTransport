@@ -1,0 +1,210 @@
+Arah rute tanpa shape: 207
+Garis rute ini digambar lurus antar halte. Sumber: build_data.py
+
+10B  arah Arah balik
+10B  arah Rusun Cipinang Besar Selatan - Penas Kalimalang - Rusun Cipinang Besar Selatan
+11D  arah Pulo Gadung - Pulo Gebang
+11D  arah Pulo Gebang - Pulo Gadung
+11M  arah Bukit Duri - Rusun Rawa Bebek
+11M  arah Rusun Rawa Bebek - Bukit Duri
+11Q  arah Kampung Melayu - Pulo Gebang via BKT
+11Q  arah Pulo Gebang - Tebet via BKT
+12B  arah Pluit - Senen
+12B  arah Senen - Pluit
+12F  arah Rusun Marunda - Rusun Waduk Pluit
+12F  arah Rusun Waduk Pluit - Rusun Marunda
+1E  arah Blok M - Pondok Labu
+1E  arah Pondok Labu - Blok M
+1F  arah Bundaran Senayan - Stasiun Palmerah
+1F  arah Stasiun Palmerah - Bundaran Senayan via Jl. Asia Afrika
+1H  arah Arah balik
+1H  arah Stasiun Tanah Abang - Stasiun Gondangdia - Stasiun Tanah Abang
+1K  arah Blok M - Cibubur
+1K  arah Cibubur - Blok M
+1M  arah Blok M - Meruya
+1M  arah Meruya - Blok M
+1Q  arah Blok M - Rempoa
+1Q  arah Rempoa - Blok M
+1R  arah Senen - Stasiun Tanah Abang
+1R  arah Stasiun Tanah Abang - Senen
+2F  arah Pulo Gadung - Rusun Cakung Barat (Albo)
+2F  arah Rusun Cakung Barat (Albo) - Pulo Gadung
+2P  arah Arah balik
+2P  arah Gondangdia - Senen - Gondangdia
+2Q  arah Arah balik
+2Q  arah Gondangdia - Balai Kota - Gondangdia
+3A  arah Kalideres - Rusun Pesakih
+3A  arah Rusun Pesakih - Kalideres
+3E  arah Puri Kembangan - Sentraland Cengkareng
+3E  arah Sentraland Cengkareng - Puri Kembangan
+4B  arah Stasiun Manggarai - Universitas Indonesia
+4B  arah Universitas Indonesia - Stasiun Manggarai via Kampus UI
+5B  arah Arah balik
+5B  arah Stasiun Tebet - Kebon Pala - Bidara Cina - Stasiun Tebet
+5F  arah Kampung Melayu - Tanah Abang
+5F  arah Tanah Abang - Kampung Melayu
+5M  arah Kampung Melayu - Stasiun Tanah Abang via Cikini
+5M  arah Stasiun Tanah Abang - Kampung Melayu via Cikini
+6H  arah Lebak Bulus - Senen
+6H  arah Senen - Lebak Bulus
+6M  arah Blok M - Stasiun Manggarai
+6M  arah Stasiun Manggarai - Blok M
+6N  arah Blok M - Ragunan
+6N  arah Ragunan - Blok M
+7A  arah Kampung Rambutan - Lebak Bulus
+7A  arah Lebak Bulus - Kampung Rambutan
+7B  arah Blok M - Kampung Rambutan
+7B  arah Kampung Rambutan - Blok M
+8E  arah Bintaro - Blok M
+8E  arah Blok M - Bintaro
+9  arah Pinang Ranti - Pluit (via Tol)
+9D  arah Pasar Minggu - Tanah Abang
+9D  arah Tanah Abang - Pasar Minggu
+9E  arah Jelambar - Kebayoran Lama
+9E  arah Kebayoran Lama - Jelambar
+B  arah Bogor → Jakarta Kota
+B  arah Jakarta Kota → Bogor
+B13  arah Blok M - Summarecon Bekasi
+B13  arah Summarecon Bekasi - Blok M
+B14  arah Kuningan - Summarecon Bekasi
+B14  arah Summarecon Bekasi - Kuningan
+BST  arah Bandara Soekarno-Hatta → Manggarai
+BST  arah Manggarai → Bandara Soekarno-Hatta
+Bk  arah Dukuh Atas → Jati Mulya
+Bk  arah Jati Mulya → Dukuh Atas
+B·N  arah Jakarta Kota → Nambo
+B·N  arah Nambo → Jakarta Kota
+C  arah Cikarang → Kampung Bandan
+C  arah Kampung Bandan → Cikarang
+Cb  arah Dukuh Atas → Harjamukti
+Cb  arah Harjamukti → Dukuh Atas
+C·S  arah Cikarang → Kampung Bandan
+C·S  arah Kampung Bandan → Cikarang
+JAK01  arah Plumpang - Tanjung Priok
+JAK01  arah Tanjung Priok - Plumpang
+JAK02  arah Duren Sawit - Kampung Melayu
+JAK02  arah Kampung Melayu - Duren Sawit
+JAK04  arah Grogol - Tubagus Angke
+JAK04  arah Tubagus Angke - Grogol
+JAK05  arah Rorotan - Semper
+JAK05  arah Semper - Rorotan
+JAK06  arah Kampung Rambutan - Pondok Gede
+JAK06  arah Pondok Gede - Kampung Rambutan
+JAK07  arah Grogol - Tanah Abang
+JAK07  arah Tanah Abang - Grogol
+JAK09  arah Arah balik
+JAK09  arah Roxy Mas - Karet
+JAK10  arah Kota - Tanah Abang
+JAK10  arah Tanah Abang - Kota
+JAK10A  arah Cikini - Gondangdia via Salemba
+JAK10A  arah Gondangdia - Cikini via Salemba
+JAK10B  arah Cikini - Gondangdia via Kramat
+JAK10B  arah Gondangdia - Cikini via Kramat
+JAK11  arah Kebayoran Lama - Tanah Abang
+JAK11  arah Tanah Abang - Kebayoran Lama
+JAK112  arah Pulo Gadung - Tanah Merah
+JAK112  arah Tanah Merah - Pulo Gadung
+JAK117  arah Terminal Tanah Merdeka - Terminal Tanjung Priok
+JAK117  arah Terminal Tanjung Priok - Terminal Tanah Merdeka
+JAK12  arah Kebayoran Lama - Tanah Abang via Pos Pengumben
+JAK12  arah Tanah Abang - Kebayoran Lama via Pos Pengumben
+JAK14  arah Meruya - Tanah Abang
+JAK14  arah Tanah Abang - Meruya
+JAK16  arah Cililitan - Condet
+JAK16  arah Condet - Cililitan
+JAK18  arah Kuningan - Stasiun Duren Kalibata
+JAK18  arah Stasiun Duren Kalibata - Kuningan
+JAK20  arah Cawang UKI - Lubang Buaya
+JAK20  arah Lubang Buaya - Cawang UKI
+JAK22  arah Dwikora - Penas Kalimalang
+JAK22  arah Penas Kalimalang - Dwikora
+JAK24  arah Pulo Gadung - Senen via Kelapa Gading
+JAK24  arah Senen - Pulo Gadung via Kelapa Gading
+JAK25  arah Kalisari - Pasar Rebo
+JAK25  arah Pasar Rebo - Kalisari
+JAK26  arah Duren Sawit - Rawamangun
+JAK26  arah Rawamangun - Duren Sawit
+JAK27  arah Pulo Gebang - Rorotan
+JAK27  arah Rorotan - Pulo Gebang
+JAK29  arah Rusun Sukapura - Semper - Tanjung Priok
+JAK29  arah Tanjung Priok - Semper - Rusun Sukapura
+JAK30  arah Grogol - Meruya
+JAK30  arah Meruya - Grogol
+JAK33  arah Kota - Pulo Gadung
+JAK33  arah Pulo Gadung - Kota
+JAK34  arah Klender - Rawamangun
+JAK34  arah Rawamangun - Klender
+JAK35  arah Pangkalan Jati - Rawamangun
+JAK35  arah Rawamangun - Pangkalan Jati
+JAK36  arah Cilangkap - Cililitan
+JAK36  arah Cililitan - Cilangkap
+JAK37  arah Cililitan - Condet via Kayu Manis
+JAK37  arah Condet - Cililitan via Kayu Manis
+JAK38  arah Bulak Ringin - Kampung Rambutan
+JAK38  arah Kampung Rambutan - Bulak Ringin
+JAK39  arah Duren Sawit - Kalimalang
+JAK39  arah Kalimalang - Duren Sawit
+JAK41  arah Kampung Melayu - Pulo Gadung
+JAK41  arah Pulo Gadung - Kampung Melayu
+JAK42  arah Kampung Melayu - Pondok Kelapa
+JAK42  arah Pondok Kelapa - Kampung Melayu
+JAK45  arah Lebak Bulus - Ragunan
+JAK45  arah Ragunan - Lebak Bulus
+JAK46  arah Jagakarsa - Pasar Minggu
+JAK46  arah Pasar Minggu - Jagakarsa
+JAK47  arah Ciganjur - Terminal Pasar Minggu
+JAK47  arah Terminal Pasar Minggu - Ciganjur
+JAK49  arah Cipulir - Lebak Bulus
+JAK49  arah Lebak Bulus - Cipulir
+JAK50  arah Kalideres - Puri Kembangan
+JAK50  arah Puri Kembangan - Kalideres
+JAK51  arah Budi Luhur - Taman Kota
+JAK51  arah Taman Kota - Budi Luhur
+JAK52  arah Kalideres - Muara Angke
+JAK52  arah Muara Angke - Kalideres
+JAK53  arah Grogol - Pos Pengumben via Slipi
+JAK53  arah Pos Pengumben - Grogol via Slipi
+JAK54  arah Benhil - Grogol
+JAK54  arah Grogol - Benhil
+JAK59  arah Rawa Sengon - Rawamangun
+JAK59  arah Rawamangun - Rawa Sengon
+JAK60  arah Kelapa Gading - Sunter Kemayoran
+JAK60  arah Sunter Kemayoran - Kelapa Gading
+JAK61  arah Cempaka Putih - Pulo Gadung
+JAK61  arah Pulo Gadung - Cempaka Putih
+JAK71  arah Kampung Rambutan - Pinang Ranti
+JAK71  arah Pinang Ranti - Kampung Rambutan
+JAK72  arah Kampung Rambutan - Pasar Rebo
+JAK72  arah Pasar Rebo - Kampung Rambutan
+JAK73  arah Jambore Cibubur - Pasar Rebo
+JAK73  arah Pasar Rebo - Jambore Cibubur
+JAK74  arah Cipinang Muara - Terminal Rawamangun
+JAK74  arah Terminal Rawamangun - Cipinang Muara
+JAK77  arah Jembatan Hitam - Tanjung Priok
+JAK77  arah Tanjung Priok - Jembatan Hitam
+JAK80  arah Rawa Buaya - Rawa Kompeni
+JAK80  arah Rawa Kompeni - Rawa Buaya
+JAK84  arah Kampung Melayu - Kapin Raya
+JAK84  arah Kapin Raya - Kampung Melayu
+JAK85  arah Bintara - Cipinang Indah
+JAK85  arah Cipinang Indah - Bintara
+JAK88  arah Ancol Barat - Tanjung Priok
+JAK88  arah Tanjung Priok - Ancol Barat
+L1  arah Manggarai → Pegangsaan Dua
+L1  arah Pegangsaan Dua → Manggarai
+M  arah Bundaran HI → Lebak Bulus
+M  arah Lebak Bulus → Bundaran HI
+P11  arah Blok M → Bogor
+P11  arah Bogor → Blok M
+R  arah Rangkasbitung → Tanah Abang
+R  arah Tanah Abang → Rangkasbitung
+S31  arah Bintaro - Blok M
+S31  arah Blok M - Bintaro
+T  arah Duri → Tangerang
+T  arah Tangerang → Duri
+T31  arah Blok M → PIK
+T31  arah PIK → Blok M
+TP  arah Jakarta Kota → Tanjung Priok
+TP  arah Tanjung Priok → Jakarta Kota
+W  arah Halim → Tegalluar
+W  arah Tegalluar → Halim

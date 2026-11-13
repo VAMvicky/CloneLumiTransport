@@ -510,6 +510,21 @@ for l in lines:
     if not l.get("noStops"):
         meta["counts"][l["mode"]] = meta["counts"].get(l["mode"], 0) + 1
 
+# D-01: arah rute tanpa geometri jalan. Bukan galat, tapi perlu kelihatan:
+# garis rute seperti itu jatuh ke fallback lurus antar halte.
+_miss = set()
+for _l in lines:
+    for _d in (_l.get("dirs") or []):
+        if not _d.get("shape"):
+            _miss.add(_l["code"] + "  arah " + str(_d.get("dir") or _d.get("h") or _d.get("headsign") or "?"))
+_report = os.path.join(ROOT, "data", "route_shape_report.txt")
+with open(_report, "w", encoding="utf-8") as _f:
+    _f.write("Arah rute tanpa shape: %d\n" % len(_miss))
+    _f.write("Garis rute ini digambar lurus antar halte. Sumber: build_data.py\n\n")
+    for _x in sorted(_miss):
+        _f.write(_x + "\n")
+print("laporan shape:", _report, len(_miss), "arah")
+
 # R8: tarif dari satu sumber (data/fares.json)
 FARES = json.load(open(os.path.join(ROOT, "data", "fares.json"), encoding="utf-8"))
 if FARES.get("v") != 1 or not all(k in FARES for k in ("tj", "krl", "mrt", "lrt", "lrtj", "kaBandara", "whoosh", "ojol")):

@@ -86,6 +86,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Lang.load(this);
+        CrashLog.install(getApplicationContext());
         pendingShortcut = getIntent() == null ? null : getIntent().getStringExtra("lumi_shortcut");
         Window w = getWindow();
         if (Build.VERSION.SDK_INT >= 30) {
@@ -488,9 +489,16 @@ public class MainActivity extends Activity {
 
     private void openExternal(String url) {
         try {
-            Intent i;
-            if (url.startsWith("intent:")) i = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-            else i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            // v2.20: hanya skema yang memang membuka konten. `intent:` dibuang karena bisa
+            // dipakai mengarahkan Intent ke komponen lain (intent redirection).
+            String scheme = Uri.parse(url).getScheme();
+            scheme = scheme == null ? "" : scheme.toLowerCase(java.util.Locale.ROOT);
+            if (!("http".equals(scheme) || "https".equals(scheme) || "mailto".equals(scheme)
+                    || "tel".equals(scheme) || "market".equals(scheme))) {
+                js("window.lumiToast && lumiToast(" + JSONObject.quote(Lang.t("Tautan tidak didukung", "Unsupported link")) + ")");
+                return;
+            }
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
         } catch (Exception e) {
@@ -790,6 +798,8 @@ public class MainActivity extends Activity {
         final boolean[] done = {false};
         w.getSettings().setJavaScriptEnabled(true);
         w.getSettings().setDomStorageEnabled(true);
+        w.getSettings().setAllowFileAccess(false);      // v2.20: halaman jauh tidak perlu berkas lokal
+        w.getSettings().setAllowContentAccess(false);
         w.getSettings().setUserAgentString(DESKTOP_UA);
         w.setWebViewClient(new WebViewClient() {
             @Override
@@ -943,6 +953,11 @@ public class MainActivity extends Activity {
 
         /** Lokasi yang dibagikan sebelum halaman siap (dipanggil sekali saat start). */
         @JavascriptInterface
+        /** Laporan crash terakhir (null bila tidak ada). */
+        public String lastCrash() { return CrashLog.read(MainActivity.this); }
+
+        public void clearCrash() { CrashLog.clear(MainActivity.this); }
+
         public String takeShared() {
             String s = pendingShare;
             pendingShare = null;
