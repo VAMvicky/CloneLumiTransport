@@ -60,8 +60,18 @@
     return false;
   }
   function waitAt(line, m) {
-    var w = MODES[line.mode].wait;
-    if (isNight(m) && (line.mode === "TJ" || line.mode === "MIKRO")) return 25;   // AMARI tiap ±20–40 mnt
+    var mode = line.mode, w = MODES[mode].wait;
+    if (isNight(m) && (mode === "TJ" || mode === "MIKRO")) return 25;   // AMARI tiap ±20–40 mnt
+    // D-03: headway rail tidak rata. Satu angka membuat ETA pagi terlalu optimis
+    // dan malam terlalu pesimis, jadi pakai pita jam.
+    if (mode === "KRL") {
+      var peak = (m >= 360 && m < 540) || (m >= 960 && m < 1200);      // 06.00–09.00, 16.00–20.00
+      return peak ? 6 : 18;
+    }
+    if (mode === "LRTJ") {
+      var pk = (m >= 420 && m < 540) || (m >= 960 && m < 1140);        // 07.00–09.00, 16.00–19.00
+      return pk ? 6 : 12;
+    }
     return w;
   }
 

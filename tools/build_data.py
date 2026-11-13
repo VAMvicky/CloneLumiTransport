@@ -566,25 +566,7 @@ if STOPFIX:
         json.dump(STOPFIX, f, separators=(",", ":"), ensure_ascii=False)
         f.write(";\n")
 
-# R6: ringkasan GTFS resmi terbaru (cabang gtfs-data) ikut di APK, supaya HP yang belum/gagal mengunduh
-# tetap punya daftar halte lengkap untuk semua rute. Sumber: data-raw/tj_gtfs.json (diambil CI sebelum build,
-# tidak di-commit) atau variabel LUMI_GTFS_JSON. Tanpa sumber, gtfs.js berisi null dan aplikasi memakai data bawaan.
-GP = os.environ.get("LUMI_GTFS_JSON") or os.path.join(RAW, "tj_gtfs.json")
-GOUT = os.path.join(os.path.dirname(OUT), "gtfs.js")
+# v2.20.1: ringkasan GTFS resmi tidak lagi ditanam di APK (lihat docs/known-issues.md P-04).
+# Data resmi diunduh aplikasi saat berjalan; yang tersimpan dipakai pada pembukaan berikutnya.
 g = None
-if os.path.exists(GP):
-    g = json.load(open(GP, encoding="utf-8"))
-    ok = isinstance(g, dict) and isinstance(g.get("lines"), list) and len(g["lines"]) >= 100 and \
-        all(isinstance(r.get("dirs"), list) and r.get("code") for r in g["lines"])
-    if not ok:
-        sys.exit("tj_gtfs.json tidak valid (butuh ≥100 rute berisi code + dirs)")
-    meta_p = os.path.join(ROOT, "data", "gtfs_meta.json")
-    if not re.match(r"\d{4}-\d{2}-\d{2}", str(g.get("date", ""))):
-        g["date"] = json.load(open(meta_p))["updated"][:10] if os.path.exists(meta_p) else "?"
-with open(GOUT, "w", encoding="utf-8") as f:
-    f.write("/* Dibuat otomatis oleh tools/build_data.py dari cabang gtfs-data — jangan diedit manual. */\n")
-    f.write("window.LUMI_GTFS=")
-    if g: json.dump(g, f, separators=(",", ":"), ensure_ascii=False)
-    else: f.write("null")
-    f.write(";\n")
-print("GTFS bawaan:", (str(len(g["lines"])) + " rute, " + g["date"]) if g else "tidak ada (data bawaan saja)", "· titik OSM:", fixed)
+print("GTFS bawaan: tidak ditanam (diunduh saat runtime) · titik OSM:", fixed)

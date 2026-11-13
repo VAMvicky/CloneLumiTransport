@@ -794,6 +794,12 @@ public class MainActivity extends Activity {
 
     /** Muat tautan di WebView tersembunyi dan tunggu koordinat muncul di URL/halaman (maks. 20 detik). */
     private void probeNow(final String id, final String url) {
+        // S-06: tautan datang dari teks bagikan aplikasi lain; hanya http(s) yang dimuat.
+        String scheme = Uri.parse(url).getScheme();
+        if (!("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+            deliverResolved(id, url, null);
+            return;
+        }
         final WebView w = new WebView(this);
         final boolean[] done = {false};
         w.getSettings().setJavaScriptEnabled(true);

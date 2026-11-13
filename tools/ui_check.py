@@ -151,6 +151,8 @@ async def main():
             await pg.evaluate("a => { __lumiSet('from', {name: a[0], p: a[1]}); __lumiSet('to', {name: a[2], p: a[3]}); }", [fn, fp, tn, tp])
             await pg.click("#btnGo"); await pg.wait_for_timeout(1500); await grab(f"results{i}", i == 0)
             n = await pg.evaluate("document.querySelectorAll('#results .it').length")
+            if i == 0 and n < 3:
+                raise SystemExit("GAGAL: perencanaan hanya menghasilkan %d opsi (minimal 3)" % n)
             if i == 0:
                 await pg.click('.fbar [data-access]'); await pg.wait_for_timeout(200); await grab("access", True)
                 await pg.click('.fbar [data-access]')

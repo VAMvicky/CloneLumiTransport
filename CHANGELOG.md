@@ -10,6 +10,17 @@
 
 ---
 
+## ✦ v2.20.1 — 13 November 2026 / 13 November 2026
+
+- 🇮🇩 **GTFS tidak lagi ditanam di APK.** Parsing 4,1 MB di WebView selalu memblokir thread utama — dulu saat boot, lalu sesaat setelah layar tampil setelah dipindah. Bundling-nya dibatalkan: data resmi diunduh di latar belakang seperti semula, dan yang tersimpan dipakai saat aplikasi dibuka. Boot 398 ms, dan tidak ada jeda setelah layar tampil. `versionCode` **22001**
+- 🇮🇩 **Anggaran boot mengukur dua hal.** Selain `domContentLoaded`, CI kini juga mengukur waktu sampai graf rute siap (anggaran 2500 ms). `versionCode` **22001**
+- 🇮🇩 **Sisa temuan ditutup.** Hasil rute yang sudah tampil dihitung ulang setelah data resmi masuk; `probeNow()` hanya memuat `http/https`; headway KRL/LRT Jabodebek mengikuti pita jam (sibuk 6 mnt, luar sibuk 18/12 mnt); `ui_check` en+id masuk gerbang rilis; tes `GtfsImporter` ditambahkan; `ui_check` gagal bila perencanaan menghasilkan <3 opsi. `versionCode` **22001**
+- 🇬🇧 **GTFS is no longer bundled.** Parsing 4.1 MB in a WebView always blocks the main thread — first at boot, then just after first paint once it was deferred. Bundling is reverted: official data is downloaded in the background as before, and stored data is used on launch. Boot is 398 ms with no post-paint stall. `versionCode` **22001**
+- 🇬🇧 **The boot budget measures two things.** Besides `domContentLoaded`, CI now measures time until the route graph is ready (2500 ms budget). `versionCode` **22001**
+- 🇬🇧 **Remaining findings closed.** Results already on screen are recomputed once official data arrives; `probeNow()` only loads `http/https`; KRL and LRT Jabodebek headways follow time bands (6 min peak, 18/12 min off-peak); `ui_check` en+id is part of the release gate; a `GtfsImporter` test was added; `ui_check` now fails when planning yields fewer than 3 options. `versionCode` **22001**
+
+---
+
 ## ✦ v2.20.0 — 13 November 2026 / 13 November 2026
 
 - 🇮🇩 **Boot balik cepat.** GTFS bawaan (4,1 MB) tidak lagi diparse sebelum layar pertama; ia dimuat setelah halaman tampil. Diukur: domContentLoaded **1472 ms → 477 ms**. `tools/boot_budget.py` menjaga angka itu di CI (gagal bila >1500 ms). `versionCode` **22000**

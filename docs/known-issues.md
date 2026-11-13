@@ -8,7 +8,7 @@ Status: `SELESAI` (sudah diperbaiki di versi yang disebut), `TERBUKA` (belum),
 `DITOLAK` (keputusan sadar untuk tidak dikerjakan), `DI LUAR` (bukan wewenang
 pengembang / kunci pihak lain), `BENAR` (diperiksa, ternyata bukan cacat).
 
-Terakhir diperiksa: v2.20.0.
+Terakhir diperiksa: v2.20.1.
 
 ---
 
@@ -19,8 +19,8 @@ Terakhir diperiksa: v2.20.0.
 | P-01 | `gtfs.js` 4,14 MB diparse saat boot | SELESAI (2.20.0) | gtfs.js dimuat setelah layar pertama; boot 1472 ms → 477 ms |
 | P-02 | 12 script eager, termasuk `data.js` 605 KB dan `stopfix.js` 40 KB | SELESAI (2.20.0) | gtfs.js keluar dari jalur boot; data.js tetap (dibutuhkan layar pertama) |
 | P-03 | tidak ada anggaran ukuran/parse di CI | SELESAI (2.20.0) | tools/boot_budget.py, gagal bila >1500 ms |
-| P-04 | parse 4,1 MB + bangun ulang graf tetap di main thread setelah paint | TERBUKA | boot cepat, tapi ada jeda ±0,4–1 dtk sesaat setelah layar tampil; usul Web Worker atau tetap tidak membundel GTFS |
-| P-05 | anggaran boot hanya mengukur DCL | TERBUKA | jeda pasca-idle tidak terjaga; usul ukur juga waktu sampai graf selesai dibangun |
+| P-04 | parse 4,1 MB + bangun ulang graf tetap di main thread setelah paint | SELESAI (2.20.1) | GTFS tidak dibundel lagi; parse 4,1 MB hilang dari jalur boot maupun pasca-boot |
+| P-05 | anggaran boot hanya mengukur DCL | SELESAI (2.20.1) | boot_budget.py juga mengukur waktu sampai graf rute siap |
 
 ## S — keamanan
 
@@ -31,7 +31,7 @@ Terakhir diperiksa: v2.20.0.
 | S-03 | `UpdateInstaller.check()` tidak membandingkan sertifikat | SELESAI (2.20.0) | bandingkan SHA-256 sertifikat penandatangan |
 | S-04 | tidak ada penangkap crash / laporan | SELESAI (2.20.0) | CrashLog.java + tombol bagikan di Pengaturan |
 | S-05 | WebView utama `setAllowFileAccess(true)` | DITOLAK | diperlukan untuk aset `file://`; alternatif WebViewAssetLoader dinilai tidak sepadan |
-| S-06 | `probeNow()` memuat URL tanpa validasi skema | TERBUKA | URL dari teks bagikan; `javascript:`/`file:` belum disaring sebelum `loadUrl` |
+| S-06 | `probeNow()` memuat URL tanpa validasi skema | SELESAI (2.20.1) | probeNow hanya memuat http/https; skema lain langsung gagal |
 
 ## K — kode & ketahanan
 
@@ -47,7 +47,7 @@ Terakhir diperiksa: v2.20.0.
 | K-08 | 84 `catch` di Java, sebagian menelan error | SELESAI (2.20.0) | sebagian: crash handler menutup kebutuhan diagnosa |
 | K-09 | 6 tombol berikon tanpa `aria-label` | BENAR | ditinjau: tombol berikon punya teks label, tidak perlu aria-label |
 | K-10 | `lumi:pcache` tidak ikut `BACKUP_KEYS` | SELESAI (2.20.0) | `pcache` masuk BACKUP_KEYS |
-| K-11 | hasil rute yang dihitung sebelum GTFS resmi masuk tidak dihitung ulang | TERBUKA | `applyOfficial()` hanya membangun ulang graf; layar hasil yang sudah tampil tetap memakai data lama |
+| K-11 | hasil rute yang dihitung sebelum GTFS resmi masuk tidak dihitung ulang | SELESAI (2.20.1) | hasil yang sudah tampil dihitung ulang setelah data resmi masuk |
 
 ## G — lapisan Google
 
@@ -84,13 +84,13 @@ Terakhir diperiksa: v2.20.0.
 
 | id | isu | status | catatan |
 |---|---|---|---|
-| R-01 | APK rilis tidak membawa GTFS | SELESAI | 2.19.6: backfill mengambil GTFS; APK 907 KB → 1,64 MB |
+| R-01 | APK rilis tidak membawa GTFS | DITOLAK | dibatalkan atas keputusan P-04: build sengaja tanpa GTFS, data diunduh saat berjalan |
 | R-02 | jalur rilis tanpa gerbang tes | SELESAI | 2.19.6: job `Uji sebelum terbit` + `needs` |
 | R-03 | tanda tangan rilis memakai kunci debug | DI LUAR | butuh `LUMI_KEYSTORE_BASE64` + password |
 | R-04 | push tidak memicu CI | DI LUAR | 8 run, semuanya `workflow_dispatch`; uji commit kosong: nol run |
-| R-05 | `ui_check` (4 mnt) belum ikut gerbang rilis | TERBUKA | keputusan: rilis rela menunggu atau tidak |
+| R-05 | `ui_check` (4 mnt) belum ikut gerbang rilis | SELESAI (2.20.1) | ui_check en+id masuk job uji gerbang rilis |
 | R-06 | label "Latest" tidak dipindah otomatis | SELESAI (2.20.0) | langkah `gh release edit --latest` di backfill |
-| R-07 | commit kosong `f4261f7` di histori | TERBUKA | uji pemicu CI; dihapus hanya lewat force-push |
+| R-07 | commit kosong `f4261f7` di histori | DITOLAK | commit kosong dibiarkan; menulis ulang histori main lebih berisiko daripada manfaatnya |
 
 ## D — data
 
@@ -98,8 +98,8 @@ Terakhir diperiksa: v2.20.0.
 |---|---|---|---|
 | D-01 | arah rute tanpa `shape` | SELESAI (2.20.0) | `data/route_shape_report.txt` ditulis build_data; 207 arah | garis jatuh ke fallback lurus; perlu laporan mana saja |
 | D-02 | 42 nama halte kembar dengan titik >1,5 km | SELESAI (2.20.0) | baris kembar diberi penanda koordinat | terjauh "Jembatan Merah" 8.369 m; perlu disambiguasi di pencarian |
-| D-03 | model rail memakai satu angka tunggu (`KRL wait 8`) | TERBUKA | jam sibuk KRL 5–10 mnt, siang/malam 20–30; ETA pagi terlalu optimis, malam terlalu pesimis |
-| D-03 | 6.991 titik halte, 3.277 unik | BENAR | bukan cacat |
+| D-03 | model rail memakai satu angka tunggu (`KRL wait 8`) | SELESAI (2.20.1) | KRL 6 mnt jam sibuk / 18 mnt di luar; LRTJ 6/12 |
+| D-03 | 6.991 titik halte, 3.277 unik | SELESAI (2.20.1) | KRL 6 mnt jam sibuk / 18 mnt di luar; LRTJ 6/12 |
 | D-04 | koordinat di luar Jabodetabek | BENAR | 0 |
 | D-05 | rute dengan <2 halte | BENAR | 0 |
 | D-06 | moda tanpa tarif | BENAR | 0 |
@@ -108,8 +108,8 @@ Terakhir diperiksa: v2.20.0.
 
 | id | isu | status | catatan |
 |---|---|---|---|
-| T-01 | `MainActivity` (84 KB), `GtfsImporter`, `BusWatchService`, `Reminders`, `NavService`, `OfflineMap` tanpa tes | TERBUKA | 9 kelas tes untuk 28 kelas utama |
-| T-02 | `app.js` 4.600 baris hanya lewat smoke UI | TERBUKA | `test_engine.js` + `test_gmaps.js` menutup mesin & Google |
+| T-01 | `MainActivity` (84 KB), `GtfsImporter`, `BusWatchService`, `Reminders`, `NavService`, `OfflineMap` tanpa tes | SEBAGIAN (2.20.1) | GtfsImporterTest ditambahkan; Activity/service tetap butuh instrumentation |
+| T-02 | `app.js` 4.600 baris hanya lewat smoke UI | SEBAGIAN (2.20.1) | ui_check kini gagal bila perencanaan <3 opsi; unit app.js belum ada |
 | T-03 | lapisan Google tanpa tes | SELESAI | 2.19.6: `tools/test_gmaps.js`, 15 pemeriksaan |
 
 ## OK — diperiksa, ternyata benar

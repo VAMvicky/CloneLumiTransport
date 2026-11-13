@@ -157,6 +157,8 @@
     try {
       planner = new E.Planner(DATA);
       STOP_INDEX = null;
+      // K-11: kalau pengguna sudah melihat hasil, hitung ulang dengan data baru.
+      if (S && S.from && S.to && S.results && S.results.length) setTimeout(function () { runPlan(); }, 0);
     } catch (e) { lumiLog(e, "gtfs"); }
     setTimeout(function () {
       try { renderGtfsBanner(); } catch (e) { lumiLog(e, "gtfs"); }
@@ -177,21 +179,10 @@
     return true;
   }
 
-  function loadBundledGtfs() {
-    if (window.LUMI_GTFS) { applyOfficial(window.LUMI_GTFS, true); return; }
-    var el = document.createElement("script");
-    el.src = "js/gtfs.js";
-    el.async = true;
-    el.onload = function () {
-      try { applyOfficial(window.LUMI_GTFS, true); } catch (e) { lumiLog(e, "gtfs"); }
-      __gtfsFinish();
-    };
-    el.onerror = function () { lumiLog(new Error("gtfs.js gagal dimuat"), "gtfs"); __gtfsFinish(); };
-    (document.head || document.documentElement).appendChild(el);
-  }
-
-  /* Janji kesiapan GTFS resmi: dipakai uji UI supaya tidak menilai layar
-     sebelum data bawaan selesai digabung. */
+  /* v2.20.1 — GTFS resmi TIDAK dibundel lagi. Parsing 4,1 MB di WebView selalu
+     memblokir main thread (boot atau sesaat setelahnya), jadi datanya diunduh di
+     latar belakang seperti semula; yang dipakai saat start hanya data unduhan
+     yang tersimpan. */
   var __gtfsDone = false, __gtfsResolve = null;
   window.__lumiGtfsReady = new Promise(function (res) { __gtfsResolve = res; });
   function __gtfsFinish() {
@@ -200,12 +191,7 @@
     try { __gtfsResolve(true); } catch (e) { lumiLog(e); }
   }
 
-  var __officialReady = bootOfficial();
-  if (__officialReady) __gtfsFinish();
-  if (!__officialReady) {
-    var __idle = window.requestIdleCallback || function (f) { return setTimeout(f, 1200); };
-    setTimeout(function () { __idle(function () { loadBundledGtfs(); }, { timeout: 3000 }); }, 400);
-  }
+  if (!bootOfficial()) __gtfsFinish();
   /*
    * Titik halte/stasiun diselaraskan dengan OpenStreetMap (peta yang kamu lihat). Berlaku untuk data bawaan
    * maupun GTFS resmi yang diunduh harian: dicocokkan per nama + jarak ≤80 m dari titik asal.

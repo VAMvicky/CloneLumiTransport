@@ -6,17 +6,21 @@ kembali ke jalur boot, langkah ini gagal.
 """
 import pathlib
 import sys
+import time
 
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PAGE = (ROOT / "app/src/main/assets/www/index.html").as_uri()
 BUDGET_MS = 1500
+GRAPH_BUDGET_MS = 2500
 
 MEASURE = """() => {
   const t = performance.timing;
-  return t.domContentLoadedEventEnd - t.navigationStart;
+  return { dcl: t.domContentLoadedEventEnd - t.navigationStart };
 }"""
+
+GRAPH = """() => window.__lumiGtfsReady ? window.__lumiGtfsReady.then(() => true) : true"""
 
 
 def main():
@@ -25,11 +29,15 @@ def main():
         pg = b.new_page()
         pg.goto(PAGE, wait_until="load")
         pg.wait_for_timeout(200)
-        ms = pg.evaluate(MEASURE)
+        ms = pg.evaluate(MEASURE)["dcl"]
+        t0 = time.time()
+        pg.evaluate(GRAPH)
+        graph_ms = int((time.time() - t0) * 1000)
         b.close()
     print("boot domContentLoaded: %d ms (anggaran %d ms)" % (ms, BUDGET_MS))
-    if ms > BUDGET_MS:
-        print("GAGAL: boot melewati anggaran", file=sys.stderr)
+    print("graf rute siap: %d ms (anggaran %d ms)" % (graph_ms, GRAPH_BUDGET_MS))
+    if ms > BUDGET_MS or graph_ms > GRAPH_BUDGET_MS:
+        print("GAGAL: melewati anggaran", file=sys.stderr)
         sys.exit(1)
 
 
