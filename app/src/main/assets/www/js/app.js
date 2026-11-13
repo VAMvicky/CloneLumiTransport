@@ -1894,7 +1894,7 @@
   // Bawaan tanpa API key (OpenFreeMap/OSM, Photon). Google Places & Static Maps opsional
   // lewat kunci internal aplikasi Google Maps — lihat js/gmaps.js dan docs/google-api-keys.md.
   var DEFAULT_CFG = { basemap: "liberty", gsearch: true, accessible: false, voice: false, theme: "system", mapDark: true, offlineAuto: true, lang: ((navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en") };
-  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, offline: 1 };
+  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, google: 1, offline: 1 };
   function cfg() {
     var c = store("cfg") || {};
     var o = {}; for (var k in DEFAULT_CFG) o[k] = c[k] === undefined ? DEFAULT_CFG[k] : c[k];
@@ -2546,10 +2546,13 @@
     bright: { name: "Bright (kontras)", gl: "https://tiles.openfreemap.org/styles/bright" },
     positron: { name: "Positron (terang, polos)", gl: "https://tiles.openfreemap.org/styles/positron" },
     osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" },
+    google: { name: "Google Maps", subs: "0123", google: true,
+              raster: "https://mt{s}.google.com/vt?lyrs=m&hl=id&x={x}&y={y}&z={z}&scale=1" },
     offline: { name: tl("Offline Jabodetabek (tersimpan di HP)", "Offline Jabodetabek (saved on phone)"), offline: true }
   };
   var ATTR_OFM = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
   var ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
+  var ATTR_GOOGLE = 'Peta &copy; <a href="https://www.google.com/maps" target="_blank">Google</a>';
   var GL_OK = null;
   function glOk() {
     if (GL_OK !== null) return GL_OK;
@@ -2577,6 +2580,27 @@
         }, 12000);
       });
       return gl;
+    }
+    if (st.raster) {
+      var layer = L.tileLayer(st.raster, {
+        subdomains: st.subs || "abc",
+        maxZoom: 20, maxNativeZoom: 20, keepBuffer: 4,
+        attribution: st.google ? ATTR_GOOGLE : ATTR_OSM
+      });
+      /* Kalau Google mulai menolak petaknya, jangan tinggalkan peta kosong:
+         pindah sekali ke OpenStreetMap dan beri tahu pengguna. */
+      if (st.google) {
+        var errs = 0;
+        layer.on("tileerror", function () {
+          if (++errs !== 8 || GL_DOWN) return;
+          GL_DOWN = true;
+          lumiLog(new Error("petak Google ditolak"), "map");
+          toast(tl("Peta Google tidak bisa dimuat — beralih ke OpenStreetMap.", "Google tiles failed — switching to OpenStreetMap."));
+          var c = cfg(); c.basemap = "osm"; store("cfg", c);
+          applyBasemap();
+        });
+      }
+      return layer;
     }
     return L.tileLayer(MAPSTYLES.osm.raster, { maxZoom: 20, maxNativeZoom: 19, keepBuffer: 4, attribution: ATTR_OSM });
   }

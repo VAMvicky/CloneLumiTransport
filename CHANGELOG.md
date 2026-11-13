@@ -10,6 +10,13 @@
 
 ---
 
+## ✦ v2.19.3 — 13 November 2026 / 13 November 2026
+
+- 🇮🇩 **Gaya peta Google Maps kembali — kali ini petak asli.** Pilihan "Google Maps" di Pengaturan sekarang memakai petak resmi `mt0…mt3.google.com/vt` (bukan Static Maps): 256 px per petak, skema slippy standar, jadi **geser dan zoom mulus seperti Google Maps**, tajam di tiap tingkat zoom, tanpa watermark berulang. Titik, halte, dan rute menempel tepat karena Leaflet yang memproyeksikan, bukan hitungan sendiri. Kalau Google mulai menolak petaknya, aplikasi memberi tahu dan pindah sekali ke OpenStreetMap — peta tidak pernah kosong. `versionCode` **21903**
+- 🇬🇧 **Google Maps style is back — with real tiles this time.** The "Google Maps" option in Settings now uses the official `mt0…mt3.google.com/vt` tiles (not Static Maps): 256 px per tile, standard slippy scheme, so **panning and zooming are smooth like Google Maps**, sharp at every zoom level, with no repeated watermark. Points, stops and routes land exactly because Leaflet does the projection instead of hand maths. If Google starts refusing tiles, the app says so and switches once to OpenStreetMap — the map never goes blank. `versionCode` **21903**
+
+---
+
 ## ✦ v2.19.2 — 13 November 2026 / 13 November 2026
 
 - 🇮🇩 **Gambar rute berwarna per ruas + ketuk peta.** Peta di gambar bagikan sekarang memakai warna trayek: merah Transjakarta, biru MRT, ungu LRT — jadi jumlah pindah langsung kelihatan dari gambarnya, bukan cuma dari strip. Pita peta juga dibuat lebih tinggi supaya rute tidak mengecil. Di aplikasi, **ketuk mana pun di peta** untuk memunculkan pilihan "Berangkat dari sini" / "Pergi ke sini"; nama tempatnya diambil dari Photon dan langsung mengisi kolom asal/tujuan. `versionCode` **21902**

@@ -1,26 +1,35 @@
 # Peta gaya Google & audit titik halte
 
-Catatan v2.19 soal apa yang masih dipakai dari kunci Google Maps (lihat
-[google-api-keys.md](google-api-keys.md)), dan apa yang sengaja dibuang.
+Catatan v2.19: apa yang dipakai dari Google, dan apa yang sengaja tidak.
 
-## Peta interaktif: BUKAN Static Maps
+## Peta interaktif: petak asli, bukan Static Maps
 
-Sejak v2.19.2 pilihan "Google Maps (raster)" dihapus. Alasannya teknis, bukan
-selera:
+Pilihan **Google Maps** di Pengaturan memakai petak resmi Google:
 
-- Static Maps **bukan tile server**. Menyusunnya jadi petak menghasilkan
-  watermark berulang di setiap kotak, dan pusat petak yang salah membuat titik
-  bergeser makin jauh tiap tingkat zoom.
-- Satu gambar per layar (percobaan v2.19.1) memperbaiki posisi dan watermark,
-  tetapi tetap **kabur saat di-zoom** dan berkedip saat digeser — sifat raster
-  yang di-scale.
+```
+https://mt{s}.google.com/vt?lyrs=m&hl=id&x={x}&y={y}&z={z}&scale=1     s = 0..3
+```
 
-Peta interaktif sekarang hanya memakai sumber yang memang tile/vektor:
-OpenFreeMap (`liberty`, `bright`, `positron`), OSM raster, dan PMTiles offline.
-Semua mulus di setiap zoom, tanpa watermark berulang.
+Kenapa ini, dan bukan Static Maps:
 
-Static Maps tetap dipakai untuk **gambar rute yang dibagikan** — di sana ia
-memang alat yang tepat: satu potret, bukan permukaan yang digeser.
+| | Static Maps (lama) | Petak `mt*.google.com` (sekarang) |
+|---|---|---|
+| geser/zoom | kabur (gambar di-scale) lalu berkedip saat di-fetch ulang | mulus, standar slippy, tiap petak dimuat sendiri |
+| posisi | meleset, karena pusat petak dihitung sendiri | tepat, Leaflet yang memproyeksikan |
+| watermark | berulang di tiap kotak | tidak ada di dalam petak; atribusi dipasang aplikasi |
+| biaya | 1 panggilan per petak / per layar | tidak memakai kunci Google sama sekali |
+
+`lyrs=m` = peta jalan. Kalau butuh citra, `lyrs=s` (satelit) dan `lyrs=s,h` (hibrida)
+tersedia dari endpoint yang sama, tapi aplikasi hanya memakai `m`.
+
+**Risiko yang disadari**: endpoint ini milik Google dan tidak disediakan untuk
+pihak ketiga; pemakaiannya melanggar ToS dan bisa ditolak kapan saja. Karena itu
+`baseLayer()` menghitung `tileerror`: setelah 8 petak gagal, aplikasi memberi tahu
+sekali dan memindahkan `cfg().basemap` ke `osm`, lalu menggambar ulang. Peta tidak
+pernah dibiarkan kosong.
+
+Static Maps tetap dipakai untuk **gambar rute yang dibagikan** — di sana ia memang
+alat yang benar: satu potret, bukan permukaan yang digeser.
 
 ## Gambar rute berwarna per ruas
 
@@ -72,8 +81,8 @@ lembar halte menampilkan lencananya. Kunci memakai nama yang dinormalkan
 
 ## Batas yang disadari
 
-- Kunci bukan milik Lumi dan bisa dicabut kapan saja; semua fitur Google punya
-  jalur mundur.
+- Petak Google dan kunci Places bukan milik Lumi; keduanya bisa dicabut/ditolak
+  kapan saja, dan keduanya punya jalur mundur (OSM, Photon, gambar tanpa peta).
 - `path=` pada gambar rute adalah garis lurus antar halte, bukan geometri jalan.
 - Static Maps dihitung per panggilan: satu gambar rute = satu panggilan.
 - Photon `/reverse` bisa lambat; UI memakai koordinat lebih dulu, nama menyusul.
