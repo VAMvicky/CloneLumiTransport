@@ -12,7 +12,7 @@
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Java](https://img.shields.io/badge/Java-WebView-38BDF8?style=for-the-badge&logo=openjdk&logoColor=white)](#%EF%B8%8F-tech-stack)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=for-the-badge)](LICENSE)
-[![Size](https://img.shields.io/badge/APK-~1.7%20MB-00897B?style=for-the-badge)](#-why-lumi-transport)
+[![Size](https://img.shields.io/badge/APK-~0.9%20MB-00897B?style=for-the-badge)](#-why-lumi-transport)
 
 **🌐 Bahasa / Language:** &nbsp; [🇮🇩 Bahasa Indonesia](README.md) &nbsp;|&nbsp; **🇬🇧 English**
 
@@ -37,7 +37,7 @@
 | 💸 **Correct fares** | Transferring inside a station is free; leaving the station means tapping in again. Covers SH2, Hub Connector, MRT per-station fares and Airport Rail. |
 | 🌙 **Knows opening hours** | At midnight Lumi only uses 24-hour services (AMARI corridors 1–14, JAK36/47/52/75) and ride-hailing. |
 | 📍 **Addresses from Google** | Address suggestions straight from Google Places while you type, using Google Maps' **internal API key** (package and certificate are spoofed). Coordinates are filled in automatically. |
-| 🪶 **Tiny and offline** | About **1.7 MB** (map engine, route data and fonts included). Route planning runs **on your phone**, with no server; the Jabodetabek map can be downloaded to work **without internet**. |
+| 🪶 **Tiny and offline** | About **0.9 MB** (map engine and fonts included). Official Transjakarta route data is downloaded automatically after install instead of being bundled. Route planning runs **on your phone**, with no server; the Jabodetabek map can be downloaded to work **without internet**. |
 
 ---
 

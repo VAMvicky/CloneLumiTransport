@@ -34,11 +34,8 @@ jobs:
       - name: Test skema versi (gagal = build merah)
         run: bash tools/test_version.sh
 
-      - name: Bangun data rute (dengan GTFS resmi terbaru)
-        run: |
-          set -euo pipefail
-          git fetch -q --depth=1 origin gtfs-data && git show FETCH_HEAD:tj_gtfs.json > data-raw/tj_gtfs.json
-          python3 tools/build_data.py
+      - name: Bangun data rute
+        run: python3 tools/build_data.py
 
       - name: Cek sintaks JavaScript
         run: for f in app/src/main/assets/www/js/*.js; do node --check "$f"; done
@@ -147,13 +144,6 @@ jobs:
             echo "KS_PASS=$KS_PASS"
             echo "KS_ALIAS=${KS_ALIAS:-lumi}"
           } >> "$GITHUB_ENV"
-
-      - name: Ambil ringkasan GTFS resmi terbaru (ikut di APK)
-        run: |
-          set -euo pipefail
-          git fetch -q --depth=1 origin gtfs-data
-          git show FETCH_HEAD:tj_gtfs.json > data-raw/tj_gtfs.json
-          ls -la data-raw/tj_gtfs.json
 
       - name: Build release (R8 + shrinkResources)
         run: |

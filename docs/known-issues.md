@@ -92,6 +92,7 @@ Terakhir diperiksa: v2.20.2.
 | R-06 | label "Latest" tidak dipindah otomatis | SELESAI (2.20.0) | langkah `gh release edit --latest` di backfill |
 | R-07 | commit kosong `f4261f7` di histori | DITOLAK | commit kosong dibiarkan; menulis ulang histori main lebih berisiko daripada manfaatnya |
 | R-08 | workflow terjadwal belum pernah berjalan | SELESAI (2.20.2) | dispatcher data-maintenance.yml sudah diuji: route-watch jalan dari satu tombol. schedule sendiri belum terbukti |
+| R-09 | sisa langkah GTFS di workflow + klaim ukuran README | SELESAI (2.20.1) | empat langkah `gtfs-data` dibuang (build_data tidak memakainya lagi); README ID/EN: 1,7 MB → 0,9 MB, data rute diunduh bukan ditanam |
 
 ## D — data
 

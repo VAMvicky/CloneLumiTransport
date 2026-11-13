@@ -12,7 +12,7 @@
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-kebutuhan-sistem)
 [![Java](https://img.shields.io/badge/Java-WebView-38BDF8?style=for-the-badge&logo=openjdk&logoColor=white)](#%EF%B8%8F-teknologi)
 [![Lisensi](https://img.shields.io/badge/lisensi-GPL--3.0-blue?style=for-the-badge)](LICENSE)
-[![Ukuran](https://img.shields.io/badge/APK-~1,7%20MB-00897B?style=for-the-badge)](#-kenapa-lumi-transport)
+[![Ukuran](https://img.shields.io/badge/APK-~0,9%20MB-00897B?style=for-the-badge)](#-kenapa-lumi-transport)
 
 **🌐 Bahasa / Language:** &nbsp; **🇮🇩 Bahasa Indonesia** &nbsp;|&nbsp; [🇬🇧 English](README.en.md)
 
@@ -37,7 +37,7 @@
 | 💸 **Tarif yang benar** | Pindah di dalam halte = tidak bayar lagi. Turun di luar halte = tap ulang. Termasuk tarif SH2, Hub Connector, MRT per stasiun, KA Bandara. |
 | 🌙 **Sadar jam operasional** | Pukul 00.00? Lumi hanya memakai layanan 24 jam (AMARI koridor 1–14, JAK36/47/52/75) dan ojol. |
 | 📍 **Alamat dari Google** | Saran alamat langsung dari Google Places saat mengetik, memakai **kunci API internal Google Maps** (paket & sertifikat Google ditiru). Koordinat terbaca otomatis. |
-| 🪶 **Super ringan & offline** | APK sekitar **1,7 MB** (sudah termasuk mesin peta, data rute, dan huruf). Perhitungan rute berjalan **di HP**, tanpa server; peta Jabodetabek bisa diunduh untuk dipakai **tanpa internet**. |
+| 🪶 **Super ringan & offline** | APK sekitar **0,9 MB** (mesin peta dan huruf sudah termasuk). Data rute resmi Transjakarta diunduh otomatis setelah pemasangan, bukan ditanam di APK. Perhitungan rute berjalan **di HP**, tanpa server; peta Jabodetabek bisa diunduh untuk dipakai **tanpa internet**. |
 
 ---
 
