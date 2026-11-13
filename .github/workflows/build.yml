@@ -43,6 +43,9 @@ jobs:
       - name: Cek sintaks JavaScript
         run: for f in app/src/main/assets/www/js/*.js; do node --check "$f"; done
 
+      - name: Uji lapisan Google (tanpa jaringan)
+        run: node tools/test_gmaps.js
+
       - name: Uji mesin rute (gagal = build merah)
         run: node tools/test_engine.js
 

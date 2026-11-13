@@ -10,6 +10,21 @@
 
 ---
 
+## ✦ v2.19.6 — 13 November 2026 / 13 November 2026
+
+- 🇮🇩 **Rilis sekarang membawa data rute resmi.** Jalur rilis (backfill) dulu tidak mengambil GTFS, jadi APK rilis dikirim tanpa data rute resmi dan baru mengunduhnya saat dipakai — beda isi dengan APK hasil CI. Sekarang keduanya mengambil GTFS yang sama, dan sebelum membangun, jalur rilis menjalankan uji versi, sintaks, mesin rute, dan lapisan Google. Rilis gagal kalau salah satunya merah. `versionCode` **21906**
+- 🇮🇩 **Layar izin tidak lagi mengunci.** "Berjalan di latar belakang" bukan izin runtime (itu mematikan optimasi baterai), jadi tidak lagi jadi syarat masuk; hanya lokasi dan notifikasi yang wajib. `versionCode` **21906**
+- 🇮🇩 **Tes lapisan Google masuk CI.** `tools/test_gmaps.js` mengunci perilaku yang gampang rusak tanpa kelihatan: isolasi kegagalan per kemampuan, cooldown 429, penolakan kunci yang permanen, `sessiontoken`, dan cache `place_id`. `versionCode` **21906**
+- 🇮🇩 **Dokumen yang bertentangan dibereskan.** `docs/pencarian-alamat.md` dulu menyimpulkan kunci tidak bisa dipakai ulang; itu keliru dan sudah dikoreksi, dengan rujukan ke bukti ujinya. `versionCode` **21906**
+- 🇮🇩 **Petak Google mengikuti layar.** `scale=2` hanya dipakai saat kerapatan layar ≥ 2; layar 1x tidak lagi membayar 2,25× byte. `versionCode` **21906**
+- 🇬🇧 **Releases now ship the official route data.** The release path (backfill) never fetched GTFS, so release APKs went out without official route data and downloaded it at runtime — a different build from the CI artifact. Both paths now fetch the same GTFS, and the release path runs version, syntax, routing-engine and Google-layer tests before building. A red test blocks the release. `versionCode` **21906**
+- 🇬🇧 **The permission screen no longer locks you out.** "Run in the background" is not a runtime permission (it turns off battery optimisation), so it is no longer a gate; only location and notifications are required. `versionCode` **21906**
+- 🇬🇧 **Google-layer tests are in CI.** `tools/test_gmaps.js` locks the behaviour that breaks invisibly: per-capability failure isolation, 429 cooldown, permanent key rejection, `sessiontoken`, and the `place_id` cache. `versionCode` **21906**
+- 🇬🇧 **Contradicting docs fixed.** `docs/pencarian-alamat.md` used to conclude the keys could not be reused; that was wrong and is corrected, pointing at the test evidence. `versionCode` **21906**
+- 🇬🇧 **Google tiles follow the screen.** `scale=2` is only requested on ≥2× screens; 1× screens no longer pay 2.25× the bytes. `versionCode` **21906**
+
+---
+
 ## ✦ v2.19.5 — 13 November 2026 / 13 November 2026
 
 - 🇮🇩 **Kegagalan Google tidak lagi menular.** Dulu satu penolakan dari endpoint mana pun mematikan seluruh lapisan Google — autocomplete ikut mati karena `nearby` ditolak. Sekarang tiap kemampuan (`autocomplete`, `details`, `search`, `nearby`) punya status sendiri, dan `OVER_QUERY_LIMIT` hanya menidurkan sementara dengan jeda berlipat (60 dtk → 2 mnt → 4 mnt, maksimal 15 mnt) lalu dicoba lagi sendiri. Penolakan kunci yang sebenarnya tetap permanen sampai kuncinya diganti. Kegagalan petak peta juga dipisah dari kegagalan gaya vektor (`TILES_DOWN` vs `GL_DOWN`), jadi Google ngadat tidak lagi mematikan OpenFreeMap. `versionCode` **21905**

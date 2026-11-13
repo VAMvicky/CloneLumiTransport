@@ -2557,7 +2557,10 @@
       return gl;
     }
     if (st.raster) {
-      var layer = L.tileLayer(st.raster, {
+      // v2.19.6: petak 2x hanya untuk layar 2x; layar 1x tidak perlu membayar 2,25x byte.
+      var tpl = st.raster;
+      if (st.google) tpl = tpl.replace(/scale=\d+/, "scale=" + ((window.devicePixelRatio || 1) >= 2 ? 2 : 1));
+      var layer = L.tileLayer(tpl, {
         subdomains: st.subs || "abc",
         maxZoom: 20, maxNativeZoom: 20, keepBuffer: 4,
         attribution: st.google ? ATTR_GOOGLE : ATTR_OSM
@@ -4344,7 +4347,9 @@
     var p = permState();
     // Lokasi, notifikasi, dan latar belakang wajib diizinkan sebelum masuk ke layar utama.
     // "Mulai otomatis" (OEM) tidak bisa dideteksi, jadi tetap opsional.
-    var allOk = !!(p.loc && p.notif && p.battery) || !!p.browser;
+    // v2.19.6: "latar belakang" bukan izin runtime (cuma optimization-off), jadi
+    // tidak boleh memblokir masuk. Lokasi + notifikasi yang wajib.
+    var allOk = !!(p.loc && p.notif) || !!p.browser;
     function item(key, ico, title, desc, ok, opt) {
       return '<button class="ob-item' + (ok ? " ok" : "") + (opt ? " opt" : "") + '" data-perm="' + key + '" type="button" aria-pressed="' + !!ok + '">' +
         '<span class="ob-ico">' + (ok ? OB_ICO.ok : ico) + '</span><div><b>' + title + (opt ? '<i class="ob-opt">opsional</i>' : "") + "</b>" +
@@ -4355,12 +4360,12 @@
       '<div class="ob-list">' +
       item("loc", OB_ICO.pin, "Izinkan lokasi", "Untuk “Lokasi saya” dan pendampingan GPS.", p.loc) +
       item("notif", OB_ICO.bell, "Izinkan notifikasi", "Peringatan turun dan info rute berubah.", p.notif) +
-      item("battery", OB_ICO.bolt, "Berjalan di latar belakang", "Agar pendampingan tetap jalan saat layar mati.", p.battery) +
+      item("battery", OB_ICO.bolt, "Berjalan di latar belakang", "Agar pendampingan tetap jalan saat layar mati.", p.battery, true) +
       (p.oem ? '<div class="ob-oem"><div class="ob-oem-h"><b>Xiaomi, Oppo, Vivo, Realme, Infinix</b><i class="ob-opt">opsional</i></div>' +
         '<span>Aktifkan “Mulai otomatis” agar Lumi tidak ditutup oleh HP.</span>' +
         '<button class="ob-oem-btn" id="obAuto" type="button">Buka pengaturan Mulai otomatis</button></div>' : "") +
       '</div><div class="ob-bottom"><button class="ob-cta' + (allOk ? "" : " is-locked") + '" id="obDone" type="button" aria-disabled="' + !allOk + '">Mulai cari rute</button>' +
-      '<p class="ob-foot" id="obNeed"' + (allOk ? " hidden" : "") + '>Izinkan ketiga akses di atas dulu untuk melanjutkan.</p></div>';
+      '<p class="ob-foot" id="obNeed"' + (allOk ? " hidden" : "") + '>' + tl("Izinkan lokasi dan notifikasi dulu untuk melanjutkan.", "Allow location and notifications to continue.") + "</p></div>";
     fitOnboarding(ob);
     $$("[data-perm]", ob).forEach(function (b) {
       b.addEventListener("click", function () {
@@ -4372,12 +4377,12 @@
     if ($("#obAuto")) $("#obAuto").addEventListener("click", function () { if (NATIVE && NATIVE.openAutostart) NATIVE.openAutostart(); else toast("Hanya di aplikasi Android"); });
     $("#obDone").addEventListener("click", function () {
       var q = permState();
-      if (!(q.loc && q.notif && q.battery) && !q.browser) {
+      if (!(q.loc && q.notif) && !q.browser) {
         // Status izin bisa berubah tanpa layar ini dirender ulang; selalu cek ulang saat diketuk.
         showOnboarding(2);
         var first = $("[data-perm]:not(.ok)", $("#onboard"));
         if (first) { first.classList.add("is-shake"); setTimeout(function () { first.classList.remove("is-shake"); }, 600); }
-        toast("Izinkan lokasi, notifikasi, dan latar belakang dulu");
+        toast(tl("Izinkan lokasi dan notifikasi dulu", "Allow location and notifications first"));
         return;
       }
       store("onboarded", 2); ob.remove();
