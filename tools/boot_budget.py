@@ -25,7 +25,11 @@ GRAPH = """() => window.__lumiGtfsReady ? window.__lumiGtfsReady.then(() => true
 
 def main():
     with sync_playwright() as p:
-        b = p.chromium.launch(args=["--allow-file-access-from-files"])
+        # CI memakai Chrome bawaan runner (sama seperti ui_check), bukan chromium unduhan.
+        try:
+            b = p.chromium.launch(channel="chrome", args=["--allow-file-access-from-files"])
+        except Exception:
+            b = p.chromium.launch(args=["--allow-file-access-from-files"])
         pg = b.new_page()
         pg.goto(PAGE, wait_until="load")
         pg.wait_for_timeout(200)
