@@ -13,17 +13,24 @@ persisnya, dan yang paling penting: cara memakainya dari aplikasi lain.
 Alat bantu: pembongkaran ZIP, pembaca AXML untuk `AndroidManifest.xml`, pembaca string
 pool DEX, dan pembaca blok tanda tangan APK (v2/v3). Tidak ada APK yang dijalankan.
 
+## 0. Catatan
+
+Sejak v2.19.5 dokumen ini **tidak lagi memuat nilai kunci**, hanya lokasinya.
+Repositori ini publik; menaruh kunci di dokumentasi mempercepat kunci itu
+dicabut. Kunci yang dipakai aplikasi tetap ada di `GoogleKeys.java` dan
+`js/gmaps.js` — ambil sendiri dari APK Google Maps dengan langkah di bagian 5.
+
 ## 1. Kunci yang ditemukan
 
 | Kunci | Lokasi | Dugaan pemakaian |
 |---|---|---|
-| `AIzaSyAwL-YrZb2V2cHyiT40jAXVFYDqlqs41gs` | `resources.arsc` @131129 — string resource, di antara entri `AI …` | **Places API (legacy) + Static Maps** — inilah kunci yang benar-benar jalan |
-| `AIzaSyAbPUTxeDTnaihCKmLXCMKrrUT3HNLQW6w` | `AndroidManifest.xml` — `<meta-data android:name="com.google.android.geo.API_KEY">` dan `com.google.location.beacon.API_KEY`; juga `classes.dex` @7629103 | Maps SDK for Android milik aplikasi |
-| `AIzaSyAZyAvJ8K9XaZCj_nrBkIYRe_iyODXJxAk` | `classes2.dex` @8058645, tepat sebelum `gmscompliance-pa.googleapis.com` | backend kepatuhan GMS (produksi) |
-| `AIzaSyBJO1-Q7JrHnlrtDZgengd4liAMLoT7sIU` | `classes2.dex` @8058735, sebelum `/staging-gmscompliance-pa.sandbox.googleapis.com` | backend kepatuhan GMS (sandbox) |
-| `AIzaSyC8UYZpvA2eknNex0Pjid0_eTLJoDu6los` | `classes2.dex` @8111109, dekat `chime-sdk` dan `1:747654520220:android:…` | Google Meet / Chime SDK |
-| `AIzaSyAtTGpfwP8X4mF4y-rZpUXWWsT6aAdktQ4` | `classes2.dex` @8204964, di rombongan konstanta analitik | analitik |
-| `AIzaSyBmGDOmYcGmylWMKTdQxmf5vXWAuybv7qA` | `classes2.dex` @8205005, di rombongan konstanta analitik | analitik |
+| `<kunci dari APK>` | `resources.arsc` @131129 — string resource, di antara entri `AI …` | **Places API (legacy) + Static Maps** — inilah kunci yang benar-benar jalan |
+| `<kunci dari APK>` | `AndroidManifest.xml` — `<meta-data android:name="com.google.android.geo.API_KEY">` dan `com.google.location.beacon.API_KEY`; juga `classes.dex` @7629103 | Maps SDK for Android milik aplikasi |
+| `<kunci dari APK>` | `classes2.dex` @8058645, tepat sebelum `gmscompliance-pa.googleapis.com` | backend kepatuhan GMS (produksi) |
+| `<kunci dari APK>` | `classes2.dex` @8058735, sebelum `/staging-gmscompliance-pa.sandbox.googleapis.com` | backend kepatuhan GMS (sandbox) |
+| `<kunci dari APK>` | `classes2.dex` @8111109, dekat `chime-sdk` dan `1:747654520220:android:…` | Google Meet / Chime SDK |
+| `<kunci dari APK>` | `classes2.dex` @8204964, di rombongan konstanta analitik | analitik |
+| `<kunci dari APK>` | `classes2.dex` @8205005, di rombongan konstanta analitik | analitik |
 
 Sertifikat penandatangan resmi (dari blok APK Signature Scheme v3, sertifikat dengan
 `CN=Google Inc., OU=Android`):

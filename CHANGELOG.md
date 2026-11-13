@@ -10,6 +10,17 @@
 
 ---
 
+## ✦ v2.19.5 — 13 November 2026 / 13 November 2026
+
+- 🇮🇩 **Kegagalan Google tidak lagi menular.** Dulu satu penolakan dari endpoint mana pun mematikan seluruh lapisan Google — autocomplete ikut mati karena `nearby` ditolak. Sekarang tiap kemampuan (`autocomplete`, `details`, `search`, `nearby`) punya status sendiri, dan `OVER_QUERY_LIMIT` hanya menidurkan sementara dengan jeda berlipat (60 dtk → 2 mnt → 4 mnt, maksimal 15 mnt) lalu dicoba lagi sendiri. Penolakan kunci yang sebenarnya tetap permanen sampai kuncinya diganti. Kegagalan petak peta juga dipisah dari kegagalan gaya vektor (`TILES_DOWN` vs `GL_DOWN`), jadi Google ngadat tidak lagi mematikan OpenFreeMap. `versionCode` **21905**
+- 🇮🇩 **Kuota lebih hemat.** Saran alamat kini memakai `sessiontoken`: satu sesi ketik ditagih sebagai satu unit, bukan satu panggilan per ketukan. Place Details menyimpan hasilnya di HP (`place_id → koordinat`, 30 hari, maksimal 400 tempat), jadi tempat yang sama tidak memanggil Google dua kali. `versionCode` **21905**
+- 🇮🇩 **Kunci tidak lagi dipamerkan di dokumen.** `docs/google-api-keys.md` tetap menjelaskan asal-usulnya, tapi nilai kuncinya diganti penanda; dokumen publik tidak perlu memuat kredensial. `versionCode` **21905**
+- 🇬🇧 **Google failures no longer spread.** One rejection from any endpoint used to kill the whole Google layer — autocomplete died because `nearby` was denied. Each capability (`autocomplete`, `details`, `search`, `nearby`) now has its own state, and `OVER_QUERY_LIMIT` only sleeps with backoff (60 s → 2 min → 4 min, capped at 15 min) before retrying itself. A real key rejection stays permanent until the key is replaced. Tile failures are also separated from vector-style failures (`TILES_DOWN` vs `GL_DOWN`), so Google breaking no longer disables OpenFreeMap. `versionCode` **21905**
+- 🇬🇧 **Less quota burn.** Address suggestions now use `sessiontoken`: one typing session is billed as one unit instead of one call per keystroke. Place Details caches its result on the phone (`place_id → coordinates`, 30 days, max 400 places), so the same place never asks Google twice. `versionCode` **21905**
+- 🇬🇧 **Keys are no longer paraded in the docs.** `docs/google-api-keys.md` still explains where they come from, but the key values are placeholders; a public document does not need credentials in it. `versionCode` **21905**
+
+---
+
 ## ✦ v2.19.4 — 13 November 2026 / 13 November 2026
 
 - 🇮🇩 **Petak Google HD, layar izin lebih jelas, dan tiga hal yang dihapus.** Peta Google Maps sekarang meminta petak `scale=2` (512 px untuk tiap petak 256 px) sehingga tajam di layar rapat — persis seperti aplikasi Google Maps. Tulisan atribusi di bawah peta dihapus; kreditnya pindah ke halaman Pengaturan. Di layar izin, keterangan tiap poin langsung tampil sejak awal (dulu baru muncul setelah diketuk). Popup "Berangkat dari sini / Pergi ke sini" saat mengetuk peta dihapus. Lencana "mungkin sudah pindah · xx m" di lembar halte dihapus. Kartu unduh rute resmi kini hilang setelah unduhan selesai. `versionCode` **21904**

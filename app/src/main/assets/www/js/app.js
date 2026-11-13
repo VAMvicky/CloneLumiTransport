@@ -2057,7 +2057,7 @@
   /* Saran alamat langsung dari Google Places (kunci internal, lihat js/gmaps.js).
      Diam saja bila kunci sudah tidak berlaku — baris lain tetap jalan. */
   function googleSuggest(q, rows) {
-    if (!q || q.length < 3 || !cfg().gsearch || !window.LumiGoogle || LumiGoogle.isDown()) return;
+    if (!q || q.length < 3 || !cfg().gsearch || !window.LumiGoogle || LumiGoogle.isDown("autocomplete")) return;
     var seq = ++gSeq;
     var near = S.myPos || (S.field && S[S.field] && S[S.field].p) || JKT;
     LumiGoogle.autocomplete(q, near).then(function (preds) {
@@ -2535,6 +2535,7 @@
   }
   function mapStyleKey() { var b = cfg().basemap; return MAPSTYLES[b] && (b !== "offline" || offlineReady()) ? b : "liberty"; }
   var GL_DOWN = false;   // R9: OpenFreeMap tidak menjawab → peta raster OSM sampai aplikasi dibuka ulang
+  var TILES_DOWN = false; // v2.19.5: petak Google ditolak → pindah ke OSM, TANPA mematikan gaya vektor
   function baseLayer() {
     var st = MAPSTYLES[mapStyleKey()];
     // v2.17: peta offline Jabodetabek — dipilih langsung, atau otomatis saat tanpa internet / server peta mati.
@@ -2566,8 +2567,8 @@
       if (st.google) {
         var errs = 0;
         layer.on("tileerror", function () {
-          if (++errs !== 8 || GL_DOWN) return;
-          GL_DOWN = true;
+          if (++errs !== 8 || TILES_DOWN) return;
+          TILES_DOWN = true;
           lumiLog(new Error("petak Google ditolak"), "map");
           toast(tl("Peta Google tidak bisa dimuat — beralih ke OpenStreetMap.", "Google tiles failed — switching to OpenStreetMap."));
           var c = cfg(); c.basemap = "osm"; store("cfg", c);
@@ -3516,8 +3517,8 @@
     html += '<div class="set-card"><h3>Mencari alamat</h3><p>' + tl("Ketik di kolom <b>Dari</b> atau <b>Ke</b> — saran alamat diambil langsung dari <b>Google Places</b> memakai kunci internal aplikasi Google Maps (paket + sertifikat Google ditiru). Ketuk baris pertama bila ingin mencari di aplikasi Google Maps lalu <b>Bagikan</b> ke <b>Lumi Transport</b>.",
       "Type in the <b>From</b> or <b>To</b> field — suggestions come straight from <b>Google Places</b> using Google Maps' own internal key (package + certificate are spoofed). Tap the first row to search inside Google Maps and <b>Share</b> the place back to <b>Lumi Transport</b>.") + "</p>" +
       '<label class="set-row"><span>' + tl("Saran alamat dari Google", "Address suggestions from Google") + '</span><input type="checkbox" id="setGsearch"' + (c.gsearch ? " checked" : "") + "></label>" +
-      (window.LumiGoogle && LumiGoogle.isDown() ? '<p style="margin:6px 0 0">' + tl("Google menolak kunci ini (" + LumiGoogle.reason() + "). Saran alamat jatuh ke Photon/OpenStreetMap.",
-        "Google rejected this key (" + LumiGoogle.reason() + "). Suggestions fall back to Photon/OpenStreetMap.") + "</p>" : "") +
+      (window.LumiGoogle && LumiGoogle.isDown("autocomplete") ? '<p style="margin:6px 0 0">' + tl("Google menolak kunci ini (" + LumiGoogle.reason("autocomplete") + "). Saran alamat jatuh ke Photon/OpenStreetMap.",
+        "Google rejected this key (" + LumiGoogle.reason("autocomplete") + "). Suggestions fall back to Photon/OpenStreetMap.") + "</p>" : "") +
       st("search") + "</div>";
     html += '<div class="set-card"><h3>Tempat tersimpan</h3><p>Tempat yang pernah kamu bagikan dari Google Maps. Muncul saat mengetik di kolom Dari/Ke.</p>' +
       (places.length ? places.map(function (pl, i) {
@@ -4205,7 +4206,7 @@
       if (!rs.length) throw new Error("tidak ditemukan");
       return { p: rs[0].r.p, sub: rs[0].r.sub || "", sure: rs[0].s >= 2 };
     }
-    var g = cfg().gsearch && window.LumiGoogle && !LumiGoogle.isDown() ? LumiGoogle.search(q, near).then(best) : Promise.reject(new Error("google mati"));
+    var g = cfg().gsearch && window.LumiGoogle && !LumiGoogle.isDown("search") ? LumiGoogle.search(q, near).then(best) : Promise.reject(new Error("google mati"));
     return g.catch(function () {
       return http("https://photon.komoot.io/api/?q=" + encodeURIComponent(q) + "&lang=id&limit=5&lat=" + near[0] + "&lon=" + near[1] + "&location_bias_scale=0.4", 9000)
         .then(function (res) {
@@ -4672,7 +4673,7 @@
   };
   /* Sambungan internet hilang/kembali: ganti peta dasar bila peta offline dipakai otomatis. */
   window.addEventListener("offline", function () { if (offlineReady() && cfg().offlineAuto !== false && mapStyleKey() !== "offline") applyBasemap(); });
-  window.addEventListener("online", function () { if (offlineReady() && cfg().offlineAuto !== false && mapStyleKey() !== "offline") { GL_DOWN = false; applyBasemap(); } });
+  window.addEventListener("online", function () { if (offlineReady() && cfg().offlineAuto !== false && mapStyleKey() !== "offline") { GL_DOWN = false; TILES_DOWN = false; applyBasemap(); } });
 
   var inStopEl = $('#inStop');
   if (inStopEl) inStopEl.addEventListener('input', function () { renderStops(this.value); });

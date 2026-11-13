@@ -24,6 +24,29 @@ supaya peta bersih tanpa menghilangkan kewajiban atribusi.
 **Risiko**: endpoint ini milik Google dan tidak disediakan untuk pihak ketiga.
 Kalau Google menolak petaknya (`tileerror` 8 kali), aplikasi memberi tahu sekali,
 memindahkan `cfg().basemap` ke `osm`, lalu menggambar ulang — peta tidak kosong.
+Kegagalan ini dicatat sebagai `TILES_DOWN`, terpisah dari `GL_DOWN` (gaya vektor
+OpenFreeMap), jadi Google ngadat tidak ikut mematikan vektor.
+
+## Kegagalan per-kapabilitas (v2.19.5)
+
+`js/gmaps.js` mencatat status tiap kemampuan sendiri, bukan satu saklar global:
+
+| kemampuan | dipakai oleh |
+|---|---|
+| `autocomplete` | saran alamat |
+| `details` | koordinat tempat dari `place_id` |
+| `search` | pencarian teks bebas |
+| `nearby` | halte/tempat sekitar (kini hanya alat) |
+| `static` | gambar rute yang dibagikan |
+
+- `REQUEST_DENIED` / `INVALID_REQUEST` → **permanen** untuk kemampuan itu saja.
+- `OVER_QUERY_LIMIT` / `UNKNOWN_ERROR` → **cooldown** berlipat: 60 dtk, 2 mnt,
+  4 mnt, … maksimal 15 mnt, lalu dicoba lagi otomatis.
+- `isDown()` tanpa argumen = semua kemampuan mati; `isDown("details")` = satu itu saja.
+
+Kuota juga ditekan: `sessiontoken` per sesi ketik (satu sesi = satu tagihan), dan
+hasil `details` di-cache di `localStorage` (`lumi:pcache`, 30 hari, maks 400
+tempat) sehingga tempat yang sama tidak memanggil Google dua kali.
 
 ## Gambar rute berwarna per ruas
 

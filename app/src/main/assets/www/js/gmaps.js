@@ -33,15 +33,55 @@ var LumiGoogle = (function () {
   var down = null;     // alasan kunci berhenti dipakai, atau null
 
   function bind(fn) { httpFn = fn; }
-  function isDown() { return down !== null; }
-  function reason() { return down; }
-  function markDown(why) {
-    if (down === null) {
-      down = why;
-      try { console.warn("[lumi] Google berhenti dipakai: " + why); } catch (e) { /* diam */ }
-    }
+
+  /*
+   * Kegagalan dicatat PER KEMAMPUAN, bukan satu saklar. Dulu satu
+   * REQUEST_DENIED dari endpoint mana pun mematikan seluruh lapisan Google —
+   * termasuk autocomplete yang sehat. Sekarang tiap kemampuan punya statusnya
+   * sendiri, dan OVER_QUERY_LIMIT hanya menidurkan sementara (cooldown
+   * berlipat), bukan mematikan permanen.
+   */
+  var CAPS = ["autocomplete", "details", "search", "nearby", "static"];
+  var fault = {};                       // cap -> { why, until, n }; until 0 = permanen
+  var COOL_BASE = 60000, COOL_MAX = 15 * 60000;
+  function capKey(cap) { return CAPS.indexOf(cap) >= 0 ? cap : "autocomplete"; }
+  function blocked(cap) {
+    var c = capKey(cap), f = fault[c];
+    if (!f) return false;
+    if (!f.until) return true;          // kunci/izin ditolak: permanen
+    if (Date.now() < f.until) return true;
+    delete fault[c];                    // cooldown habis: boleh dicoba lagi
+    return false;
   }
-  function reset() { down = null; }
+  function isDown(cap) {
+    if (cap) return blocked(cap);
+    return CAPS.every(function (c) { return blocked(c); });
+  }
+  function reason(cap) {
+    if (!cap) {
+      for (var i = 0; i < CAPS.length; i++) if (fault[CAPS[i]]) return reason(CAPS[i]);
+      return null;
+    }
+    var f = fault[capKey(cap)];
+    if (!f) return null;
+    if (!f.until) return f.why;
+    return f.why + " (" + Math.ceil((f.until - Date.now()) / 1000) + " dtk)";
+  }
+  function markDown(cap, why, status) {
+    var c = capKey(cap), f = fault[c];
+    var n = (f && f.n ? f.n : 0) + 1;
+    var soft = status === "OVER_QUERY_LIMIT" || status === "UNKNOWN_ERROR";
+    fault[c] = soft
+      ? { why: why, until: Date.now() + Math.min(COOL_MAX, COOL_BASE * Math.pow(2, n - 1)), n: n }
+      : { why: why, until: 0, n: n };
+    try {
+      console.warn("[lumi] Google/" + c + ": " + why + (soft ? " (cooldown)" : " (berhenti)"));
+    } catch (e) { /* diam */ }
+  }
+  function reset(cap) {
+    if (cap) delete fault[capKey(cap)];
+    else fault = {};
+  }
 
   function build(path, params) {
     var out = [], k;
@@ -53,18 +93,61 @@ var LumiGoogle = (function () {
     return API + path + "?" + out.join("&");
   }
 
-  function call(path, params, ms) {
-    if (down !== null) return Promise.reject(new Error(down));
+  function call(path, params, ms, cap) {
+    if (blocked(cap)) return Promise.reject(new Error(reason(cap)));
     if (!httpFn) return Promise.reject(new Error("jembatan HTTP belum siap"));
     return httpFn(build(path, params), ms || 9000, HEADERS).then(function (j) {
       if (!j) throw new Error("jawaban kosong");
       if (j.status === "OK" || j.status === "ZERO_RESULTS") return j;
       if (j.status === "REQUEST_DENIED" || j.status === "OVER_QUERY_LIMIT" ||
-          j.status === "INVALID_REQUEST" || j.status === "UNKNOWN_ERROR") markDown(j.status);
+          j.status === "INVALID_REQUEST" || j.status === "UNKNOWN_ERROR") {
+        markDown(cap, j.status + (j.error_message ? ": " + j.error_message : ""), j.status);
+      }
       var e = new Error(j.error_message || j.status || "permintaan ditolak");
       e.status = j.status;
       throw e;
     });
+  }
+
+  /* ------------------------------------------------- sesi & cache place_id */
+
+  /*
+   * Satu sesi ketik = satu sessiontoken: Places menagih satu sesi autocomplete
+   * + satu Details sebagai satu unit, bukan satu panggilan per ketukan.
+   * Sesi ditutup setelah Details dipakai.
+   */
+  var sess = null;
+  function sessionToken() {
+    if (!sess) {
+      sess = "lumi-" + Date.now().toString(36) + "-" +
+        Math.random().toString(36).slice(2, 10);
+    }
+    return sess;
+  }
+  function endSession() { sess = null; }
+
+  /* place_id -> koordinat di localStorage: panggilan berulang tidak perlu
+     menyentuh Google lagi. Cache hanya bonus; penuh/gagal = dilewati. */
+  var CACHE_KEY = "lumi:pcache", CACHE_TTL = 30 * 86400000, CACHE_MAX = 400;
+  function cacheAll() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function cacheGet(id) {
+    var c = cacheAll()[id];
+    if (!c || !c.p || (Date.now() - (c.ts || 0)) > CACHE_TTL) return null;
+    return { name: c.name || "", sub: c.sub || "", p: c.p };
+  }
+  function cachePut(id, d) {
+    try {
+      var c = cacheAll();
+      c[id] = { name: d.name, sub: d.sub, p: d.p, ts: Date.now() };
+      var keys = Object.keys(c);
+      if (keys.length > CACHE_MAX) {
+        keys.sort(function (a, b) { return (c[a].ts || 0) - (c[b].ts || 0); });
+        for (var i = 0; i < keys.length - CACHE_MAX; i++) delete c[keys[i]];
+      }
+      localStorage.setItem(CACHE_KEY, JSON.stringify(c));
+    } catch (e) { /* kuota penuh / mode privat: cache dilewati */ }
   }
 
   /* ---------------------------------------------------------------- Places */
@@ -77,8 +160,9 @@ var LumiGoogle = (function () {
       language: "id",
       components: "country:id",
       location: p[0].toFixed(6) + "," + p[1].toFixed(6),
-      radius: 50000
-    }).then(function (j) {
+      radius: 50000,
+      sessiontoken: sessionToken()
+    }, 9000, "autocomplete").then(function (j) {
       return (j.predictions || []).map(function (x) {
         var f = x.structured_formatting || {};
         return { id: x.place_id, name: f.main_text || x.description || "", sub: f.secondary_text || x.description || "" };
@@ -86,17 +170,23 @@ var LumiGoogle = (function () {
     });
   }
 
-  /* Koordinat & nama satu tempat dari place_id. */
+  /* Koordinat & nama satu tempat dari place_id (cache dulu, baru Google). */
   function details(id) {
+    var hit = cacheGet(id);
+    if (hit) { endSession(); return Promise.resolve(hit); }
     return call("place/details/json", {
       place_id: id,
       fields: "name,geometry,formatted_address,vicinity",
-      language: "id"
-    }).then(function (j) {
+      language: "id",
+      sessiontoken: sessionToken()
+    }, 9000, "details").then(function (j) {
       var r = j.result || {}, loc = r.geometry && r.geometry.location;
       if (!loc) throw new Error("tempat tanpa koordinat");
-      return { name: r.name || "", sub: r.formatted_address || r.vicinity || "", p: [loc.lat, loc.lng] };
-    });
+      var d = { name: r.name || "", sub: r.formatted_address || r.vicinity || "", p: [loc.lat, loc.lng] };
+      cachePut(id, d);
+      return d;
+    }).then(function (d) { endSession(); return d; },
+            function (e) { endSession(); throw e; });
   }
 
   /* Cari tempat dengan kata bebas (Place Text Search) — cadangan bila autocomplete kosong. */
@@ -105,7 +195,7 @@ var LumiGoogle = (function () {
     return call("place/textsearch/json", {
       query: q, language: "id", region: "id",
       location: p[0].toFixed(6) + "," + p[1].toFixed(6), radius: 50000
-    }).then(function (j) {
+    }, 9000, "search").then(function (j) {
       return (j.results || []).map(function (x) {
         var loc = x.geometry && x.geometry.location;
         return loc ? { id: x.place_id, name: x.name || "", sub: x.formatted_address || x.vicinity || "", p: [loc.lat, loc.lng] } : null;
@@ -120,7 +210,7 @@ var LumiGoogle = (function () {
       radius: radius || 1500,
       type: type || "transit_station",
       language: "id"
-    }).then(function (j) {
+    }, 9000, "nearby").then(function (j) {
       return (j.results || []).map(function (x) {
         var g = x.geometry && x.geometry.location;
         return g ? { id: x.place_id, name: x.name || "", sub: x.vicinity || "", p: [g.lat, g.lng] } : null;
@@ -213,6 +303,7 @@ var LumiGoogle = (function () {
     isDown: isDown,
     reason: reason,
     reset: reset,
+    endSession: endSession,
     autocomplete: autocomplete,
     details: details,
     search: search,
