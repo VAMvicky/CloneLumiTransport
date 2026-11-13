@@ -532,22 +532,6 @@ if FARES.get("v") != 1 or not all(k in FARES for k in ("tj", "krl", "mrt", "lrt"
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
-# v2.19: hasil audit titik halte terhadap Google Places (tools/validate_stops.py).
-# Opsional: tanpa berkas ini, aplikasi tidak menampilkan lencana audit dan tetap
-# berjalan seperti biasa. Ditulis selalu supaya index.html tidak pernah 404.
-SCP = os.path.join(ROOT, "data", "stop_check.json")
-sc = None
-if os.path.exists(SCP):
-    sc = json.load(open(SCP, encoding="utf-8"))
-    if not isinstance(sc, dict) or not isinstance(sc.get("stops"), dict):
-        sys.exit("data/stop_check.json tidak valid (butuh objek 'stops')")
-SOUT = os.path.join(os.path.dirname(OUT), "stopcheck.js")
-with open(SOUT, "w", encoding="utf-8") as f:
-    f.write("/* Hasil audit titik halte terhadap Google Places (tools/validate_stops.py). */\n")
-    f.write("window.LUMI_STOPCHECK=")
-    if sc: json.dump(sc, f, separators=(",", ":"), ensure_ascii=False)
-    else: f.write("null")
-    f.write(";\n")
 with open(OUT, "w") as f:
     f.write("/* Dibuat otomatis oleh tools/build_data.py — jangan diedit manual. */\n")
     f.write("window.LUMI_DATA=")
