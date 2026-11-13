@@ -1,27 +1,27 @@
-﻿/* =============================================================================
- * Lumi Ã¢â‚¬â€ lapisan Google Maps.
+/* =============================================================================
+ * Lumi — lapisan Google.
  *
- * Kunci di bawah diekstrak dari APK Google Maps 26.44.06 (lihat
- * docs/google-api-keys.md). Kuncinya dibatasi ke aplikasi Google Maps, jadi
- * setiap permintaan membawa dua header tiruan supaya lolos pembatasan:
+ * Kunci di bawah diekstrak dari APK Google Maps (lihat docs/google-api-keys.md).
+ * Kuncinya dibatasi ke aplikasi Google Maps, jadi setiap permintaan membawa dua
+ * header tiruan supaya lolos pembatasan:
  *
  *     X-Android-Package: com.google.android.apps.maps
  *     X-Android-Cert:    <SHA-1 sertifikat penandatangan Google Maps>
  *
  * Permintaan JSON lewat jembatan native (LumiNative.httpH) karena
  * maps.googleapis.com tidak mengirim header CORS sehingga fetch/XHR dari
- * halaman file:// akan ditolak. Petak peta lewat <img> dan headernya
+ * halaman file:// akan ditolak. Gambar (Static Maps) lewat <img> dan headernya
  * dipasang oleh shouldInterceptRequest di MainActivity.
  *
- * Yang dipakai di sini hanya API yang memang terbuka untuk kunci ini:
- * Place Autocomplete, Place Details, Place Query/Nearby/Text Search,
- * dan Static Maps. Directions/Routes, Geocoding, dan Timezone ditolak
- * (API-nya tidak diaktifkan pada proyek Google pemilik kunci).
+ * Yang dipakai di sini: Place Autocomplete, Place Details, Place Query/Nearby/
+ * Text Search, dan Static Maps untuk gambar rute yang dibagikan. Directions,
+ * Geocoding, dan Timezone ditolak (API-nya tidak diaktifkan pada proyek Google
+ * pemilik kunci).
  * ========================================================================== */
 var LumiGoogle = (function () {
   "use strict";
 
-  /* Kunci dari res/values/strings.xml APK Google Maps Ã¢â‚¬â€ Places + Static Maps. */
+  /* Kunci dari res/values/strings.xml APK Google Maps — Places + Static Maps. */
   var KEY = "AIzaSyAwL-YrZb2V2cHyiT40jAXVFYDqlqs41gs";
   var PKG = "com.google.android.apps.maps";
   var CERT = "38918A453D07199354F8B19AF05EC6562CED5788";
@@ -38,7 +38,7 @@ var LumiGoogle = (function () {
   function markDown(why) {
     if (down === null) {
       down = why;
-      try { console.warn("[lumi] Google Maps berhenti dipakai: " + why); } catch (e) { /* diam */ }
+      try { console.warn("[lumi] Google berhenti dipakai: " + why); } catch (e) { /* diam */ }
     }
   }
   function reset() { down = null; }
@@ -99,7 +99,7 @@ var LumiGoogle = (function () {
     });
   }
 
-  /* Cari tempat dengan kata bebas (Place Text Search) Ã¢â‚¬â€ cadangan bila autocomplete kosong. */
+  /* Cari tempat dengan kata bebas (Place Text Search) — cadangan bila autocomplete kosong. */
   function search(q, near) {
     var p = near || [-6.2, 106.83];
     return call("place/textsearch/json", {
@@ -130,20 +130,13 @@ var LumiGoogle = (function () {
 
   /* ------------------------------------------------------------------ peta */
 
+  /* URL satu gambar Static Maps yang berpusat di (lat,lng) pada zoom z. */
   function staticUrl(lat, lng, z, size, scale) {
     var px = size || 256;
     return API + "staticmap?center=" + lat.toFixed(7) + "," + lng.toFixed(7) +
       "&zoom=" + Math.max(0, Math.min(20, Math.round(z))) +
       "&size=" + px + "x" + px + "&scale=" + (scale || 1) +
       "&language=id&sensor=false&key=" + KEY;
-  }
-
-  /* Tengah petak slippy (Web Mercator) untuk z/x/y. Wajib (x+0.5, y+0.5):
-     sudut kiri-atas petak bukan tengahnya, dan selisihnya berubah tiap zoom. */
-  function center(z, x, y) {
-    var n = Math.PI - 2 * Math.PI * (y + 0.5) / Math.pow(2, z);
-    var lat = Math.atan(Math.sinh ? Math.sinh(n) : (Math.exp(n) - Math.exp(-n)) / 2) * 180 / Math.PI;
-    return [lat, (x + 0.5) / Math.pow(2, z) * 360 - 180];
   }
 
   /* Web Mercator: derajat -> piksel dunia pada zoom z, dan sebaliknya. */
@@ -160,48 +153,7 @@ var LumiGoogle = (function () {
     return [lat, x / s * 360 - 180];
   }
 
-  /*
-   * Peta dasar gaya Google: SATU gambar Static Maps per layar, bukan per petak.
-   *
-   * Static Maps bukan tile server. Tiap gambar yang diminta adalah render peta
-   * utuh lengkap dengan logo + "Map data Â©â€¦ Google" miliknya sendiri, jadi
-   * menyusunnya sebagai petak 256 px menggandakan watermark di setiap kotak.
-   * Di sini satu gambar 640 px digeoreferensi sebagai ImageOverlay: satu
-   * atribusi per layar (seperti aplikasi peta sungguhan), dan posisinya tepat
-   * karena batas geografisnya dihitung dari pusat + zoom yang kita pilih.
-   * Gambar disegarkan setiap kali peta berhenti bergerak atau berubah zoom.
-   */
-  function overlayLayer(attribution) {
-    var Img = L.ImageOverlay.extend({
-      onAdd: function (map) {
-        L.ImageOverlay.prototype.onAdd.call(this, map);
-        this._sync();
-        map.on("moveend zoomend", this._sync, this);
-      },
-      onRemove: function (map) {
-        map.off("moveend zoomend", this._sync, this);
-        L.ImageOverlay.prototype.onRemove.call(this, map);
-      },
-      _sync: function () {
-        var map = this._map;
-        if (!map) return;
-        var size = map.getSize(), c = map.getCenter();
-        // gambar harus MENUTUPI layar: 640 px @ zImg >= sisiTerpanjang @ z peta
-        var zImg = Math.floor(map.getZoom() + Math.log(640 / Math.max(240, size.x, size.y)) / Math.LN2);
-        zImg = Math.max(2, Math.min(20, zImg));
-        var px = project(c.lat, c.lng, zImg), half = 320;
-        var sw = unproject(px[0] - half, px[1] + half, zImg);
-        var ne = unproject(px[0] + half, px[1] - half, zImg);
-        this.setBounds(L.latLngBounds([sw[0], sw[1]], [ne[0], ne[1]]));
-        this.setUrl(staticUrl(c.lat, c.lng, zImg, 640, 1));
-      }
-    });
-    return new Img("", [[-85, -180], [85, 180]], {
-      interactive: false, attribution: attribution || ATTR, className: "lm-google"
-    });
-  }
-
-  /* Zoom yang memasukkan semua titik ke kotak wÃ—h dengan tepi aman. */
+  /* Zoom yang memasukkan semua titik ke kotak w×h dengan tepi aman. */
   function fitView(pts, w, h, pad) {
     var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
     for (var i = 0; i < pts.length; i++) {
@@ -221,32 +173,30 @@ var LumiGoogle = (function () {
   }
 
   /*
-   * Gambar rute siap tempel: Static Maps dengan garis polyline dan dua penanda
-   * ujung. `points` = [[lat,lng], ...] mengikuti urutan perjalanan.
-   * Pusat dan zoom dihitung sendiri (fitView) â€” auto-fit Static Maps tidak
-   * selalu memasukkan `path` ke perhitungan bounds, sehingga rute bisa terpotong.
-   * Ukuran dijaga <= 640 px supaya tetap di jalur gratis; URL dibatasi 8192
-   * karakter, jadi titik yang dikirim sudah diencerkan oleh pemanggil.
+   * Peta rute berwarna per ruas: satu `path=` untuk tiap ruas naik, memakai
+   * warna trayeknya. Perpindahan jadi kelihatan sebagai pergantian warna.
+   * `segs` = [{ pts: [[lat,lng],...], color: "RRGGBB", weight: 6 }, ...]
    */
-  function staticRouteUrl(points, opts) {
+  function staticRouteSegs(segs, opts) {
     var o = opts || {};
     var w = Math.max(200, Math.min(640, o.w || 600));
     var h = Math.max(160, Math.min(640, o.h || 360));
-    var pts = (points || []).filter(function (p) {
-      return p && isFinite(p[0]) && isFinite(p[1]) && Math.abs(p[0]) <= 85 && Math.abs(p[1]) <= 180;
+    var fitPts = [], paths = [];
+    (segs || []).forEach(function (sg) {
+      var pts = (sg.pts || []).filter(function (p) {
+        return p && isFinite(p[0]) && isFinite(p[1]) && Math.abs(p[0]) <= 85 && Math.abs(p[1]) <= 180;
+      });
+      if (pts.length < 2) return;
+      fitPts = fitPts.concat(pts);
+      var hex = String(sg.color || "1565D8").replace("#", "").slice(0, 6);
+      paths.push("path=" + encodeURIComponent("color:0x" + hex + "ff|weight:" + (sg.weight || 6)) +
+        "|" + pts.map(function (p) { return p[0].toFixed(5) + "," + p[1].toFixed(5); }).join("|"));
     });
-    if (pts.length < 2) return null;
-    var fit = fitView(pts, w, h, 22);
-    var parts = [];
-    var a = pts[0], b = pts[pts.length - 1];
-    parts.push("center=" + fit.c[0].toFixed(6) + "," + fit.c[1].toFixed(6));
-    parts.push("zoom=" + fit.z);
-    parts.push("path=" + encodeURIComponent("color:0x1565D8ff|weight:6") +
-      "|" + pts.map(function (p) { return p[0].toFixed(5) + "," + p[1].toFixed(5); }).join("|"));
-    parts.push("size=" + w + "x" + h);
-    parts.push("scale=1");
-    parts.push("language=id");
-    parts.push("key=" + KEY);
+    if (fitPts.length < 2 || !paths.length) return null;
+    var fit = fitView(fitPts, w, h, 22);
+    var parts = ["center=" + fit.c[0].toFixed(6) + "," + fit.c[1].toFixed(6), "zoom=" + fit.z];
+    parts = parts.concat(paths);
+    parts.push("size=" + w + "x" + h, "scale=1", "language=id", "key=" + KEY);
     return API + "staticmap?" + parts.join("&");
   }
 
@@ -268,8 +218,7 @@ var LumiGoogle = (function () {
     search: search,
     nearby: nearby,
     staticUrl: staticUrl,
-    staticRouteUrl: staticRouteUrl,
-    mapFit: mapFit,
-    overlayLayer: overlayLayer
+    staticRouteSegs: staticRouteSegs,
+    mapFit: mapFit
   };
 })();

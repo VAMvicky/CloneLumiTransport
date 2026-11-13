@@ -10,6 +10,15 @@
 
 ---
 
+## ✦ v2.19.2 — 13 November 2026 / 13 November 2026
+
+- 🇮🇩 **Gambar rute berwarna per ruas + ketuk peta.** Peta di gambar bagikan sekarang memakai warna trayek: merah Transjakarta, biru MRT, ungu LRT — jadi jumlah pindah langsung kelihatan dari gambarnya, bukan cuma dari strip. Pita peta juga dibuat lebih tinggi supaya rute tidak mengecil. Di aplikasi, **ketuk mana pun di peta** untuk memunculkan pilihan "Berangkat dari sini" / "Pergi ke sini"; nama tempatnya diambil dari Photon dan langsung mengisi kolom asal/tujuan. `versionCode` **21902**
+- 🇮🇩 **Peta gaya Google (raster) dihapus.** Static Maps bukan tile server: sebagai peta dasar ia selalu kabur saat di-zoom dan berkedip saat digeser, dan watermark-nya berulang. Pilihan itu dibuang; peta interaktif memakai OpenFreeMap/OSM/PMTiles yang mulus di semua zoom. Static Maps tetap dipakai untuk gambar rute. `versionCode` **21902**
+- 🇬🇧 **Route image coloured per leg + tap the map.** The shared route map now uses the line colours: red Transjakarta, blue MRT, purple LRT — so the number of transfers is visible from the image itself, not just the strip. The map band is taller so the route no longer shrinks. In the app, **tap anywhere on the map** to get "Start here" / "Go here"; the place name comes from Photon and fills the origin/destination field. `versionCode` **21902**
+- 🇬🇧 **The Google raster basemap is gone.** Static Maps is not a tile server: as a basemap it always blurs while zooming, flickers while panning, and repeats its watermark. That option is removed; the interactive map uses OpenFreeMap/OSM/PMTiles, which stay sharp at every zoom. Static Maps is still used for the route image. `versionCode` **21902**
+
+---
+
 ## ✦ v2.19.1 — 13 November 2026 / 13 November 2026
 
 - 🇮🇩 **Peta gaya Google diperbaiki, dua fitur dicabut.** Peta raster Google dulu disusun dari petak 256 px, dan tiap petak dihitung dari **sudut** petak bukan tengahnya — hasilnya titik bergeser dan makin ngawur tiap zoom, plus watermark "Map data ©… Google" berulang di setiap kotak. Kini gaya itu memakai **satu gambar per layar** yang digeoreferensi sebagai overlay: posisi tepat, satu atribusi, disegarkan setiap peta berhenti bergerak. Gambar rute yang dibagikan juga tidak lagi terpotong — pusat dan zoom dihitung sendiri, dan titik A/B digambar langsung di kartu supaya tidak terpotong tepi. Fitur **foto halte** dan **halte di sekitar saya** dicabut sesuai keputusan. `versionCode` **21901**

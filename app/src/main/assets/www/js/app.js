@@ -1894,7 +1894,7 @@
   // Bawaan tanpa API key (OpenFreeMap/OSM, Photon). Google Places & Static Maps opsional
   // lewat kunci internal aplikasi Google Maps — lihat js/gmaps.js dan docs/google-api-keys.md.
   var DEFAULT_CFG = { basemap: "liberty", gsearch: true, accessible: false, voice: false, theme: "system", mapDark: true, offlineAuto: true, lang: ((navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en") };
-  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, google: 1, offline: 1 };
+  var MAPSTYLES_KEYS = { liberty: 1, bright: 1, positron: 1, osm: 1, offline: 1 };
   function cfg() {
     var c = store("cfg") || {};
     var o = {}; for (var k in DEFAULT_CFG) o[k] = c[k] === undefined ? DEFAULT_CFG[k] : c[k];
@@ -1922,7 +1922,20 @@
   function deletePlace(i) { var arr = savedPlaces(); arr.splice(i, 1); store("places", arr); }
 
   var JKT = [-6.2, 106.83];
-  function reverse(p) { return Promise.resolve(p[0].toFixed(5) + ", " + p[1].toFixed(5)); }
+  /* Alamat dari titik (Photon, tanpa kunci). Gagal = koordinat; UI tidak ditahan. */
+  function reverse(p) {
+    var fallback = p[0].toFixed(5) + ", " + p[1].toFixed(5);
+    var lang = (navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en";
+    var url = "https://photon.komoot.io/reverse?lat=" + p[0].toFixed(6) + "&lon=" + p[1].toFixed(6) + "&lang=" + lang;
+    return http(url, 3500).then(function (j) {
+      var f = j && j.features && j.features[0], pr = f && f.properties;
+      if (!pr) return fallback;
+      var nm = pr.name || pr.street || pr.city || "";
+      var rest = [pr.name && pr.street ? pr.street : "", pr.district || pr.city || "", pr.state || ""]
+        .filter(function (x) { return x && x !== nm; }).slice(0, 2).join(", ");
+      return nm ? (rest ? nm + ", " + rest : nm) : fallback;
+    }).catch(function () { return fallback; });
+  }
   /* Jarak jalan untuk estimasi ojol (OSRM publik, tanpa key). */
   function roadKm(a, b) {
     var url = "https://router.project-osrm.org/route/v1/driving/" + a[1] + "," + a[0] + ";" + b[1] + "," + b[0] + "?overview=false";
@@ -2533,12 +2546,10 @@
     bright: { name: "Bright (kontras)", gl: "https://tiles.openfreemap.org/styles/bright" },
     positron: { name: "Positron (terang, polos)", gl: "https://tiles.openfreemap.org/styles/positron" },
     osm: { name: "OpenStreetMap standar", raster: "https://tile.openstreetmap.org/{z}/{x}/{y}.png" },
-    google: { name: "Google Maps (raster)", google: true },
     offline: { name: tl("Offline Jabodetabek (tersimpan di HP)", "Offline Jabodetabek (saved on phone)"), offline: true }
   };
   var ATTR_OFM = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
   var ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors';
-  var ATTR_GOOGLE = 'Peta &copy; <a href="https://www.google.com/maps" target="_blank">Google</a>';
   var GL_OK = null;
   function glOk() {
     if (GL_OK !== null) return GL_OK;
@@ -2549,9 +2560,6 @@
   var GL_DOWN = false;   // R9: OpenFreeMap tidak menjawab → peta raster OSM sampai aplikasi dibuka ulang
   function baseLayer() {
     var st = MAPSTYLES[mapStyleKey()];
-    /* Peta Google: petak raster dari Static Maps, dimuat lewat <img> yang headernya
-     * dipasang shouldInterceptRequest (lihat GoogleKeys.java). */
-    if (st.google && window.LumiGoogle) return LumiGoogle.overlayLayer(ATTR_GOOGLE);
     // v2.17: peta offline Jabodetabek — dipilih langsung, atau otomatis saat tanpa internet / server peta mati.
     if (glOk() && offlineReady() && (st.offline || (cfg().offlineAuto !== false && (!navigator.onLine || GL_DOWN)))) return offlineLayer();
     if (st.gl && glOk() && !GL_DOWN) {
@@ -2573,10 +2581,47 @@
     return L.tileLayer(MAPSTYLES.osm.raster, { maxZoom: 20, maxNativeZoom: 19, keepBuffer: 4, attribution: ATTR_OSM });
   }
   var allMaps = [];
+  /* Ketuk peta: tawarkan titik itu sebagai asal atau tujuan (bukan di peta pemilih). */
+  function mapTapActions(map, ll) {
+    var p = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)];
+    var el = document.createElement("div");
+    el.className = "map-act";
+    el.innerHTML = '<button class="map-act-close" type="button" aria-label="' + esc(tl("Tutup", "Close")) + '">\u00d7</button>' +
+      '<div class="map-act-name">' + p[0].toFixed(5) + ", " + p[1].toFixed(5) + "</div>" +
+      '<div class="map-act-btns">' +
+      '<button type="button" data-a="from">' + esc(tl("Berangkat dari sini", "Start here")) + "</button>" +
+      '<button type="button" data-a="to">' + esc(tl("Pergi ke sini", "Go here")) + "</button>" +
+      "</div>";
+    var pop = L.popup({ closeButton: false, autoPan: true, offset: [0, -6], className: "lm-pop" })
+      .setLatLng(ll).setContent(el).openOn(map);
+    var nameEl = el.querySelector(".map-act-name");
+    reverse(p).then(function (nm) {
+      if (pop.isOpen && pop.isOpen()) nameEl.textContent = nm;
+    });
+    el.querySelector(".map-act-close").addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation(); map.closePopup(pop);
+    });
+    el.querySelectorAll(".map-act-btns button").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var which = b.dataset.a;
+        map.closePopup(pop);
+        setPoint(which, { name: nameEl.textContent, p: p });
+        afterPick(which);
+      });
+    });
+  }
+
   function makeMap(el) {
     var m = L.map(el, { zoomControl: false, attributionControl: true, maxZoom: 20, zoomSnap: 0.25, wheelPxPerZoomLevel: 90 }).setView(JKT, 12);
     m._lumiTiles = baseLayer().addTo(m);
     m.attributionControl.setPrefix(false);
+    m.on("click", function (e) {
+      if (el.id === "pickMap") return;            // peta pemilih punya alurnya sendiri
+      var t = e.originalEvent && e.originalEvent.target;
+      if (t && t.closest && t.closest(".leaflet-marker-icon,.leaflet-popup")) return;
+      mapTapActions(m, e.latlng);
+    });
     allMaps.push(m);
     return m;
   }
@@ -2851,7 +2896,7 @@
       ctx.font = "500 30px " + F; st.sl = (st.sub ? wrap(ctx, st.sub, textW) : []).concat(st.sub2 ? wrap(ctx, st.sub2, textW) : []).slice(0, 4);
       st.h = 34 + st.tl.length * 46 + st.sl.length * 40 + 30;
     });
-    var mapH = mapImg ? 420 : 0;
+    var mapH = mapImg ? 500 : 0;
     var headH = 250, sumH = 330, footH = 150;
     var H = headH + mapH + sumH + steps.reduce(function (a, st) { return a + st.h; }, 0) + footH + 40;
     c.width = W; c.height = H;
@@ -2875,7 +2920,7 @@
     ctx.font = "500 30px " + F; ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillText(tl("Rute perjalanan · ", "Trip route · ") + dayWord(dep) + clock(dep), P + 140, 158);
     // peta rute (bila petak Google berhasil diambil)
     if (mapImg) {
-      var mh = 380, mx = P - 20, mw = W - (P - 20) * 2, my = headH - 30;
+      var mh = 460, mx = P - 20, mw = W - (P - 20) * 2, my = headH - 30;
       ctx.save();
       rr(ctx, mx, my, mw, mh, 40); ctx.clip();
       var iw = mapImg.width || mw, ih = mapImg.height || mh;
@@ -2988,39 +3033,49 @@
     ctx.fillText(tl("Waktu & tarif perkiraan · cek info operator", "Times & fares are estimates · check operator info"), P, H - footH + 104);
     return c.toDataURL("image/png");
   }
-  /* Titik gambar peta untuk sebuah perjalanan: ujung, lalu halte tiap ruas naik.
-     Diencerkan ke maksimal 40 titik supaya URL Static Maps tetap pendek. */
-  function routePoints(it) {
-    var out = [];
-    var push = function (p) { if (p && isFinite(p[0]) && isFinite(p[1])) out.push([+p[0], +p[1]]); };
-    push(S.from && S.from.p);
+  /* Ruas berwarna untuk peta kartu: tiap ruas naik jadi satu garis trayek. */
+  function routeSegments(it) {
+    var segs = [], all = [];
+    var push = function (p) {
+      if (p && isFinite(p[0]) && isFinite(p[1])) return [+p[0], +p[1]];
+      return null;
+    };
     (it.legs || []).forEach(function (l) {
-      if (l.type === "ride" && l.stops) l.stops.forEach(function (st) { push(st.p); });
+      if (l.type !== "ride" || !l.stops || l.stops.length < 2) return;
+      var pts = [];
+      l.stops.forEach(function (st) { var q = push(st.p); if (q) pts.push(q); });
+      if (pts.length < 2) return;
+      segs.push({ pts: pts, color: String(lc(l)).replace("#", ""), weight: 6 });
+      all = all.concat(pts);
     });
-    push(S.to && S.to.p);
-    if (out.length <= 40) return out;
-    var step = (out.length - 1) / 39, thin = [];
-    for (var i = 0; i < 40; i++) thin.push(out[Math.round(i * step)]);
-    return thin;
+    var a = push(S.from && S.from.p), b = push(S.to && S.to.p);
+    if (a) all.push(a);
+    if (b) all.push(b);
+    if (all.length > 60) {                       // URL tetap di bawah batas 8.192
+      var step = (all.length - 1) / 59, th = [];
+      for (var k = 0; k < 60; k++) th.push(all[Math.round(k * step)]);
+      all = th;
+    }
+    return { segs: segs, all: all };
   }
 
   /* Ambil gambar rute dari Static Maps. Gagal = gambar tetap dibuat tanpa peta. */
-  var MAP_W = 640, MAP_H = 246, MAP_PAD = 22;
+  var MAP_W = 640, MAP_H = 298, MAP_PAD = 22;
   function loadRouteMap(it) {
     if (!window.LumiGoogle || LumiGoogle.isDown()) return Promise.resolve(null);
-    var pts = routePoints(it);
-    if (pts.length < 2) return Promise.resolve(null);
-    var fit = LumiGoogle.mapFit(pts, MAP_W, MAP_H, MAP_PAD);
-    var url = LumiGoogle.staticRouteUrl(pts, { w: MAP_W, h: MAP_H });
+    var g = routeSegments(it);
+    if (!g.segs.length || g.all.length < 2) return Promise.resolve(null);
+    var fit = LumiGoogle.mapFit(g.all, MAP_W, MAP_H, MAP_PAD);
+    var url = LumiGoogle.staticRouteSegs(g.segs, { w: MAP_W, h: MAP_H });
     if (!url) return Promise.resolve(null);
     return new Promise(function (res) {
       var img = new Image(), done = false;
       var t = setTimeout(function () { if (!done) { done = true; res(null); } }, 4500);
-      img.crossOrigin = "anonymous";                 // perlu CORS dari penyadap di MainActivity
+      img.crossOrigin = "anonymous";               // perlu CORS dari penyadap di MainActivity
       img.onload = function () {
         if (done) return;
         done = true; clearTimeout(t);
-        res({ img: img, fit: fit, ends: [pts[0], pts[pts.length - 1]], w: MAP_W, h: MAP_H });
+        res({ img: img, fit: fit, ends: [g.all[0], g.all[g.all.length - 1]], w: MAP_W, h: MAP_H });
       };
       img.onerror = function () { if (!done) { done = true; clearTimeout(t); res(null); } };
       img.src = url;
@@ -3574,8 +3629,7 @@
       var c = cfg(); c.basemap = this.value; store("cfg", c);
       applyBasemap();
       renderSettings(["map", "ok", tl("Gaya peta diganti: ", "Map style changed: ") + T(MAPSTYLES[this.value].name) + "."]);
-      if (this.value === "google" && window.LumiGoogle && LumiGoogle.isDown()) toast(tl("Kunci Google ditolak — peta bisa tetap kosong.", "Google key rejected — the map may stay blank."));
-    });
+      });
     $$("[data-del]", $("#settingsBody")).forEach(function (b) { b.addEventListener("click", function () { deletePlace(+b.dataset.del); renderSettings(); }); });
   }
   $("#btnSettings").addEventListener("click", openSettings);

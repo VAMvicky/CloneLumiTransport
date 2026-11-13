@@ -1119,3 +1119,16 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 
 /* Peta dasar gaya Google: satu gambar Static Maps per layar (bukan petak). */
 .lm-google { pointer-events: none; }
+
+/* ============================================================================
+ * v2.19.2 — ketuk peta: pilih "berangkat dari sini" / "pergi ke sini"
+ * ========================================================================== */
+.lm-pop .leaflet-popup-content-wrapper { border-radius: 16px; padding: 0; box-shadow: 0 10px 28px rgba(14,72,150,.22); }
+.lm-pop .leaflet-popup-content { margin: 0; }
+.map-act { position: relative; padding: 12px 14px 13px; min-width: 208px; }
+.map-act-close { position: absolute; top: 2px; right: 7px; border: 0; background: none; padding: 2px 4px; font-size: 20px; line-height: 1; color: #527089; cursor: pointer; }
+.map-act-name { font-weight: 700; font-size: 13px; line-height: 1.35; color: #0F2740; padding-right: 20px; margin-bottom: 10px; }
+.map-act-btns { display: flex; gap: 8px; }
+.map-act-btns button { flex: 1; border: 0; border-radius: 10px; padding: 10px 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.map-act-btns button[data-a="from"] { background: #EAF3FC; color: #1565D8; }
+.map-act-btns button[data-a="to"] { background: #1565D8; color: #fff; }

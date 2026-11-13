@@ -1,50 +1,53 @@
 # Peta gaya Google & audit titik halte
 
-Dua hal di v2.19 yang memakai kunci Google Maps yang sama dengan saran alamat
-(lihat [google-api-keys.md](google-api-keys.md)). Keduanya pelengkap: tanpa kunci,
-tanpa jaringan, atau saat kuota habis, aplikasi tetap berjalan seperti biasa.
+Catatan v2.19 soal apa yang masih dipakai dari kunci Google Maps (lihat
+[google-api-keys.md](google-api-keys.md)), dan apa yang sengaja dibuang.
 
-## 1. Peta dasar gaya Google — satu gambar per layar
+## Peta interaktif: BUKAN Static Maps
 
-`LumiGoogle.overlayLayer()` di `js/gmaps.js`.
+Sejak v2.19.2 pilihan "Google Maps (raster)" dihapus. Alasannya teknis, bukan
+selera:
 
-Static Maps **bukan tile server**. Setiap gambar yang diminta adalah render peta
-utuh lengkap dengan logo dan "Map data ©… Google" miliknya sendiri. Menyusunnya
-sebagai petak 256 px menghasilkan dua cacat:
+- Static Maps **bukan tile server**. Menyusunnya jadi petak menghasilkan
+  watermark berulang di setiap kotak, dan pusat petak yang salah membuat titik
+  bergeser makin jauh tiap tingkat zoom.
+- Satu gambar per layar (percobaan v2.19.1) memperbaiki posisi dan watermark,
+  tetapi tetap **kabur saat di-zoom** dan berkedip saat digeser — sifat raster
+  yang di-scale.
 
-- titik bergeser, karena pusat petak harus `(x+0.5, y+0.5)` di skema slippy —
-  memakai `(x, y)` menggeser gambar setengah petak, dan besar geserannya berubah
-  di setiap tingkat zoom;
-- watermark berulang di setiap kotak.
+Peta interaktif sekarang hanya memakai sumber yang memang tile/vektor:
+OpenFreeMap (`liberty`, `bright`, `positron`), OSM raster, dan PMTiles offline.
+Semua mulus di setiap zoom, tanpa watermark berulang.
 
-Karena itu gaya ini sekarang memakai **satu gambar 640 px per layar**:
+Static Maps tetap dipakai untuk **gambar rute yang dibagikan** — di sana ia
+memang alat yang tepat: satu potret, bukan permukaan yang digeser.
 
-```
-zoom gambar = floor(zoom peta + log2(640 / sisiTerpanjang))
-```
+## Gambar rute berwarna per ruas
 
-Batas geografis gambar dihitung dari pusat peta + zoom gambar itu, lalu dipasang
-sebagai `L.ImageOverlay`. Hasilnya: satu atribusi per layar, posisi tepat, dan
-gambar disegarkan setiap `moveend` / `zoomend`. Biayanya satu permintaan per
-gerakan peta yang berhenti — bukan satu per petak.
+`LumiGoogle.staticRouteSegs()` + `tripImage()`.
 
-## 2. Peta pada gambar rute yang dibagikan
+- `segs` = satu entri per ruas naik: `{ pts, color, weight }`. Tiap ruas jadi satu
+  parameter `path=` dengan warna trayeknya, jadi perpindahan kelihatan sebagai
+  pergantian warna (merah TJ, biru MRT, ungu LRT, cokelat KRL).
+- `center` dan `zoom` dihitung sendiri (`fitView`) — auto-fit Static Maps tidak
+  selalu memasukkan `path` ke bounds, sehingga rute bisa terpotong.
+- Gambar 640×298 dengan pita kartu 992×460: rasio sama, tidak ada piksel dipotong.
+- Titik **A** dan **B** digambar di kanvas kartu, bukan `markers` Static Maps —
+  pin di ujung rute selalu terpotong tepi pita.
+- `crossOrigin="anonymous"` + `Access-Control-Allow-Origin: *` dari
+  `MainActivity.googleFetch()` supaya kanvas tidak ternoda.
+- Batas waktu 4,5 detik: tanpa gambar, kartu tetap dibuat.
 
-`LumiGoogle.staticRouteUrl()` + `tripImage()`.
+## Ketuk peta: asal / tujuan
 
-- `center` dan `zoom` **dihitung sendiri** (`fitView`), tidak mengandalkan auto-fit
-  Static Maps — auto-fit tidak selalu memasukkan `path` ke perhitungan bounds,
-  sehingga rute bisa terpotong.
-- Ukuran gambar 640×246, rasio yang sama dengan pita peta di kartu (992×380),
-  jadi tidak ada piksel yang dipotong.
-- Titik **A** dan **B** digambar di kanvas kartu, bukan sebagai `markers` Static
-  Maps: pin di ujung rute selalu terpotong tepi pita.
-- Gambar diambil dengan `crossOrigin="anonymous"`; `MainActivity.googleFetch()`
-  mengirim `Access-Control-Allow-Origin: *` supaya kanvas tidak "ternoda" dan
-  `toDataURL()` tetap bekerja.
-- Batas waktu 4,5 detik: kalau gambar tidak datang, kartu tetap dibuat tanpa peta.
+`mapTapActions()` di `app.js`, dipasang di `makeMap()`.
 
-## 3. Audit titik halte
+Ketuk mana pun (kecuali di peta pemilih `#pickMap` dan di atas penanda/popup)
+memunculkan popup berisi nama tempat + dua tombol. Nama diambil dari Photon
+`/reverse` (tanpa kunci); kalau gagal, dipakai koordinat. Tombol mengisi kolom
+asal/tujuan lewat `setPoint()` lalu `afterPick()`.
+
+## Audit titik halte
 
 ```bash
 python3 tools/validate_stops.py --limit 120    # bawaan: 120 halte per jalan
@@ -63,21 +66,14 @@ jarak terdekat ke titik Lumi → tulis `data/stop_check.json`
 | `moved` | kemungkinan halte sudah pindah | 60–400 m |
 | `missing` | tidak ada halte Google di sekitar | > 400 m |
 
-`build_data.py` menyalin berkas itu ke `js/stopcheck.js`
-(`window.LUMI_STOPCHECK`), dan lembar halte menampilkan lencananya. Kunci memakai
-**nama yang dinormalkan** (`nmKey`), bukan koordinat, supaya lencana tidak hilang
-saat GTFS menggeser titik halte sedikit.
-
-Audit tidak dijalankan di CI: butuh jaringan dan memakai kuota proyek Google
-pemilik kunci. Jalankan manual bila data GTFS berubah banyak, lalu commit
-`data/stop_check.json`.
+`build_data.py` menyalinnya ke `js/stopcheck.js` (`window.LUMI_STOPCHECK`) dan
+lembar halte menampilkan lencananya. Kunci memakai nama yang dinormalkan
+(`nmKey`), bukan koordinat, supaya lencana tidak hilang saat GTFS menggeser titik.
 
 ## Batas yang disadari
 
-- Kunci bukan milik Lumi dan bisa dicabut kapan saja.
-- `nearbysearch` hanya mengenal tempat yang ada di Google; halte baru bisa
-  berstatus `missing` — itu informasi, bukan vonis.
-- Static Maps dihitung per panggilan. Satu gambar rute = satu panggilan, dan peta
-  dasar gaya Google = satu panggilan per gerakan peta yang berhenti.
+- Kunci bukan milik Lumi dan bisa dicabut kapan saja; semua fitur Google punya
+  jalur mundur.
 - `path=` pada gambar rute adalah garis lurus antar halte, bukan geometri jalan.
-  Untuk garis yang mengikuti aspal, titiknya harus diambil dari shape GTFS.
+- Static Maps dihitung per panggilan: satu gambar rute = satu panggilan.
+- Photon `/reverse` bisa lambat; UI memakai koordinat lebih dulu, nama menyusul.
