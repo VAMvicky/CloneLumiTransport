@@ -1,2 +1,2 @@
-/* Dibuat otomatis oleh tools/gen_build_info.py — jangan diedit manual. */
+/* Dibuat otomatis oleh tools/gen_build_info.py â€” jangan diedit manual. */
 window.LUMI_BUILD={"version":"2.21.0","tjClientVersion":"3.1.1"};
