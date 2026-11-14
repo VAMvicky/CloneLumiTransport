@@ -425,17 +425,36 @@
       (l.dirs || []).forEach(function (d) {
         (d.s || []).forEach(function (st) {
           if (!st || !st.n || !st.p) return;
-          var k = nmKey(st.n), bucket = byName[k] || (byName[k] = []), hit = null;
+          /*
+           * v2.22.1: arah adalah bagian identitas. Nama halte sudah tidak lagi membawa "Arah …"
+           * (dibuang build_data supaya rute tidak terpecah), jadi token arah dibaca dari field `d`.
+           * Tanpa ini "Pancoran Arah Barat" dan "Pancoran Arah Timur" jadi satu baris, dan semua
+           * koridor yang lewat sana ikut tampil di salah satu peron.
+           */
+          var tok = st.d || LumiLive.dirTok(st.n) || "";
+          var k = nmKey(st.n) + "|" + tok, bucket = byName[k] || (byName[k] = []), hit = null;
           for (var i = 0; i < bucket.length; i++) {
             if (E.hav(bucket[i].p, st.p) <= STOP_MERGE_KM) { hit = bucket[i]; break; }
           }
-          if (!hit) { hit = { n: st.n, p: st.p, codes: {} }; bucket.push(hit); out.push(hit); }
+          if (!hit) { hit = { n: st.n, p: st.p, d: tok, x: st.x || 0, codes: {} }; bucket.push(hit); out.push(hit); }
           hit.codes[l.code] = 1;
         });
       });
     });
-    STOP_INDEX = out.sort(function (a, b) { return a.n.localeCompare(b.n); });
+    STOP_INDEX = out.sort(function (a, b) {
+      return a.n.localeCompare(b.n) || String(a.d || "").localeCompare(String(b.d || ""));
+    });
     return STOP_INDEX;
+  }
+  /* v2.22.1: nama tampil menyertakan arah peron ("Pancoran Arah Barat"), sama seperti aplikasi
+     resmi. Nama dasarnya tetap dipakai untuk pencocokan; arah hanya untuk dibaca manusia. */
+  var DIR_EN = { barat: "west", timur: "east", utara: "north", selatan: "south" };
+  function dirLabel(t) { return t ? (EN ? (DIR_EN[t] || t) : t) : ""; }
+  function stopLabel(s) {
+    if (!s) return "";
+    if (!s.d) return s.n;
+    var t = s.d.charAt(0).toUpperCase() + s.d.slice(1);
+    return s.n + " " + tl("Arah ", "towards ") + t;
   }
   /* D-02: nama halte kembar yang titiknya berjauhan diberi penanda koordinat,
      supaya daftar tidak menampilkan dua baris yang tampak identik. */
@@ -470,7 +489,7 @@
       var where = dupTags()[nmKey(s.n)]
         ? '<span class="stop-where">' + s.p[0].toFixed(3) + ", " + s.p[1].toFixed(3) + "</span>"
         : "";
-      return '<button class="stop-row" data-stop="' + i + '"><b>' + esc(s.n) + '</b><span>' + esc(codes) + where + "</span></button>";
+      return '<button class="stop-row" data-stop="' + i + '"><b>' + esc(stopLabel(s)) + '</b><span>' + esc(codes) + where + "</span></button>";
     }).join("");
     $$("#stopList .stop-row").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -483,14 +502,28 @@
      (halte dua arah biasanya berjarak puluhan meter). Halte bus dan stasiun yang namanya sama
      (mis. "Manggarai") dipisah: entri ini dianggap stasiun bila rute di titik persisnya semuanya kereta. */
   function linesAtStop(s) {
-    var key = nmKey(s.n), near = [], exact = [];
+    var key = nmKey(s.n), tok = s.d || LumiLive.dirTok(s.n) || "", near = [], exact = [];
     planner.lines.forEach(function (l) {
-      var best = 9;
+      var best = 9, ok = false;
       (l.dirs || []).forEach(function (d) {
-        (d.s || []).forEach(function (x) { if (x && x.p && nmKey(x.n) === key) best = Math.min(best, E.hav(s.p, x.p)); });
+        (d.s || []).forEach(function (x) {
+          if (!x || !x.p || nmKey(x.n) !== key) return;
+          /*
+           * v2.22.1: hanya arah rute yang peronnya membawa token arah SAMA. Dua peron berseberangan
+           * memakai nama dasar yang sama ("Pancoran"), jadi tanpa cek token keduanya lolos dan semua
+           * koridor yang lewat sana ikut tampil di satu peron.
+           */
+          var t2 = x.d || LumiLive.dirTok(x.n) || "";
+          if (tok && t2 && t2 !== tok) return;
+          var dd = E.hav(s.p, x.p);
+          if (dd < 0.2) ok = true;
+          best = Math.min(best, dd);
+        });
       });
-      if (best < 0.2) near.push(l);
-      if (best < 0.01) exact.push(l);
+      if (ok) {
+        if (best < 0.2) near.push(l);
+        if (best < 0.01) exact.push(l);
+      }
     });
     var station = exact.length > 0 && exact.every(function (l) { return RAIL[l.mode]; });
     return near.filter(function (l) { return station ? RAIL[l.mode] : !RAIL[l.mode]; });
@@ -509,7 +542,7 @@
   function openStopActions(s) {
     var m = $("#sheetStop"); if (!m) return;
     var lines = linesAtStop(s), isStation = lines.length > 0 && lines.every(function (l) { return RAIL[l.mode]; }), bus = isStation ? [] : lines.filter(liveOk);
-    $("#stopActName").textContent = s.n;
+    $("#stopActName").textContent = stopLabel(s);
     $("#stopActKind").textContent = isStation ? tl("Stasiun", "Station") : tl("Halte", "Stop");
     $("#stopActLines").innerHTML = lines.slice(0, 14).map(function (l) { return badge(l, "xs"); }).join("") +
       (lines.length > 14 ? '<span class="s-num">+' + (lines.length - 14) + "</span>" : "");
@@ -522,7 +555,7 @@
     };
     $("#stopActFrom").onclick = function () { use("from"); };
     $("#stopActTo").onclick = function () { use("to"); };
-    $("#stopActLive").onclick = function () { m.hidden = true; openLiveAt(s.p, s.n, { stop: s, lines: bus }); };
+    $("#stopActLive").onclick = function () { m.hidden = true; openLiveAt(s.p, stopLabel(s), { stop: s, lines: bus }); };
     $("#stopActAccess") && ($("#stopActAccess").innerHTML = accessLineHTML(s, isStation));
     enrichStop(s);                       // v2.21: fasilitas resmi, rute resmi, cuaca (malas, tidak memblokir)
     m.hidden = false; raiseSheet(m);   // tampil di atas peta/lembar yang sedang terbuka
@@ -1200,7 +1233,7 @@
       if (stop) list.forEach(function (x) {
         // Utamakan arah yang singgah di halte BERNAMA SAMA (mis. "Pancoran Arah Barat" hanya ada di satu arah);
         // bila tidak ada, arah dengan titik halte terdekat (selisih ≤ 15 m dari yang paling dekat).
-        var stopTok = LumiLive.dirTok(stop.n);
+        var stopTok = stop.d || LumiLive.dirTok(stop.n) || "";
         var byName = [], byDist = [];
         (x.l.dirs || []).forEach(function (d) {
           var nk = -1, bk = -1, bd = 0.03;          // v2.21: 80 m terlalu lebar untuk dua peron ±40 m
@@ -1211,7 +1244,7 @@
              * sebelum jarak dihitung — dulu peron seberang masuk lewat jalur "terdekat" lalu bus arah
              * sebaliknya ikut tampil di halte ini.
              */
-            var tok = LumiLive.dirTok(q.n);
+            var tok = q.d || LumiLive.dirTok(q.n) || "";
             if (stopTok && tok && tok !== stopTok) return;
             var dd = E.hav(q.p, stop.p);
             if (nk < 0 && dd < 0.15 && nmKey(q.n) === nmKey(stop.n)) nk = k;
@@ -1222,12 +1255,12 @@
         });
         var minD = byDist.reduce(function (m, y) { return Math.min(m, y.d); }, 1);
         // v2.18.1: halte satu arah tanpa nama yang cocok → hanya SATU arah terdekat (dulu dua arah bisa ikut).
-        var oneWayStop = /arah/.test(nmKey(stop.n));
+        var oneWayStop = !!((stop.d || LumiLive.dirTok(stop.n)) || /arah/.test(nmKey(stop.n)));
         stopDirs[LumiLive.norm(x.l.code)] = byName.length ? byName
           : oneWayStop ? byDist.sort(function (a, b) { return a.d - b.d; }).slice(0, 1)
           : byDist.filter(function (y) { return y.d <= minD + 0.015; });
       });
-      var oneWay = stop && /arah/.test(nmKey(stop.n));
+      var oneWay = !!(stop && ((stop.d || LumiLive.dirTok(stop.n)) || /arah/.test(nmKey(stop.n))));
       var stopEta = function (b) {
         var key = LumiLive.norm(b.code), ln = lineOfBus[key], ds = stopDirs[key];
         if (!ln) return null;

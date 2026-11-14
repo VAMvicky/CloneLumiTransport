@@ -598,7 +598,9 @@ def _pick(name, p):
     cand = []
     for sn in _SNAP:
         d = _hav_km(p, (sn["la"], sn["lo"]))
-        if d <= 0.08:
+        # nama dasar sama: 80 m cukup. Nama dasar hanya AWALAN ("Pancoran" -> "Pancoran Arah
+        # Barat"): 120 m, karena koordinat GTFS lama sering bergeser dan halte besar itu lebar.
+        if d <= (0.12 if _norm_base(sn["n"]).startswith(base) and _norm_base(sn["n"]) != base else 0.08):
             cand.append((d, sn))
     if not cand:
         return None

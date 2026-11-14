@@ -10,6 +10,15 @@
 
 ---
 
+## ✦ v2.22.1 — 15 November 2026 / 15 November 2026
+
+- 🇮🇩 **Snapshot nama halte diperluas: 7.515 halte dari 238 rute** (dulu 375 dari 11 rute). **1.395 nama** disamakan dengan aplikasi resmi 2026, 59 salah ketik digabung, 39 kembar dibuang — saat build, tanpa jaringan. `versionCode` **22201**
+- 🇮🇩 **Halte satu arah tidak lagi menampilkan semua koridor.** Token arah dibaca dari field `d` (nama halte sudah tidak membawa "Arah …"): `stopIndex()` menjadikan (nama dasar + arah) identitas, `linesAtStop()` hanya menerima arah yang bertoken sama, papan bus memakai token yang sama. Judul menampilkan "Pancoran Arah Barat". `versionCode` **22201**
+- 🇬🇧 **Stop-name snapshot expanded to all 238 routes: 7,515 stops** (was 375 from 11). **1,395 names** now match the official 2026 app, 59 typos merged, 39 duplicates dropped — at build time, offline. `versionCode` **22201**
+- 🇬🇧 **One-way stops no longer list every corridor.** The direction token is read from field `d` (names no longer carry "Arah …"): `stopIndex()` treats (base name + direction) as identity, `linesAtStop()` only accepts directions carrying the same token, and the bus board uses the same token. The sheet title reads "Pancoran Arah Barat". `versionCode` **22201**
+
+---
+
 ## ✦ v2.22.0 — 15 November 2026 / 15 November 2026
 
 - 🇮🇩 **Data rute dibangun ulang.** 179 nama halte disamakan dengan aplikasi resmi 2026 lewat snapshot `data-raw/tj_stops_2026.json` (375 halte, 11 rute) — bukan panggilan jaringan saat build. Contoh: **Gelora Bung Karno → Senayan Bank Jakarta**, **Setiabudi → Setiabudi Integritas**. `versionCode` **22200**
