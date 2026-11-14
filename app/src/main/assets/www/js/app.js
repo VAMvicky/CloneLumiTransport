@@ -1163,8 +1163,17 @@
    * v2.16: halte & stasiun Lumi sebagai titik yang bisa diketuk di peta "Bus di sekitarmu" (zoom >= 15):
    * ketuk → lembar aksi halte (berangkat dari sini / pergi ke sini / posisi bus di halte ini).
    */
-  function haltIcon(rail) {
-    return L.divIcon({ className: "", html: '<div class="lm-halt' + (rail ? " rail" : "") + '"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+  /*
+   * v2.23: titik halte di peta dibedakan menurut jenisnya — BRT, non-BRT (Mikrotrans), dan kereta.
+   * Dulu semua titik sama, jadi orang nggak bisa lihat mana yang dilayani bus BRT berhenti.
+   */
+  var HALT_ICON = {
+    brt: [15, 15], mikro: [11, 11], rail: [15, 15]
+  };
+  function haltIcon(kind) {
+    var cls = kind === "rail" ? " rail" : kind === "brt" ? " brt" : " mikro";
+    var sz = HALT_ICON[kind] || HALT_ICON.mikro;
+    return L.divIcon({ className: "", html: '<div class="lm-halt' + cls + '"></div>', iconSize: sz, iconAnchor: [sz[0] / 2, sz[1] / 2] });
   }
   function showHaltsOn(map) {
     if (map._halts) { map._halts.remove(); map.off("moveend zoomend", map._haltsFn); }
@@ -1178,8 +1187,15 @@
         n++;
         var k = s.n + "@" + s.p[0] + "," + s.p[1];
         if (drawn[k]) return;
-        var rail = Object.keys(s.codes).some(function (c) { var l = planner.lines.filter(function (x) { return x.code === c; })[0]; return l && RAIL[l.mode]; });
-        drawn[k] = L.marker(s.p, { icon: haltIcon(rail), zIndexOffset: 400, title: s.n, keyboard: false }).addTo(map._halts)
+        // jenis titik: kereta > BRT > non-BRT (Mikrotrans). BRT dihitung dari line.brt.
+        var kind = "mikro";
+        Object.keys(s.codes).forEach(function (c) {
+          var l = planner.lines.filter(function (x) { return x.code === c; })[0];
+          if (!l) return;
+          if (RAIL[l.mode]) kind = "rail";
+          else if (kind !== "rail" && l.brt) kind = "brt";
+        });
+        drawn[k] = L.marker(s.p, { icon: haltIcon(kind), zIndexOffset: 400, title: stopLabel(s), keyboard: false }).addTo(map._halts)
           .on("click", function () { openStopActions(s); });
       });
     };
@@ -3955,7 +3971,7 @@
    * kartu "rute berubah" beserta rincian sebelum → sesudah dari RouteUpdater.
    * Jeda 30 menit supaya membuka aplikasi berulang tidak memanggil server terus.
    */
-  var ROUTE_CHECK_MS = 30 * 60000;
+  var ROUTE_CHECK_MS = 10 * 60000;   // v2.23: 30 -> 10 menit; pemeriksaan juga memicu unduh GTFS bila tanda versinya berubah
   function routeCheckDue() {
     var at = store("remoteAt") || {};
     return !at.route || Date.now() - at.route > ROUTE_CHECK_MS;

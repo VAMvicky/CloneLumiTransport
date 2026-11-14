@@ -10,6 +10,17 @@
 
 ---
 
+## ✦ v2.23.0 — 15 November 2026 / 15 November 2026
+
+- 🇮🇩 **Halte di peta dibedakan:** BRT kotak biru, non-BRT/Mikrotrans titik bulat tosca kecil, kereta bulat merah. Jenis dihitung dari rute yang benar-benar berhenti di titik itu (`line.brt`), bukan dari nama; tooltip menampilkan arah peron. `versionCode` **22300**
+- 🇮🇩 **GPS beku setelah minimize/layar mati diperbaiki.** `startLocation()` punya penjaga `if (lm != null) return;` sehingga setelah Doze berhenti mengirim posisi, permintaan tidak pernah dipasang ulang. Kini pengawas 15 detik melepas & memasang ulang pendengar bila tak ada posisi > 20 detik; `onProviderEnabled` juga memaksa pasang ulang. `versionCode` **22300**
+- 🇮🇩 **Data rute diperiksa tiap 10 menit** saat aplikasi dibuka (dulu 30); bila tanda versi GTFS berubah, data baru langsung diunduh dan dipakai. `versionCode` **22300**
+- 🇬🇧 **Stops on the map are now typed:** BRT as a blue square, non-BRT/Mikrotrans as a small teal dot, rail as a red circle. The type comes from the routes that actually stop there (`line.brt`), not from the name; tooltips show the platform direction. `versionCode` **22300**
+- 🇬🇧 **GPS freezing after minimise/screen-off is fixed.** `startLocation()` guarded on `if (lm != null) return;`, so once Doze stopped delivering fixes the request was never re-armed. A 15-second watchdog now detaches and re-attaches the listener when no fix arrives for 20 seconds; `onProviderEnabled` forces a re-arm too. `versionCode` **22300**
+- 🇬🇧 **Route data is checked every 10 minutes** when the app opens (was 30); if the GTFS version marker changed, new data is downloaded and used immediately. `versionCode` **22300**
+
+---
+
 ## ✦ v2.22.1 — 15 November 2026 / 15 November 2026
 
 - 🇮🇩 **Snapshot nama halte diperluas: 7.515 halte dari 238 rute** (dulu 375 dari 11 rute). **1.395 nama** disamakan dengan aplikasi resmi 2026, 59 salah ketik digabung, 39 kembar dibuang — saat build, tanpa jaringan. `versionCode` **22201**

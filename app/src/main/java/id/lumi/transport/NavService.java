@@ -171,7 +171,10 @@ public class NavService extends Service {
         }
         running = true;
         spokenPhase = null; spokenStops = -1;
+        lastFixAt = System.currentTimeMillis();
         startLocation();
+        handler.removeCallbacks(gpsWatchdog);
+        handler.postDelayed(gpsWatchdog, 15000);
         return START_NOT_STICKY;
     }
 
@@ -182,7 +185,7 @@ public class NavService extends Service {
         ll = new LocationListener() {
             @Override public void onLocationChanged(Location loc) { onLoc(loc); }
             @Override public void onStatusChanged(String p, int s, Bundle b) { }
-            @Override public void onProviderEnabled(String p) { }
+            @Override public void onProviderEnabled(String p) { lastFixAt = 0; }   // v2.23: paksa pasang ulang
             @Override public void onProviderDisabled(String p) { }
         };
         try {
@@ -202,7 +205,30 @@ public class NavService extends Service {
     }
 
     private long lastNetAt;
+    /** v2.23: waktu posisi terakhir diterima. Dipakai pengawas GPS di bawah. */
+    private long lastFixAt;
+    /**
+     * v2.23: pengawas GPS.
+     *
+     * Bug yang diperbaiki: setelah aplikasi diminimalkan (Doze/App Standby) atau provider sempat mati,
+     * Android berhenti mengirim posisi tanpa memberi tahu. `startLocation()` punya penjaga
+     * `if (lm != null) return;` sehingga permintaan tidak pernah dipasang ulang — GPS terlihat
+     * "beku" sampai layanan dihentikan. Sekarang: tidak ada posisi > 20 detik -> lepas lalu pasang
+     * ulang pendengar lokasi.
+     */
+    private final Runnable gpsWatchdog = new Runnable() {
+        @Override public void run() {
+            if (!running || finishing) return;
+            if (System.currentTimeMillis() - lastFixAt > 20000) {
+                try { if (lm != null && ll != null) lm.removeUpdates(ll); } catch (Exception ignored) { }
+                lm = null; ll = null;
+                startLocation();
+            }
+            handler.postDelayed(this, 15000);
+        }
+    };
     private void onLoc(Location loc) {
+        lastFixAt = System.currentTimeMillis();
         GuideTracker t = tracker;
         if (t == null) return;
         // Abaikan lokasi jaringan yang kasar bila GPS baru saja memberi posisi.
@@ -257,6 +283,7 @@ public class NavService extends Service {
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(gpsWatchdog);
         running = false;
         handler.removeCallbacksAndMessages(null);
         if (lm != null && ll != null) try { lm.removeUpdates(ll); } catch (Exception ignored) { }

@@ -1127,3 +1127,9 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
   font-size: 12px; font-weight: 700; background: rgba(127, 127, 127, .2); }
 .fac-src { font-size: 12px; opacity: .6; }
 .hours-srv { opacity: .75; }
+
+/* v2.23: jenis halte di peta — BRT kotak biru, non-BRT titik kecil tosca, kereta bulat merah. */
+.lm-halt.brt { border-color: #1565D8; border-radius: 3px; }
+.lm-halt.mikro { border-color: #12A594; border-radius: 50%; border-width: 2.5px; }
+:root[data-theme="dark"] .lm-halt.brt { background: #0e1a2e; }
+:root[data-theme="dark"] .lm-halt.mikro { background: #0e1a2e; }
