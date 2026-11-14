@@ -530,9 +530,191 @@ FARES = json.load(open(os.path.join(ROOT, "data", "fares.json"), encoding="utf-8
 if FARES.get("v") != 1 or not all(k in FARES for k in ("tj", "krl", "mrt", "lrt", "lrtj", "kaBandara", "whoosh", "ojol")):
     sys.exit("data/fares.json tidak lengkap")
 
+
+# ------------------------------------------------- normalisasi nama halte (v2.22) ----
+# Tiga hal yang dulu tidak disentuh, sekarang dikerjakan saat build:
+#  1. Nama halte disamakan dengan aplikasi resmi 2026 (snapshot data-raw/tj_stops_2026.json).
+#     "Gelora Bung Karno" -> "Senayan Bank Jakarta", "Setiabudi" -> "Setiabudi Integritas",
+#     "Grogol" -> "Grogol Reformasi", "Pasar Senen" -> "Senen TOYOTA Rangga".
+#  2. Salah ketik digabung: nama berjarak edit <= 2 pada titik <= 25 m
+#     ("Jambatan Serong" 15 m dari "Jembatan Serong"), diputuskan lintas arah.
+#  3. Token arah disimpan di field "d" ("Arah Barat", "Arah Timur", ...), prefiks "Sbr." di "x",
+#     supaya dua peron berseberangan tidak pernah lagi dianggap satu halte.
+# Snapshot = berkas, bukan jaringan: build tetap offline dan hasilnya sama di mana pun.
+
+def _norm_base(n):
+    n = (n or "").strip().lower()
+    n = re.sub(r"^(sbr\.?|seberang)\s+", "", n)
+    n = re.sub(r"\s+arah\s+(utara|selatan|timur|barat)$", "", n)
+    return re.sub(r"[^a-z0-9]", "", n)
+
+
+def _dir_tok(n):
+    m = re.search(r"arah\s+(utara|selatan|timur|barat)", n or "", re.I)
+    if m:
+        return m.group(1).lower()
+    m = re.search(r"\b(utara|selatan|timur|barat)\s*$", (n or "").strip(), re.I)
+    return m.group(1).lower() if m else ""
+
+
+def _lev(a, b):
+    if a == b:
+        return 0
+    if not a or not b:
+        return max(len(a), len(b))
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _hav_km(p, q):
+    import math
+    r = math.pi / 180
+    dla, dlo = (q[0] - p[0]) * r, (q[1] - p[1]) * r
+    h = math.sin(dla / 2) ** 2 + math.cos(p[0] * r) * math.cos(q[0] * r) * math.sin(dlo / 2) ** 2
+    return 2 * 6371 * math.asin(math.sqrt(h))
+
+
+_SNAP = []
+_sf = os.path.join(RAW, "tj_stops_2026.json")
+if os.path.exists(_sf):
+    try:
+        _SNAP = json.load(open(_sf, encoding="utf-8")).get("stops") or []
+    except Exception as e:
+        print("snapshot nama halte dilewati:", e)
+
+_renamed = _typo = _merged = 0
+
+
+def _pick(name, p):
+    """Nama resmi 2026 untuk satu titik (None bila tidak ada dasar yang cukup)."""
+    if not _SNAP:
+        return None
+    base = _norm_base(name)
+    cand = []
+    for sn in _SNAP:
+        d = _hav_km(p, (sn["la"], sn["lo"]))
+        if d <= 0.08:
+            cand.append((d, sn))
+    if not cand:
+        return None
+    exact = [c for c in cand if _norm_base(c[1]["n"]) == base]
+    if exact:
+        exact.sort()
+        return exact[0][1]["n"]
+    pref = [c for c in cand if base and (_norm_base(c[1]["n"]).startswith(base) or base.startswith(_norm_base(c[1]["n"])))]
+    if pref:
+        pref.sort()
+        return pref[0][1]["n"]
+    # Catatan: aturan "satu-satunya titik resmi dalam 30 m" sengaja TIDAK dipakai. Snapshot baru
+    # mencakup 11 rute, jadi di luar itu ia bisa menamai ulang halte yang salah (mis. "Jembatan
+    # Sungai Landak 1" menjadi nama tetangganya). Rename hanya dari dasar nama yang cocok.
+    return None
+
+
+# --- 1) nama resmi + token arah, kumpulkan semua titik lebih dulu -------------------
+_pts = []
+for _l in lines:
+    for _d in (_l.get("dirs") or []):
+        for _st in (_d.get("s") or []):
+            _pts.append(_st)
+
+_CANON = {}
+for _st in _pts:
+    key = (_st["n"], round(_st["p"][0], 5), round(_st["p"][1], 5))
+    if key in _CANON:
+        continue
+    c = _pick(_st["n"], _st["p"])
+    _CANON[key] = c
+
+# Salah ketik yang titiknya terlalu jauh untuk aturan otomatis, tapi jelas halte yang sama.
+# Ditulis eksplisit supaya bisa ditinjau; jangan menambah entri tanpa bukti di lapangan.
+_ALIAS = {
+    "Jambatan Serong": "Jembatan Serong",     # GTFS 2021 salah ketik, 90 m dari yang benar
+}
+
+_FREQ = {}
+for _st in _pts:
+    _FREQ[_st["n"]] = _FREQ.get(_st["n"], 0) + 1
+
+# --- 2) salah ketik: titik <= 25 m dengan nama berjarak edit <= 2 (lintas arah) -----
+_FIX = {}
+for a in range(len(_pts)):
+    pa = _pts[a]
+    na = _CANON.get((pa["n"], round(pa["p"][0], 5), round(pa["p"][1], 5))) or pa["n"]
+    for b in range(a + 1, len(_pts)):
+        pb = _pts[b]
+        if _hav_km(pa["p"], pb["p"]) > 0.025:
+            continue
+        nb = _CANON.get((pb["n"], round(pb["p"][0], 5), round(pb["p"][1], 5))) or pb["n"]
+        if _dir_tok(na) != _dir_tok(nb):
+            continue
+        ba, bb = _norm_base(na), _norm_base(nb)
+        if ba == bb or _lev(ba, bb) > 2:
+            continue
+        # yang menang: yang punya nama resmi; kalau dua-duanya bukan, yang lebih panjang
+        ca = _CANON.get((pa["n"], round(pa["p"][0], 5), round(pa["p"][1], 5)))
+        cb = _CANON.get((pb["n"], round(pb["p"][0], 5), round(pb["p"][1], 5)))
+        if ca and not cb:
+            win = na
+        elif cb and not ca:
+            win = nb
+        else:
+            # dua-duanya bukan nama resmi -> yang lebih sering dipakai menang.
+            # Dulu tie-break "nama lebih panjang" memilih ejaan salah karena panjangnya sama.
+            fa = _FREQ.get(na, 0)
+            fb = _FREQ.get(nb, 0)
+            win = na if fa > fb else nb if fb > fa else (na if len(na) >= len(nb) else nb)
+        lose = nb if win == na else na
+        _FIX[lose] = win
+
+# --- 3) tulis ulang daftar halte tiap arah ------------------------------------------
+for _l in lines:
+    for _d in (_l.get("dirs") or []):
+        out = []
+        for _st in (_d.get("s") or []):
+            raw = _st["n"]
+            p = _st["p"]
+            name = _CANON.get((raw, round(p[0], 5), round(p[1], 5))) or raw
+            # Nomor peron bagian dari identitas: jangan pernah dibuang oleh rename.
+            if re.search(r"\d$", _norm_base(raw)) and not re.search(r"\d$", _norm_base(name)):
+                name = raw
+            if name != raw:
+                _renamed += 1
+            name = _ALIAS.get(name, name)
+            if name in _FIX:
+                _typo += 1
+                name = _FIX[name]
+            tok = _dir_tok(raw) or _dir_tok(name)
+            keep = {"n": name, "p": p}
+            if tok:
+                keep["d"] = tok
+            if re.match(r"^(sbr\.?|seberang)\s+", name, re.I):
+                keep["x"] = 1
+            dup = None
+            for q in out:
+                if (q.get("d") or "") != (keep.get("d") or ""):
+                    continue
+                if _hav_km(q["p"], p) <= 0.025 and (
+                        _norm_base(q["n"]) == _norm_base(name) or _lev(_norm_base(q["n"]), _norm_base(name)) <= 2):
+                    dup = q
+                    break
+            if dup:
+                _merged += 1
+                continue
+            out.append(keep)
+        _d["s"] = out
+
+print("nama halte: %d diganti ke nama resmi 2026, %d salah ketik digabung, %d kembar dibuang"
+      % (_renamed, _typo, _merged))
+
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
-with open(OUT, "w") as f:
+with open(OUT, "w", encoding="utf-8") as f:
     f.write("/* Dibuat otomatis oleh tools/build_data.py — jangan diedit manual. */\n")
     f.write("window.LUMI_DATA=")
     json.dump({"meta": meta, "fares": FARES, "lines": lines}, f, separators=(",", ":"), ensure_ascii=False)

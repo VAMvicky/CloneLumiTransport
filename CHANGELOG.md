@@ -10,6 +10,19 @@
 
 ---
 
+## ✦ v2.22.0 — 15 November 2026 / 15 November 2026
+
+- 🇮🇩 **Data rute dibangun ulang.** 179 nama halte disamakan dengan aplikasi resmi 2026 lewat snapshot `data-raw/tj_stops_2026.json` (375 halte, 11 rute) — bukan panggilan jaringan saat build. Contoh: **Gelora Bung Karno → Senayan Bank Jakarta**, **Setiabudi → Setiabudi Integritas**. `versionCode` **22200**
+- 🇮🇩 **42 salah ketik digabung, 39 kembar dibuang.** "Jambatan Serong" dan "Jembatan Serong" kini satu halte (aturan: beda ≤ 2 huruf dan ≤ 25 m; yang lebih jauh ditulis eksplisit di `_ALIAS` supaya tidak menebak). `versionCode` **22200**
+- 🇮🇩 **Arah halte jadi identitas.** Token "Arah …" disimpan di field `d`, prefiks "Sbr." di `x` — 394 titik bertoken arah, 44 bertanda seberang. Dua peron berseberangan tidak bisa lagi dianggap satu halte. `versionCode` **22200**
+- 🇮🇩 **`build_data.py` menulis UTF-8.** Dulu `open(OUT,"w")` memakai encoding sistem; build di Windows menghasilkan byte cp1252 dan `data.js` bukan UTF-8 sah. `versionCode` **22200**
+- 🇬🇧 **Route data rebuilt.** 179 stop names now match the official 2026 app via the `data-raw/tj_stops_2026.json` snapshot (375 stops, 11 routes) — no network at build time. Examples: **Gelora Bung Karno → Senayan Bank Jakarta**, **Setiabudi → Setiabudi Integritas**. `versionCode` **22200**
+- 🇬🇧 **42 typos merged, 39 duplicates dropped.** "Jambatan Serong" and "Jembatan Serong" are one stop now (rule: ≤ 2 edit distance and ≤ 25 m; farther ones are listed explicitly in `_ALIAS` so nothing is guessed). `versionCode` **22200**
+- 🇬🇧 **Stop direction is identity.** "Arah …" tokens are kept in field `d`, the "Sbr." prefix in `x` — 394 stops carry a direction token, 44 are across-the-road. Two opposite platforms can no longer collapse into one stop. `versionCode` **22200**
+- 🇬🇧 **`build_data.py` writes UTF-8.** It used the system encoding before, so a Windows build produced cp1252 bytes and `data.js` was not valid UTF-8. `versionCode` **22200**
+
+---
+
 ## ✦ v2.21.1 — 14 November 2026 / 14 November 2026
 
 - 🇮🇩 **Pantau perubahan rute berhenti gagal.** Langkah `javac` di `route-watch.yml` hanya mengompilasi `GtfsImporter.java`, padahal berkas itu memakai `Csv`/`Lang`/`AppInfo` (kelas Android) → `cannot find symbol`, dan `set -e` mematikan job sebelum "Simpan perubahan". `data/route_changes.json` karena itu tidak pernah naik. Langkah mati itu dibuang. `versionCode` **22101**
