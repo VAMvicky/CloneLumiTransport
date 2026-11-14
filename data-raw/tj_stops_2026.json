@@ -1,0 +1,2644 @@
+{
+"v": 1,
+"_": "Snapshot nama halte resmi Transjakarta (API 2026) untuk koridor 1,2,3,4,5,6,9,10,12,JAK.36,JAK.47. Dipakai tools/build_data.py untuk rename 2024 -> 2026 tanpa jaringan saat build.",
+"codes": [
+"1",
+"2",
+"3",
+"4",
+"5",
+"6",
+"9",
+"10",
+"12",
+"JAK.36",
+"JAK.47"
+],
+"stops": [
+{
+"id": "H00265P",
+"n": "ASEAN",
+"la": -6.239911,
+"lo": 106.79897,
+"t": "halte"
+},
+{
+"id": "B00011P",
+"n": "Agrowisata Cilangkap",
+"la": -6.339786,
+"lo": 106.9013,
+"t": "bus_stop"
+},
+{
+"id": "B00035P",
+"n": "Ampera 1",
+"la": -6.292069,
+"lo": 106.81774,
+"t": "bus_stop"
+},
+{
+"id": "H00003P",
+"n": "Ancol",
+"la": -6.127563,
+"lo": 106.83039,
+"t": "halte"
+},
+{
+"id": "H00006P",
+"n": "Balai Kota",
+"la": -6.180428,
+"lo": 106.826431,
+"t": "halte"
+},
+{
+"id": "H00148P",
+"n": "Bali Mester",
+"la": -6.21578,
+"lo": 106.866369,
+"t": "halte"
+},
+{
+"id": "H00007P",
+"n": "Bandengan",
+"la": -6.136318,
+"lo": 106.80347,
+"t": "halte"
+},
+{
+"id": "H00010P",
+"n": "Bendungan Hilir",
+"la": -6.217194,
+"lo": 106.815261,
+"t": "halte"
+},
+{
+"id": "H00011P",
+"n": "Bermis",
+"la": -6.178218,
+"lo": 106.898465,
+"t": "halte"
+},
+{
+"id": "H00014P",
+"n": "Blok M",
+"la": -6.243312,
+"lo": 106.80175,
+"t": "halte"
+},
+{
+"id": "B00201P",
+"n": "Budiwarman 1",
+"la": -6.279071,
+"lo": 106.87019,
+"t": "bus_stop"
+},
+{
+"id": "B00202P",
+"n": "Budiwarman 2",
+"la": -6.279048,
+"lo": 106.870363,
+"t": "bus_stop"
+},
+{
+"id": "B00206P",
+"n": "Bulak Rantai",
+"la": -6.284664,
+"lo": 106.87123,
+"t": "bus_stop"
+},
+{
+"id": "H00021P",
+"n": "Buncit Indah",
+"la": -6.274348,
+"lo": 106.830336,
+"t": "halte"
+},
+{
+"id": "H00022P",
+"n": "Bundaran HI Astra",
+"la": -6.193596,
+"lo": 106.82306,
+"t": "halte"
+},
+{
+"id": "H00023P",
+"n": "Bundaran Senayan",
+"la": -6.227941,
+"lo": 106.800905,
+"t": "halte"
+},
+{
+"id": "H00276P",
+"n": "Cawang",
+"la": -6.245836,
+"lo": 106.871212,
+"t": "halte"
+},
+{
+"id": "H00013P",
+"n": "Cawang Cililitan",
+"la": -6.257743,
+"lo": 106.869949,
+"t": "halte"
+},
+{
+"id": "H00030P",
+"n": "Cawang Sentral",
+"la": -6.250198,
+"lo": 106.873696,
+"t": "halte"
+},
+{
+"id": "H00034P",
+"n": "Cempaka Baru",
+"la": -6.170428,
+"lo": 106.86661,
+"t": "halte"
+},
+{
+"id": "H00035P",
+"n": "Cempaka Mas",
+"la": -6.166614,
+"lo": 106.875923,
+"t": "halte"
+},
+{
+"id": "H00033P",
+"n": "Cempaka Putih",
+"la": -6.174225,
+"lo": 106.876412,
+"t": "halte"
+},
+{
+"id": "H00064S",
+"n": "Cikoko Arah Barat",
+"la": -6.243376,
+"lo": 106.858187,
+"t": "halte"
+},
+{
+"id": "H00063S",
+"n": "Cikoko Arah Timur",
+"la": -6.242996,
+"lo": 106.858144,
+"t": "halte"
+},
+{
+"id": "H00062S",
+"n": "Ciliwung Arah Barat",
+"la": -6.243292,
+"lo": 106.86356,
+"t": "halte"
+},
+{
+"id": "H00061S",
+"n": "Ciliwung Arah Timur",
+"la": -6.243005,
+"lo": 106.863512,
+"t": "halte"
+},
+{
+"id": "H00077P",
+"n": "Damai",
+"la": -6.163413,
+"lo": 106.77522,
+"t": "halte"
+},
+{
+"id": "H00042P",
+"n": "Danau Agung",
+"la": -6.146869,
+"lo": 106.858043,
+"t": "halte"
+},
+{
+"id": "H00286P",
+"n": "Danau Sunter",
+"la": -6.14122,
+"lo": 106.856896,
+"t": "halte"
+},
+{
+"id": "H00119S",
+"n": "Denpasar Arah Barat",
+"la": -6.233406,
+"lo": 106.821958,
+"t": "halte"
+},
+{
+"id": "H00109S",
+"n": "Denpasar Arah Timur",
+"la": -6.232616,
+"lo": 106.821632,
+"t": "halte"
+},
+{
+"id": "B00312P",
+"n": "Direktorat Jenderal Hortikultura",
+"la": -6.285538,
+"lo": 106.8393,
+"t": "bus_stop"
+},
+{
+"id": "H00047P",
+"n": "Dukuh Atas",
+"la": -6.205627,
+"lo": 106.822295,
+"t": "halte"
+},
+{
+"id": "H00049P",
+"n": "Duren Tiga",
+"la": -6.252325,
+"lo": 106.826983,
+"t": "halte"
+},
+{
+"id": "H00037C",
+"n": "Flyover Jatinegara",
+"la": -6.21542,
+"lo": 106.8742,
+"t": "halte"
+},
+{
+"id": "H00118P",
+"n": "Flyover Kuningan",
+"la": -6.202779,
+"lo": 106.827655,
+"t": "halte"
+},
+{
+"id": "H00129P",
+"n": "Flyover Pramuka",
+"la": -6.198864,
+"lo": 106.854454,
+"t": "halte"
+},
+{
+"id": "H00283P",
+"n": "Galunggung",
+"la": -6.204373,
+"lo": 106.823432,
+"t": "halte"
+},
+{
+"id": "H00057P",
+"n": "Galur",
+"la": -6.174422,
+"lo": 106.854857,
+"t": "halte"
+},
+{
+"id": "H00058P",
+"n": "Gambir",
+"la": -6.174612,
+"lo": 106.8304,
+"t": "halte"
+},
+{
+"id": "H00059P",
+"n": "Gambir 2",
+"la": -6.178929,
+"lo": 106.83106,
+"t": "halte"
+},
+{
+"id": "H00065P",
+"n": "Gedong Panjang",
+"la": -6.132576,
+"lo": 106.806024,
+"t": "halte"
+},
+{
+"id": "B00608P",
+"n": "Gelanggang Remaja Pasar Minggu",
+"la": -6.284615,
+"lo": 106.83787,
+"t": "bus_stop"
+},
+{
+"id": "H00218S",
+"n": "Gerbang Pemuda Arah Barat",
+"la": -6.213962,
+"lo": 106.808428,
+"t": "halte"
+},
+{
+"id": "H00219S",
+"n": "Gerbang Pemuda Arah Timur",
+"la": -6.214159,
+"lo": 106.809044,
+"t": "halte"
+},
+{
+"id": "B00626P",
+"n": "Gereja HKBP Cilangkap",
+"la": -6.334412,
+"lo": 106.89744,
+"t": "bus_stop"
+},
+{
+"id": "B00410P",
+"n": "Gg. Ayama",
+"la": -6.27204,
+"lo": 106.8671,
+"t": "bus_stop"
+},
+{
+"id": "B00430P",
+"n": "Gg. Cemara Cilandak KKO",
+"la": -6.299412,
+"lo": 106.81475,
+"t": "bus_stop"
+},
+{
+"id": "B00442P",
+"n": "Gg. Film Jagakarsa",
+"la": -6.322356,
+"lo": 106.81118,
+"t": "bus_stop"
+},
+{
+"id": "B00468P",
+"n": "Gg. H. Gose Raya Cilangkap",
+"la": -6.338181,
+"lo": 106.89885,
+"t": "bus_stop"
+},
+{
+"id": "B00486P",
+"n": "Gg. Harapan I Jagakarsa",
+"la": -6.313476,
+"lo": 106.81269,
+"t": "bus_stop"
+},
+{
+"id": "B06725P",
+"n": "Gg. Jenan",
+"la": -6.28619,
+"lo": 106.827613,
+"t": "bus_stop"
+},
+{
+"id": "H00068P",
+"n": "Glodok",
+"la": -6.144438,
+"lo": 106.815498,
+"t": "halte"
+},
+{
+"id": "B00679P",
+"n": "Graha Pejaten",
+"la": -6.277337,
+"lo": 106.84187,
+"t": "bus_stop"
+},
+{
+"id": "B00700P",
+"n": "Green Terrace",
+"la": -6.303484,
+"lo": 106.88539,
+"t": "bus_stop"
+},
+{
+"id": "B00701P",
+"n": "Green Terrace 2",
+"la": -6.30478,
+"lo": 106.88724,
+"t": "bus_stop"
+},
+{
+"id": "H00070P",
+"n": "Grogol",
+"la": -6.166853,
+"lo": 106.789668,
+"t": "halte"
+},
+{
+"id": "H00071P",
+"n": "Grogol Reformasi",
+"la": -6.167473,
+"lo": 106.788509,
+"t": "halte"
+},
+{
+"id": "H00072P",
+"n": "Gunung Sahari",
+"la": -6.136805,
+"lo": 106.832428,
+"t": "halte"
+},
+{
+"id": "H00162P",
+"n": "Halim",
+"la": -6.239069,
+"lo": 106.877984,
+"t": "halte"
+},
+{
+"id": "H00073P",
+"n": "Halimun",
+"la": -6.205093,
+"lo": 106.833394,
+"t": "halte"
+},
+{
+"id": "B08301P",
+"n": "Halte Manggarai Temporer 1",
+"la": -6.209127,
+"lo": 106.847159,
+"t": "bus_stop"
+},
+{
+"id": "B08302P",
+"n": "Halte Manggarai Temporer 2",
+"la": -6.209383,
+"lo": 106.847603,
+"t": "bus_stop"
+},
+{
+"id": "H00278P",
+"n": "Harmoni",
+"la": -6.162764,
+"lo": 106.819961,
+"t": "halte"
+},
+{
+"id": "H00277P",
+"n": "Harmoni Arah Utara",
+"la": -6.162684,
+"lo": 106.819639,
+"t": "halte"
+},
+{
+"id": "B00809P",
+"n": "Islamic Centre Wasilah Subuh",
+"la": -6.33663,
+"lo": 106.89768,
+"t": "bus_stop"
+},
+{
+"id": "H00078P",
+"n": "Istiqlal",
+"la": -6.172252,
+"lo": 106.83093,
+"t": "halte"
+},
+{
+"id": "H00213P",
+"n": "Jaga Jakarta",
+"la": -6.178167,
+"lo": 106.842064,
+"t": "halte"
+},
+{
+"id": "B01726P",
+"n": "Jasamarga Toll Road Maintenance",
+"la": -6.291584,
+"lo": 106.8807,
+"t": "bus_stop"
+},
+{
+"id": "H00221P",
+"n": "Jati Barat",
+"la": -6.290979,
+"lo": 106.823689,
+"t": "halte"
+},
+{
+"id": "H00081P",
+"n": "Jati Padang",
+"la": -6.285349,
+"lo": 106.826329,
+"t": "halte"
+},
+{
+"id": "H00082P",
+"n": "Jatinegara",
+"la": -6.221451,
+"lo": 106.868087,
+"t": "halte"
+},
+{
+"id": "H00083P",
+"n": "Jelambar",
+"la": -6.166614,
+"lo": 106.78661,
+"t": "halte"
+},
+{
+"id": "H00084P",
+"n": "Jembatan Baru",
+"la": -6.154861,
+"lo": 106.730332,
+"t": "halte"
+},
+{
+"id": "H00085P",
+"n": "Jembatan Besi",
+"la": -6.151997,
+"lo": 106.794912,
+"t": "halte"
+},
+{
+"id": "H00086P",
+"n": "Jembatan Dua",
+"la": -6.14328,
+"lo": 106.793546,
+"t": "halte"
+},
+{
+"id": "H00087P",
+"n": "Jembatan Gantung",
+"la": -6.155563,
+"lo": 106.749457,
+"t": "halte"
+},
+{
+"id": "H00088P",
+"n": "Jembatan Merah",
+"la": -6.146731,
+"lo": 106.834332,
+"t": "halte"
+},
+{
+"id": "B01761P",
+"n": "Jembatan Pintu 1",
+"la": -6.300551,
+"lo": 106.88367,
+"t": "bus_stop"
+},
+{
+"id": "H00089P",
+"n": "Jembatan Tiga",
+"la": -6.133377,
+"lo": 106.79273,
+"t": "halte"
+},
+{
+"id": "B00867P",
+"n": "Jln. As Syafiiyah Raya Cilangkap",
+"la": -6.338197,
+"lo": 106.89899,
+"t": "bus_stop"
+},
+{
+"id": "B00869P",
+"n": "Jln. Aselih Cipedak",
+"la": -6.352111,
+"lo": 106.80147,
+"t": "bus_stop"
+},
+{
+"id": "B00902P",
+"n": "Jln. Basuki Raya Cilangkap",
+"la": -6.34166,
+"lo": 106.90546,
+"t": "bus_stop"
+},
+{
+"id": "B00914P",
+"n": "Jln. Batu Tumbuh",
+"la": -6.272596,
+"lo": 106.86722,
+"t": "bus_stop"
+},
+{
+"id": "B00945P",
+"n": "Jln. Brigif Ciganjur",
+"la": -6.344465,
+"lo": 106.80398,
+"t": "bus_stop"
+},
+{
+"id": "B00949P",
+"n": "Jln. Budi Murni Raya Cilangkap",
+"la": -6.33352,
+"lo": 106.89479,
+"t": "bus_stop"
+},
+{
+"id": "B01005P",
+"n": "Jln. Cipayung Barat I",
+"la": -6.330893,
+"lo": 106.8881,
+"t": "bus_stop"
+},
+{
+"id": "B06853P",
+"n": "Jln. Damai 74",
+"la": -6.353245,
+"lo": 106.801453,
+"t": "bus_stop"
+},
+{
+"id": "B01027P",
+"n": "Jln. Damai PBSI Cilangkap",
+"la": -6.332964,
+"lo": 106.89167,
+"t": "bus_stop"
+},
+{
+"id": "B01046P",
+"n": "Jln. Dukuh II",
+"la": -6.288462,
+"lo": 106.87563,
+"t": "bus_stop"
+},
+{
+"id": "B01047P",
+"n": "Jln. Dukuh III",
+"la": -6.288611,
+"lo": 106.8757,
+"t": "bus_stop"
+},
+{
+"id": "B01048P",
+"n": "Jln. Dul Djaim Cipedak",
+"la": -6.36178,
+"lo": 106.80714,
+"t": "bus_stop"
+},
+{
+"id": "B01079P",
+"n": "Jln. Giri Kencana Raya Cilangkap",
+"la": -6.340412,
+"lo": 106.90292,
+"t": "bus_stop"
+},
+{
+"id": "B08429P",
+"n": "Jln. Iklas",
+"la": -6.342507,
+"lo": 106.907551,
+"t": "bus_stop"
+},
+{
+"id": "B01199P",
+"n": "Jln. Kampung Utan Cilandak KKO",
+"la": -6.30194,
+"lo": 106.81439,
+"t": "bus_stop"
+},
+{
+"id": "B06844P",
+"n": "Jln. Kelinci",
+"la": -6.34032,
+"lo": 106.804673,
+"t": "bus_stop"
+},
+{
+"id": "B07193P",
+"n": "Jln. Keluarga",
+"la": -6.32076,
+"lo": 106.8895,
+"t": "bus_stop"
+},
+{
+"id": "B01271P",
+"n": "Jln. Kemenyan Ciganjur",
+"la": -6.339055,
+"lo": 106.80508,
+"t": "bus_stop"
+},
+{
+"id": "B01296P",
+"n": "Jln. Kramat Cipedak",
+"la": -6.363585,
+"lo": 106.80336,
+"t": "bus_stop"
+},
+{
+"id": "B06842P",
+"n": "Jln. M. Khafi",
+"la": -6.311739,
+"lo": 106.813142,
+"t": "bus_stop"
+},
+{
+"id": "B06843P",
+"n": "Jln. M. Khafi 1",
+"la": -6.353258,
+"lo": 106.801395,
+"t": "bus_stop"
+},
+{
+"id": "B01360P",
+"n": "Jln. Manunggal II Ceger",
+"la": -6.311199,
+"lo": 106.88876,
+"t": "bus_stop"
+},
+{
+"id": "B06900P",
+"n": "Jln. Margasatwa Barat",
+"la": -6.310776,
+"lo": 106.814218,
+"t": "bus_stop"
+},
+{
+"id": "B01369P",
+"n": "Jln. Masjid Al Ihsan",
+"la": -6.280339,
+"lo": 106.87117,
+"t": "bus_stop"
+},
+{
+"id": "B01410P",
+"n": "Jln. Murai II Jati Padang",
+"la": -6.287663,
+"lo": 106.82545,
+"t": "bus_stop"
+},
+{
+"id": "B01428P",
+"n": "Jln. Olahraga 1 Raya Bogor",
+"la": -6.267006,
+"lo": 106.865951,
+"t": "bus_stop"
+},
+{
+"id": "B06846P",
+"n": "Jln. Pasir",
+"la": -6.336591,
+"lo": 106.806156,
+"t": "bus_stop"
+},
+{
+"id": "B01588P",
+"n": "Jln. SMAN 64",
+"la": -6.332331,
+"lo": 106.89008,
+"t": "bus_stop"
+},
+{
+"id": "B08582P",
+"n": "Jln. Salihara",
+"la": -6.282732,
+"lo": 106.838159,
+"t": "bus_stop"
+},
+{
+"id": "B01576P",
+"n": "Jln. Sepakat X Raya Cilangkap",
+"la": -6.340473,
+"lo": 106.90299,
+"t": "bus_stop"
+},
+{
+"id": "B01711P",
+"n": "Jln. Waru Raya Cilangkap",
+"la": -6.341002,
+"lo": 106.90437,
+"t": "bus_stop"
+},
+{
+"id": "B01712P",
+"n": "Jln. Warung Sila Ciganjur",
+"la": -6.344895,
+"lo": 106.80396,
+"t": "bus_stop"
+},
+{
+"id": "H00092P",
+"n": "Juanda",
+"la": -6.168086,
+"lo": 106.830792,
+"t": "halte"
+},
+{
+"id": "H00093P",
+"n": "Kali Besar",
+"la": -6.135355,
+"lo": 106.81143,
+"t": "halte"
+},
+{
+"id": "H00197S",
+"n": "Kali Grogol Arah Selatan",
+"la": -6.159755,
+"lo": 106.791453,
+"t": "halte"
+},
+{
+"id": "H00138S",
+"n": "Kali Grogol Arah Utara",
+"la": -6.160164,
+"lo": 106.790684,
+"t": "halte"
+},
+{
+"id": "H00094P",
+"n": "Kalideres",
+"la": -6.154449,
+"lo": 106.7055,
+"t": "halte"
+},
+{
+"id": "H00095P",
+"n": "Kampung Melayu",
+"la": -6.224589,
+"lo": 106.867061,
+"t": "halte"
+},
+{
+"id": "B06015P",
+"n": "Karang Pol",
+"la": -6.286162,
+"lo": 106.83146,
+"t": "bus_stop"
+},
+{
+"id": "H00099P",
+"n": "Karet",
+"la": -6.212511,
+"lo": 106.820052,
+"t": "halte"
+},
+{
+"id": "H00098P",
+"n": "Karet Kuningan",
+"la": -6.216708,
+"lo": 106.830765,
+"t": "halte"
+},
+{
+"id": "B01846P",
+"n": "Kav Polri Blok E Jagakarsa",
+"la": -6.314309,
+"lo": 106.81633,
+"t": "bus_stop"
+},
+{
+"id": "B01847P",
+"n": "Kav Polri Blok H Jagakarsa",
+"la": -6.312293,
+"lo": 106.81629,
+"t": "bus_stop"
+},
+{
+"id": "H00230P",
+"n": "Kayu Jati",
+"la": -6.193211,
+"lo": 106.883674,
+"t": "halte"
+},
+{
+"id": "H00100P",
+"n": "Kayu Putih Rawasari",
+"la": -6.187474,
+"lo": 106.875382,
+"t": "halte"
+},
+{
+"id": "H00039P",
+"n": "Kebon Nanas",
+"la": -6.231671,
+"lo": 106.876339,
+"t": "halte"
+},
+{
+"id": "H00268S",
+"n": "Kebon Sirih Arah Selatan",
+"la": -6.184195,
+"lo": 106.823232,
+"t": "halte"
+},
+{
+"id": "H00267S",
+"n": "Kebon Sirih Arah Utara",
+"la": -6.182776,
+"lo": 106.8228,
+"t": "halte"
+},
+{
+"id": "B01868P",
+"n": "Kec. Cipayung",
+"la": -6.328612,
+"lo": 106.88789,
+"t": "bus_stop"
+},
+{
+"id": "B01878P",
+"n": "Kec. Kramat Jati 2",
+"la": -6.284729,
+"lo": 106.87136,
+"t": "bus_stop"
+},
+{
+"id": "B01881P",
+"n": "Kec. Pasar Minggu",
+"la": -6.285563,
+"lo": 106.8353,
+"t": "bus_stop"
+},
+{
+"id": "H00266P",
+"n": "Kejaksaan Agung",
+"la": -6.24046,
+"lo": 106.798482,
+"t": "halte"
+},
+{
+"id": "B06030P",
+"n": "Kel. Jati Padang",
+"la": -6.285899,
+"lo": 106.83476,
+"t": "bus_stop"
+},
+{
+"id": "H00224S",
+"n": "Kemanggisan Arah Selatan",
+"la": -6.189783,
+"lo": 106.797265,
+"t": "halte"
+},
+{
+"id": "H00220S",
+"n": "Kemanggisan Arah Utara",
+"la": -6.18991,
+"lo": 106.796939,
+"t": "halte"
+},
+{
+"id": "H00217P",
+"n": "Kesatrian",
+"la": -6.208506,
+"lo": 106.859373,
+"t": "halte"
+},
+{
+"id": "H00263P",
+"n": "Kodamar",
+"la": -6.16205,
+"lo": 106.881665,
+"t": "halte"
+},
+{
+"id": "H00165P",
+"n": "Koja",
+"la": -6.114165,
+"lo": 106.893085,
+"t": "halte"
+},
+{
+"id": "B02067P",
+"n": "Komplek TNI AD Raya Cilangkap",
+"la": -6.333687,
+"lo": 106.89513,
+"t": "bus_stop"
+},
+{
+"id": "B06029P",
+"n": "Koperasi",
+"la": -6.285978,
+"lo": 106.83071,
+"t": "bus_stop"
+},
+{
+"id": "H00275P",
+"n": "Kota",
+"la": -6.136827,
+"lo": 106.814876,
+"t": "halte"
+},
+{
+"id": "H00209S",
+"n": "Kota Bambu Arah Selatan",
+"la": -6.185194,
+"lo": 106.79709,
+"t": "halte"
+},
+{
+"id": "H00204S",
+"n": "Kota Bambu Arah Utara",
+"la": -6.184506,
+"lo": 106.796739,
+"t": "halte"
+},
+{
+"id": "H00112P",
+"n": "Kramat Sentiong",
+"la": -6.187953,
+"lo": 106.846011,
+"t": "halte"
+},
+{
+"id": "H00043P",
+"n": "Kuningan",
+"la": -6.228825,
+"lo": 106.833233,
+"t": "halte"
+},
+{
+"id": "H00114P",
+"n": "Kuningan Madya",
+"la": -6.213471,
+"lo": 106.830497,
+"t": "halte"
+},
+{
+"id": "H00116P",
+"n": "Kwitang",
+"la": -6.181014,
+"lo": 106.838645,
+"t": "halte"
+},
+{
+"id": "H00108P",
+"n": "Landasan Pacu",
+"la": -6.152119,
+"lo": 106.85423,
+"t": "halte"
+},
+{
+"id": "H00018P",
+"n": "Lapangan Banteng",
+"la": -6.166049,
+"lo": 106.839112,
+"t": "halte"
+},
+{
+"id": "H00121P",
+"n": "Layur",
+"la": -6.193489,
+"lo": 106.899097,
+"t": "halte"
+},
+{
+"id": "B02144P",
+"n": "Lippo Mall Kramat Jati",
+"la": -6.270835,
+"lo": 106.86741,
+"t": "bus_stop"
+},
+{
+"id": "B02146P",
+"n": "Litbang Pertanian",
+"la": -6.285245,
+"lo": 106.83725,
+"t": "bus_stop"
+},
+{
+"id": "H00207P",
+"n": "MH Thamrin",
+"la": -6.188262,
+"lo": 106.82304,
+"t": "halte"
+},
+{
+"id": "B02168P",
+"n": "Madrasah Aliyah Citra Cendekia",
+"la": -6.35789,
+"lo": 106.8006,
+"t": "bus_stop"
+},
+{
+"id": "H00060P",
+"n": "Makasar",
+"la": -6.290144,
+"lo": 106.88119,
+"t": "halte"
+},
+{
+"id": "H00051P",
+"n": "Mambo",
+"la": -6.110132,
+"lo": 106.892389,
+"t": "halte"
+},
+{
+"id": "H00123P",
+"n": "Mampang Prapatan",
+"la": -6.242737,
+"lo": 106.825744,
+"t": "halte"
+},
+{
+"id": "H00281P",
+"n": "Mangga Besar",
+"la": -6.153266,
+"lo": 106.817481,
+"t": "halte"
+},
+{
+"id": "H00282P",
+"n": "Mangga Besar Arah Selatan",
+"la": -6.153943,
+"lo": 106.817952,
+"t": "halte"
+},
+{
+"id": "H00125P",
+"n": "Mangga Dua",
+"la": -6.136117,
+"lo": 106.826003,
+"t": "halte"
+},
+{
+"id": "H00140P",
+"n": "Mangga Dua Raya",
+"la": -6.13757,
+"lo": 106.817935,
+"t": "halte"
+},
+{
+"id": "H00127P",
+"n": "Masjid Agung",
+"la": -6.236477,
+"lo": 106.798482,
+"t": "halte"
+},
+{
+"id": "B07989P",
+"n": "Masjid Ar-Raudhah",
+"la": -6.293846,
+"lo": 106.821474,
+"t": "bus_stop"
+},
+{
+"id": "B02281P",
+"n": "Masjid At Tin",
+"la": -6.298148,
+"lo": 106.883111,
+"t": "bus_stop"
+},
+{
+"id": "B02299P",
+"n": "Masjid El Syifa Ciganjur",
+"la": -6.333178,
+"lo": 106.807277,
+"t": "bus_stop"
+},
+{
+"id": "B02301P",
+"n": "Masjid H. Andi Muhammad Ghalib",
+"la": -6.312473,
+"lo": 106.8908,
+"t": "bus_stop"
+},
+{
+"id": "B02304P",
+"n": "Masjid Jami Al Akhyar",
+"la": -6.317992,
+"lo": 106.81119,
+"t": "bus_stop"
+},
+{
+"id": "B02333P",
+"n": "Masjid Jami Asy Syakirin",
+"la": -6.351203,
+"lo": 106.80153,
+"t": "bus_stop"
+},
+{
+"id": "B02367P",
+"n": "Masjid Nurul Iman Cilangkap",
+"la": -6.341431,
+"lo": 106.90495,
+"t": "bus_stop"
+},
+{
+"id": "H00128P",
+"n": "Matraman",
+"la": -6.199931,
+"lo": 106.854476,
+"t": "halte"
+},
+{
+"id": "H00104P",
+"n": "Matraman Baru",
+"la": -6.212847,
+"lo": 106.861176,
+"t": "halte"
+},
+{
+"id": "H00131P",
+"n": "Monumen Nasional",
+"la": -6.176358,
+"lo": 106.822928,
+"t": "halte"
+},
+{
+"id": "H00132P",
+"n": "Museum Sejarah Jakarta",
+"la": -6.133882,
+"lo": 106.81214,
+"t": "halte"
+},
+{
+"id": "H00172P",
+"n": "PGC",
+"la": -6.2619,
+"lo": 106.8657,
+"t": "halte"
+},
+{
+"id": "B02828P",
+"n": "PGC Dalam",
+"la": -6.261841,
+"lo": 106.8657,
+"t": "bus_stop"
+},
+{
+"id": "B02879P",
+"n": "PLN Kramat Jati",
+"la": -6.283549,
+"lo": 106.87163,
+"t": "bus_stop"
+},
+{
+"id": "H00134P",
+"n": "Pademangan",
+"la": -6.13369,
+"lo": 106.831688,
+"t": "halte"
+},
+{
+"id": "H00135P",
+"n": "Pakin",
+"la": -6.127951,
+"lo": 106.804748,
+"t": "halte"
+},
+{
+"id": "H00136P",
+"n": "Pal Putih",
+"la": -6.184598,
+"lo": 106.844069,
+"t": "halte"
+},
+{
+"id": "H00203S",
+"n": "Pancoran Arah Barat",
+"la": -6.241691,
+"lo": 106.837376,
+"t": "halte"
+},
+{
+"id": "H00198S",
+"n": "Pancoran Arah Timur",
+"la": -6.241525,
+"lo": 106.837825,
+"t": "halte"
+},
+{
+"id": "H00139P",
+"n": "Pancoran Tugu",
+"la": -6.243082,
+"lo": 106.84392,
+"t": "halte"
+},
+{
+"id": "B02576P",
+"n": "Panti Sosial Bina Laras",
+"la": -6.31946,
+"lo": 106.89013,
+"t": "bus_stop"
+},
+{
+"id": "H00142P",
+"n": "Pasar Baru Timur",
+"la": -6.162262,
+"lo": 106.838163,
+"t": "halte"
+},
+{
+"id": "H00144P",
+"n": "Pasar Cempaka Putih",
+"la": -6.172374,
+"lo": 106.862485,
+"t": "halte"
+},
+{
+"id": "H00146P",
+"n": "Pasar Genjing",
+"la": -6.19439,
+"lo": 106.860875,
+"t": "halte"
+},
+{
+"id": "B02647P",
+"n": "Pasar Minggu",
+"la": -6.284413,
+"lo": 106.84414,
+"t": "bus_stop"
+},
+{
+"id": "H00152P",
+"n": "Pasar Pulo Gadung",
+"la": -6.187451,
+"lo": 106.905867,
+"t": "halte"
+},
+{
+"id": "H00153P",
+"n": "Pasar Rumput",
+"la": -6.207067,
+"lo": 106.841128,
+"t": "halte"
+},
+{
+"id": "H00205P",
+"n": "Paseban",
+"la": -6.196736,
+"lo": 106.851064,
+"t": "halte"
+},
+{
+"id": "H00154P",
+"n": "Patra Kuningan",
+"la": -6.232696,
+"lo": 106.832085,
+"t": "halte"
+},
+{
+"id": "H00155P",
+"n": "Pecenongan",
+"la": -6.167825,
+"lo": 106.828169,
+"t": "halte"
+},
+{
+"id": "H00156P",
+"n": "Pedati Prumpung",
+"la": -6.220159,
+"lo": 106.874368,
+"t": "halte"
+},
+{
+"id": "H00157P",
+"n": "Pedongkelan",
+"la": -6.167996,
+"lo": 106.88244,
+"t": "halte"
+},
+{
+"id": "H00045P",
+"n": "Pejambon",
+"la": -6.173503,
+"lo": 106.83472,
+"t": "halte"
+},
+{
+"id": "H00158P",
+"n": "Pejaten",
+"la": -6.278422,
+"lo": 106.829762,
+"t": "halte"
+},
+{
+"id": "B02713P",
+"n": "Pemadam Jagakarsa",
+"la": -6.315442,
+"lo": 106.811651,
+"t": "bus_stop"
+},
+{
+"id": "H00252P",
+"n": "Pemuda Merdeka",
+"la": -6.192395,
+"lo": 106.904849,
+"t": "halte"
+},
+{
+"id": "H00160P",
+"n": "Pemuda Pramuka",
+"la": -6.192821,
+"lo": 106.874931,
+"t": "halte"
+},
+{
+"id": "H00161P",
+"n": "Pemuda Rawamangun",
+"la": -6.193435,
+"lo": 106.891694,
+"t": "halte"
+},
+{
+"id": "B07728P",
+"n": "Pengendapan Moch. Kahfi II",
+"la": -6.359481,
+"lo": 106.807539,
+"t": "bus_stop"
+},
+{
+"id": "H00164P",
+"n": "Penjaringan",
+"la": -6.126303,
+"lo": 106.792088,
+"t": "halte"
+},
+{
+"id": "H00004P",
+"n": "Perintis Kemerdekaan",
+"la": -6.171755,
+"lo": 106.88869,
+"t": "halte"
+},
+{
+"id": "H00169P",
+"n": "Pesakih",
+"la": -6.154838,
+"lo": 106.715307,
+"t": "halte"
+},
+{
+"id": "H00036C",
+"n": "Petamburan",
+"la": -6.201973,
+"lo": 106.800059,
+"t": "halte"
+},
+{
+"id": "H00170P",
+"n": "Petojo",
+"la": -6.17001,
+"lo": 106.81699,
+"t": "halte"
+},
+{
+"id": "H00173P",
+"n": "Pinang Ranti",
+"la": -6.291098,
+"lo": 106.886348,
+"t": "halte"
+},
+{
+"id": "B02834P",
+"n": "Pintu 3 TMII",
+"la": -6.305153,
+"lo": 106.88853,
+"t": "bus_stop"
+},
+{
+"id": "B02842P",
+"n": "Pintu Barat Ragunan 1",
+"la": -6.310857,
+"lo": 106.816274,
+"t": "bus_stop"
+},
+{
+"id": "B02852P",
+"n": "Pintu SMK 57",
+"la": -6.291397,
+"lo": 106.82357,
+"t": "bus_stop"
+},
+{
+"id": "B06817P",
+"n": "Pintu Tol Pondok Gede Selatan",
+"la": -6.289177,
+"lo": 106.876882,
+"t": "bus_stop"
+},
+{
+"id": "H00002P",
+"n": "Pisangan",
+"la": -6.205525,
+"lo": 106.873771,
+"t": "halte"
+},
+{
+"id": "H00174P",
+"n": "Pluit",
+"la": -6.115788,
+"lo": 106.79125,
+"t": "halte"
+},
+{
+"id": "H00117P",
+"n": "Pluit Selatan",
+"la": -6.125236,
+"lo": 106.79971,
+"t": "halte"
+},
+{
+"id": "H00175P",
+"n": "Plumpang",
+"la": -6.128475,
+"lo": 106.89373,
+"t": "halte"
+},
+{
+"id": "H00176P",
+"n": "Polda Metro Jaya",
+"la": -6.221129,
+"lo": 106.81031,
+"t": "halte"
+},
+{
+"id": "B02924P",
+"n": "Pondok Gede Raya",
+"la": -6.28939,
+"lo": 106.880201,
+"t": "bus_stop"
+},
+{
+"id": "H00182P",
+"n": "Pramuka Sari",
+"la": -6.192155,
+"lo": 106.868584,
+"t": "halte"
+},
+{
+"id": "B02612P",
+"n": "Ps. Hek 1",
+"la": -6.286298,
+"lo": 106.87083,
+"t": "bus_stop"
+},
+{
+"id": "B02613P",
+"n": "Ps. Hek 2",
+"la": -6.286261,
+"lo": 106.87094,
+"t": "bus_stop"
+},
+{
+"id": "B02637P",
+"n": "Ps. Kramat Jati 1",
+"la": -6.269058,
+"lo": 106.86691,
+"t": "bus_stop"
+},
+{
+"id": "B02638P",
+"n": "Ps. Kramat Jati 2",
+"la": -6.269037,
+"lo": 106.86664,
+"t": "bus_stop"
+},
+{
+"id": "H00184P",
+"n": "Pulo Gadung",
+"la": -6.183276,
+"lo": 106.909064,
+"t": "halte"
+},
+{
+"id": "H00187P",
+"n": "Pulo Mas",
+"la": -6.174765,
+"lo": 106.892757,
+"t": "halte"
+},
+{
+"id": "H00188P",
+"n": "Pulo Mas Bypass",
+"la": -6.176988,
+"lo": 106.875987,
+"t": "halte"
+},
+{
+"id": "H00046P",
+"n": "Pulo Nangka",
+"la": -6.154657,
+"lo": 106.738095,
+"t": "halte"
+},
+{
+"id": "B03029P",
+"n": "Pusdikkes",
+"la": -6.277665,
+"lo": 106.869455,
+"t": "bus_stop"
+},
+{
+"id": "B08427P",
+"n": "Puskesmas Kelurahan Ceger",
+"la": -6.316043,
+"lo": 106.892422,
+"t": "bus_stop"
+},
+{
+"id": "B03158P",
+"n": "RS Moh Ridwan Meuraksa",
+"la": -6.294684,
+"lo": 106.88179,
+"t": "bus_stop"
+},
+{
+"id": "B03167P",
+"n": "RS Polri Jaktim",
+"la": -6.27067,
+"lo": 106.86732,
+"t": "bus_stop"
+},
+{
+"id": "B03172P",
+"n": "RS Pusdikkes",
+"la": -6.277538,
+"lo": 106.86917,
+"t": "bus_stop"
+},
+{
+"id": "B03173P",
+"n": "RS Restu Kasih",
+"la": -6.26606,
+"lo": 106.86598,
+"t": "bus_stop"
+},
+{
+"id": "H00202P",
+"n": "RSPAD",
+"la": -6.175485,
+"lo": 106.83674,
+"t": "halte"
+},
+{
+"id": "B03210P",
+"n": "RSUD Jagakarsa",
+"la": -6.31636,
+"lo": 106.81168,
+"t": "bus_stop"
+},
+{
+"id": "H00191P",
+"n": "Ragunan",
+"la": -6.30573,
+"lo": 106.81895,
+"t": "halte"
+},
+{
+"id": "H00069P",
+"n": "Rasuna Said",
+"la": -6.221641,
+"lo": 106.832283,
+"t": "halte"
+},
+{
+"id": "H00193P",
+"n": "Rawa Buaya",
+"la": -6.153942,
+"lo": 106.726191,
+"t": "halte"
+},
+{
+"id": "H00194P",
+"n": "Rawa Selatan",
+"la": -6.173958,
+"lo": 106.858102,
+"t": "halte"
+},
+{
+"id": "H00254P",
+"n": "Rawamangun",
+"la": -6.192881,
+"lo": 106.880338,
+"t": "halte"
+},
+{
+"id": "B06647P",
+"n": "Robinson",
+"la": -6.285104,
+"lo": 106.84358,
+"t": "bus_stop"
+},
+{
+"id": "H00200P",
+"n": "Roxy",
+"la": -6.166316,
+"lo": 106.796808,
+"t": "halte"
+},
+{
+"id": "B03350P",
+"n": "SDN Cilandak Timur 01",
+"la": -6.306334,
+"lo": 106.81391,
+"t": "bus_stop"
+},
+{
+"id": "B03353P",
+"n": "SDN Cipedak 05",
+"la": -6.354478,
+"lo": 106.80119,
+"t": "bus_stop"
+},
+{
+"id": "B03360P",
+"n": "SDN Dukuh 01",
+"la": -6.287794,
+"lo": 106.87406,
+"t": "bus_stop"
+},
+{
+"id": "B05265P",
+"n": "SMAN 28",
+"la": -6.286109,
+"lo": 106.83318,
+"t": "bus_stop"
+},
+{
+"id": "B05287P",
+"n": "SMK Al Hidayah 1",
+"la": -6.30829,
+"lo": 106.81377,
+"t": "bus_stop"
+},
+{
+"id": "B05330P",
+"n": "SMP El Syifa Ciganjur",
+"la": -6.334125,
+"lo": 106.80695,
+"t": "bus_stop"
+},
+{
+"id": "B05336P",
+"n": "SMP PGRI 9",
+"la": -6.332922,
+"lo": 106.89179,
+"t": "bus_stop"
+},
+{
+"id": "B05347P",
+"n": "SMPN 131",
+"la": -6.362279,
+"lo": 106.8017,
+"t": "bus_stop"
+},
+{
+"id": "B05369P",
+"n": "SMPN 222",
+"la": -6.308849,
+"lo": 106.88887,
+"t": "bus_stop"
+},
+{
+"id": "B06031P",
+"n": "SMU Balai Rakyat",
+"la": -6.285105,
+"lo": 106.83694,
+"t": "bus_stop"
+},
+{
+"id": "B05404P",
+"n": "SPBU Cilandak KKO",
+"la": -6.29585,
+"lo": 106.81551,
+"t": "bus_stop"
+},
+{
+"id": "B05410P",
+"n": "SPBU M Kahfi 1",
+"la": -6.350044,
+"lo": 106.80175,
+"t": "bus_stop"
+},
+{
+"id": "B03306P",
+"n": "Sakura Garden City",
+"la": -6.322444,
+"lo": 106.88866,
+"t": "bus_stop"
+},
+{
+"id": "H00206P",
+"n": "Salemba",
+"la": -6.193345,
+"lo": 106.848961,
+"t": "halte"
+},
+{
+"id": "H00280P",
+"n": "Sawah Besar",
+"la": -6.157366,
+"lo": 106.818702,
+"t": "halte"
+},
+{
+"id": "H00279P",
+"n": "Sawah Besar Arah Utara",
+"la": -6.157418,
+"lo": 106.81846,
+"t": "halte"
+},
+{
+"id": "B03438P",
+"n": "Sbr. Agrowisata Cilangkap",
+"la": -6.339822,
+"lo": 106.90147,
+"t": "bus_stop"
+},
+{
+"id": "B06988P",
+"n": "Sbr. Balai Benih Ikan Ciganjur",
+"la": -6.363493,
+"lo": 106.80535,
+"t": "bus_stop"
+},
+{
+"id": "B03474P",
+"n": "Sbr. Cilandak KKO",
+"la": -6.294056,
+"lo": 106.81604,
+"t": "bus_stop"
+},
+{
+"id": "B03584P",
+"n": "Sbr. Gereja HKBP Cilangkap",
+"la": -6.334694,
+"lo": 106.89746,
+"t": "bus_stop"
+},
+{
+"id": "B03516P",
+"n": "Sbr. Gg. Cemara Cilandak KKO",
+"la": -6.299539,
+"lo": 106.81463,
+"t": "bus_stop"
+},
+{
+"id": "B06847P",
+"n": "Sbr. Gg. Cermai",
+"la": -6.324671,
+"lo": 106.811372,
+"t": "bus_stop"
+},
+{
+"id": "B03522P",
+"n": "Sbr. Gg. Film Jagakarsa",
+"la": -6.322325,
+"lo": 106.81114,
+"t": "bus_stop"
+},
+{
+"id": "B06749P",
+"n": "Sbr. Gg. Jenan",
+"la": -6.286078,
+"lo": 106.827709,
+"t": "bus_stop"
+},
+{
+"id": "B03883P",
+"n": "Sbr. Jembatan Pintu Satu",
+"la": -6.300665,
+"lo": 106.88386,
+"t": "bus_stop"
+},
+{
+"id": "B03638P",
+"n": "Sbr. Jln. Aselih Cipedak",
+"la": -6.351786,
+"lo": 106.80153,
+"t": "bus_stop"
+},
+{
+"id": "B03687P",
+"n": "Sbr. Jln. Darmajaya Pejaten",
+"la": -6.278599,
+"lo": 106.84482,
+"t": "bus_stop"
+},
+{
+"id": "B07506P",
+"n": "Sbr. Jln. Dul. Djaim Cipedak",
+"la": -6.361797,
+"lo": 106.807215,
+"t": "bus_stop"
+},
+{
+"id": "B06852P",
+"n": "Sbr. Jln. H. Khayar",
+"la": -6.341809,
+"lo": 106.80462,
+"t": "bus_stop"
+},
+{
+"id": "B03743P",
+"n": "Sbr. Jln. Kampung Utan",
+"la": -6.301788,
+"lo": 106.8143,
+"t": "bus_stop"
+},
+{
+"id": "B06851P",
+"n": "Sbr. Jln. Kelinci",
+"la": -6.340332,
+"lo": 106.804777,
+"t": "bus_stop"
+},
+{
+"id": "B03757P",
+"n": "Sbr. Jln. Kramat Cipedak",
+"la": -6.363399,
+"lo": 106.80298,
+"t": "bus_stop"
+},
+{
+"id": "B06849P",
+"n": "Sbr. Jln. Manggis",
+"la": -6.325073,
+"lo": 106.811469,
+"t": "bus_stop"
+},
+{
+"id": "B03781P",
+"n": "Sbr. Jln. Manunggal II Ceger",
+"la": -6.311137,
+"lo": 106.88878,
+"t": "bus_stop"
+},
+{
+"id": "B06850P",
+"n": "Sbr. Jln. Pasir",
+"la": -6.33645,
+"lo": 106.806294,
+"t": "bus_stop"
+},
+{
+"id": "B03848P",
+"n": "Sbr. Jln. SMAN 64",
+"la": -6.332276,
+"lo": 106.8898,
+"t": "bus_stop"
+},
+{
+"id": "B03852P",
+"n": "Sbr. Jln. SMPN 160",
+"la": -6.311787,
+"lo": 106.88941,
+"t": "bus_stop"
+},
+{
+"id": "B03879P",
+"n": "Sbr. Jln. Waru Raya Cilangkap",
+"la": -6.341026,
+"lo": 106.90428,
+"t": "bus_stop"
+},
+{
+"id": "B03897P",
+"n": "Sbr. Kec. Cipayung",
+"la": -6.328673,
+"lo": 106.88785,
+"t": "bus_stop"
+},
+{
+"id": "B03905P",
+"n": "Sbr. Kec. Pasar Minggu",
+"la": -6.285526,
+"lo": 106.83549,
+"t": "bus_stop"
+},
+{
+"id": "B06633P",
+"n": "Sbr. Kel. Ps. Minggu",
+"la": -6.285514,
+"lo": 106.84058,
+"t": "bus_stop"
+},
+{
+"id": "B04002P",
+"n": "Sbr. Madrasah Aliyah Citra Cendekia",
+"la": -6.357553,
+"lo": 106.80076,
+"t": "bus_stop"
+},
+{
+"id": "B04046P",
+"n": "Sbr. Masjid At Tin",
+"la": -6.298697,
+"lo": 106.88317,
+"t": "bus_stop"
+},
+{
+"id": "B04050P",
+"n": "Sbr. Masjid El Syifa Ciganjur",
+"la": -6.332948,
+"lo": 106.80755,
+"t": "bus_stop"
+},
+{
+"id": "B04051P",
+"n": "Sbr. Masjid H. Andi Muhammad Ghalib",
+"la": -6.312385,
+"lo": 106.89055,
+"t": "bus_stop"
+},
+{
+"id": "B04052P",
+"n": "Sbr. Masjid Jami Al Akhyar",
+"la": -6.318206,
+"lo": 106.81119,
+"t": "bus_stop"
+},
+{
+"id": "B04061P",
+"n": "Sbr. Masjid Jami Asy Syakirin",
+"la": -6.351065,
+"lo": 106.80161,
+"t": "bus_stop"
+},
+{
+"id": "B04211P",
+"n": "Sbr. PLN Kramat Jati",
+"la": -6.283302,
+"lo": 106.8716,
+"t": "bus_stop"
+},
+{
+"id": "B04126P",
+"n": "Sbr. Panti Sosial Bina Laras",
+"la": -6.319153,
+"lo": 106.89018,
+"t": "bus_stop"
+},
+{
+"id": "B04204P",
+"n": "Sbr. Pintu III Taman Mini",
+"la": -6.305526,
+"lo": 106.88903,
+"t": "bus_stop"
+},
+{
+"id": "B08428P",
+"n": "Sbr. Puskesmas Kelurahan Ceger",
+"la": -6.316083,
+"lo": 106.892475,
+"t": "bus_stop"
+},
+{
+"id": "B04286P",
+"n": "Sbr. RS Marinir Cilandak",
+"la": -6.305692,
+"lo": 106.81404,
+"t": "bus_stop"
+},
+{
+"id": "B04290P",
+"n": "Sbr. RS Moh Ridwan Meuraksa",
+"la": -6.294767,
+"lo": 106.88167,
+"t": "bus_stop"
+},
+{
+"id": "B04300P",
+"n": "Sbr. RSUD Jagakarsa",
+"la": -6.316361,
+"lo": 106.81173,
+"t": "bus_stop"
+},
+{
+"id": "B04331P",
+"n": "Sbr. SDN Cipedak 05",
+"la": -6.354871,
+"lo": 106.80112,
+"t": "bus_stop"
+},
+{
+"id": "B04333P",
+"n": "Sbr. SDN Dukuh 01",
+"la": -6.287962,
+"lo": 106.87417,
+"t": "bus_stop"
+},
+{
+"id": "B08001P",
+"n": "Sbr. SDN Jagakarsa 09",
+"la": -6.319953,
+"lo": 106.810704,
+"t": "bus_stop"
+},
+{
+"id": "B04438P",
+"n": "Sbr. SMK 57",
+"la": -6.291191,
+"lo": 106.82342,
+"t": "bus_stop"
+},
+{
+"id": "B04439P",
+"n": "Sbr. SMK Al Hidayah 1",
+"la": -6.308208,
+"lo": 106.81387,
+"t": "bus_stop"
+},
+{
+"id": "B04459P",
+"n": "Sbr. SMP El Syifa Ciganjur",
+"la": -6.334529,
+"lo": 106.80675,
+"t": "bus_stop"
+},
+{
+"id": "B04465P",
+"n": "Sbr. SMPN 131",
+"la": -6.362219,
+"lo": 106.80175,
+"t": "bus_stop"
+},
+{
+"id": "B04482P",
+"n": "Sbr. SMPN 222",
+"la": -6.30897,
+"lo": 106.8888,
+"t": "bus_stop"
+},
+{
+"id": "B04500P",
+"n": "Sbr. SPBU Cilandak KKO",
+"la": -6.295925,
+"lo": 106.8156,
+"t": "bus_stop"
+},
+{
+"id": "B04501P",
+"n": "Sbr. SPBU M Kahfi 1",
+"la": -6.350204,
+"lo": 106.80167,
+"t": "bus_stop"
+},
+{
+"id": "B04504P",
+"n": "Sbr. SPBU Warung Jati",
+"la": -6.286956,
+"lo": 106.82555,
+"t": "bus_stop"
+},
+{
+"id": "B04317P",
+"n": "Sbr. Sakura Garden City",
+"la": -6.322659,
+"lo": 106.88857,
+"t": "bus_stop"
+},
+{
+"id": "B06845P",
+"n": "Sbr. TDC Jagakarsa",
+"la": -6.343049,
+"lo": 106.804283,
+"t": "bus_stop"
+},
+{
+"id": "B04522P",
+"n": "Sbr. Taman Buni",
+"la": -6.331421,
+"lo": 106.80803,
+"t": "bus_stop"
+},
+{
+"id": "B04578P",
+"n": "Sbr. UP Angkutan Sekolah",
+"la": -6.287471,
+"lo": 106.87243,
+"t": "bus_stop"
+},
+{
+"id": "B04579P",
+"n": "Sbr. UP Pajak Daerah Cipayung",
+"la": -6.343076,
+"lo": 106.90913,
+"t": "bus_stop"
+},
+{
+"id": "B04589P",
+"n": "Sbr. Yaspen Islam Al Mamur Ciganjur",
+"la": -6.345422,
+"lo": 106.80368,
+"t": "bus_stop"
+},
+{
+"id": "B04625P",
+"n": "Sekolah Cita Buana",
+"la": -6.316189,
+"lo": 106.81425,
+"t": "bus_stop"
+},
+{
+"id": "B04666P",
+"n": "Sekolah Yayasan Daarussaadah Ciganjur",
+"la": -6.338634,
+"lo": 106.80511,
+"t": "bus_stop"
+},
+{
+"id": "H00027C",
+"n": "Semanggi",
+"la": -6.220483,
+"lo": 106.813247,
+"t": "halte"
+},
+{
+"id": "H00067P",
+"n": "Senayan Bank Jakarta",
+"la": -6.224286,
+"lo": 106.805761,
+"t": "halte"
+},
+{
+"id": "H00005P",
+"n": "Senen Raya",
+"la": -6.176251,
+"lo": 106.84023,
+"t": "halte"
+},
+{
+"id": "H00212P",
+"n": "Senen TOYOTA Rangga",
+"la": -6.178257,
+"lo": 106.842492,
+"t": "halte"
+},
+{
+"id": "H00215P",
+"n": "Setiabudi Integritas",
+"la": -6.209205,
+"lo": 106.830271,
+"t": "halte"
+},
+{
+"id": "B04725P",
+"n": "Simpang Bina Marga Raya Ceger",
+"la": -6.314652,
+"lo": 106.89243,
+"t": "bus_stop"
+},
+{
+"id": "H00029P",
+"n": "Simpang Cawang",
+"la": -6.244773,
+"lo": 106.875959,
+"t": "halte"
+},
+{
+"id": "H00032P",
+"n": "Simpang Cempaka",
+"la": -6.165886,
+"lo": 106.879175,
+"t": "halte"
+},
+{
+"id": "B04765P",
+"n": "Simpang Cilandak KKO Margasatwa",
+"la": -6.310312,
+"lo": 106.81375,
+"t": "bus_stop"
+},
+{
+"id": "B04768P",
+"n": "Simpang Cilangkap Bina Marga",
+"la": -6.331425,
+"lo": 106.88808,
+"t": "bus_stop"
+},
+{
+"id": "B04843P",
+"n": "Simpang Herman Susilo 1",
+"la": -6.326889,
+"lo": 106.81098,
+"t": "bus_stop"
+},
+{
+"id": "B04844P",
+"n": "Simpang Herman Susilo 2",
+"la": -6.326266,
+"lo": 106.810998,
+"t": "bus_stop"
+},
+{
+"id": "B06848P",
+"n": "Simpang Jln. Paso",
+"la": -6.316025,
+"lo": 106.816128,
+"t": "bus_stop"
+},
+{
+"id": "H00113P",
+"n": "Simpang Kuningan",
+"la": -6.237215,
+"lo": 106.827953,
+"t": "halte"
+},
+{
+"id": "B04977P",
+"n": "Simpang Mabes Hankam Raya Ceger",
+"la": -6.306299,
+"lo": 106.88855,
+"t": "bus_stop"
+},
+{
+"id": "B04981P",
+"n": "Simpang Malaka Raya Cilangkap",
+"la": -6.337223,
+"lo": 106.89782,
+"t": "bus_stop"
+},
+{
+"id": "B04997P",
+"n": "Simpang Margasatwa Cilandak KKO",
+"la": -6.31022,
+"lo": 106.81364,
+"t": "bus_stop"
+},
+{
+"id": "B08047P",
+"n": "Simpang Pramuka 1",
+"la": -6.191823,
+"lo": 106.873279,
+"t": "bus_stop"
+},
+{
+"id": "B08048P",
+"n": "Simpang Pramuka 2",
+"la": -6.192457,
+"lo": 106.874554,
+"t": "bus_stop"
+},
+{
+"id": "H00044P",
+"n": "Simpang Ragunan Ar-Raudhah",
+"la": -6.294671,
+"lo": 106.822135,
+"t": "halte"
+},
+{
+"id": "B05110P",
+"n": "Simpang Raya Bogor Cililitan",
+"la": -6.264191,
+"lo": 106.86585,
+"t": "bus_stop"
+},
+{
+"id": "B05112P",
+"n": "Simpang Raya Ceger Bina Marga",
+"la": -6.314974,
+"lo": 106.89265,
+"t": "bus_stop"
+},
+{
+"id": "B05113P",
+"n": "Simpang Raya Ceger Mabes Hankam",
+"la": -6.306447,
+"lo": 106.88835,
+"t": "bus_stop"
+},
+{
+"id": "H00199P",
+"n": "Sumur Batu",
+"la": -6.168716,
+"lo": 106.87029,
+"t": "halte"
+},
+{
+"id": "H00229P",
+"n": "Sumur Bor",
+"la": -6.153071,
+"lo": 106.719303,
+"t": "halte"
+},
+{
+"id": "H00231P",
+"n": "Sunter Boulevard Barat",
+"la": -6.149644,
+"lo": 106.888982,
+"t": "halte"
+},
+{
+"id": "H00232P",
+"n": "Sunter Karya",
+"la": -6.137576,
+"lo": 106.870787,
+"t": "halte"
+},
+{
+"id": "H00233P",
+"n": "Sunter Kelapa Gading",
+"la": -6.14293,
+"lo": 106.890714,
+"t": "halte"
+},
+{
+"id": "H00222P",
+"n": "Sunter Utara",
+"la": -6.139717,
+"lo": 106.859198,
+"t": "halte"
+},
+{
+"id": "B05804P",
+"n": "TTI Center",
+"la": -6.2862,
+"lo": 106.8339,
+"t": "bus_stop"
+},
+{
+"id": "B05583P",
+"n": "Taman Buni",
+"la": -6.331063,
+"lo": 106.80825,
+"t": "bus_stop"
+},
+{
+"id": "H00235P",
+"n": "Taman Kota",
+"la": -6.157211,
+"lo": 106.757884,
+"t": "halte"
+},
+{
+"id": "H00133P",
+"n": "Taman Sari",
+"la": -6.149291,
+"lo": 106.816732,
+"t": "halte"
+},
+{
+"id": "B05664P",
+"n": "Tamini Square 2",
+"la": -6.291651,
+"lo": 106.880938,
+"t": "bus_stop"
+},
+{
+"id": "B05670P",
+"n": "Tanah Baru Cipedak",
+"la": -6.363462,
+"lo": 106.80684,
+"t": "bus_stop"
+},
+{
+"id": "H00210S",
+"n": "Tanjung Duren Arah Barat",
+"la": -6.175635,
+"lo": 106.792248,
+"t": "halte"
+},
+{
+"id": "H00211S",
+"n": "Tanjung Duren Arah Timur",
+"la": -6.175783,
+"lo": 106.793104,
+"t": "halte"
+},
+{
+"id": "H00240P",
+"n": "Tanjung Priok",
+"la": -6.10956,
+"lo": 106.882156,
+"t": "halte"
+},
+{
+"id": "H00242S",
+"n": "Tebet Eco Park Arah Barat",
+"la": -6.243338,
+"lo": 106.85212,
+"t": "halte"
+},
+{
+"id": "H00241S",
+"n": "Tebet Eco Park Arah Timur",
+"la": -6.243056,
+"lo": 106.85208,
+"t": "halte"
+},
+{
+"id": "H00244S",
+"n": "Tegal Parang Arah Barat",
+"la": -6.238863,
+"lo": 106.83022,
+"t": "halte"
+},
+{
+"id": "H00243S",
+"n": "Tegal Parang Arah Timur",
+"la": -6.239005,
+"lo": 106.83106,
+"t": "halte"
+},
+{
+"id": "H00245P",
+"n": "Tegalan",
+"la": -6.203072,
+"lo": 106.857212,
+"t": "halte"
+},
+{
+"id": "B05715P",
+"n": "Term. Pasar Minggu",
+"la": -6.283048,
+"lo": 106.84371,
+"t": "bus_stop"
+},
+{
+"id": "B05716P",
+"n": "Term. Pasar Minggu 2",
+"la": -6.282492,
+"lo": 106.84455,
+"t": "bus_stop"
+},
+{
+"id": "H00251P",
+"n": "Tosari",
+"la": -6.19695,
+"lo": 106.823131,
+"t": "halte"
+},
+{
+"id": "B05822P",
+"n": "UNAS",
+"la": -6.280337,
+"lo": 106.83891,
+"t": "bus_stop"
+},
+{
+"id": "B05847P",
+"n": "UP Angkutan Sekolah",
+"la": -6.287636,
+"lo": 106.87258,
+"t": "bus_stop"
+},
+{
+"id": "B05848P",
+"n": "UP Pajak Daerah Cipayung",
+"la": -6.343078,
+"lo": 106.90938,
+"t": "bus_stop"
+},
+{
+"id": "H00115P",
+"n": "Underpass Kuningan",
+"la": -6.23477,
+"lo": 106.829027,
+"t": "halte"
+},
+{
+"id": "B05841P",
+"n": "Univ. Tarumanegara Cilandak KKO",
+"la": -6.293511,
+"lo": 106.81635,
+"t": "bus_stop"
+},
+{
+"id": "H00255P",
+"n": "Utan Kayu",
+"la": -6.192651,
+"lo": 106.864555,
+"t": "halte"
+},
+{
+"id": "H00256P",
+"n": "Utan Kayu Rawamangun",
+"la": -6.197544,
+"lo": 106.874008,
+"t": "halte"
+},
+{
+"id": "H00258P",
+"n": "Velodrome",
+"la": -6.193414,
+"lo": 106.888298,
+"t": "halte"
+},
+{
+"id": "H00261S",
+"n": "Walikota Jakarta Utara Arah Selatan",
+"la": -6.118867,
+"lo": 106.89344,
+"t": "halte"
+},
+{
+"id": "H00260S",
+"n": "Walikota Jakarta Utara Arah Utara",
+"la": -6.118845,
+"lo": 106.893125,
+"t": "halte"
+},
+{
+"id": "H00075P",
+"n": "Warung Buncit",
+"la": -6.256965,
+"lo": 106.828104,
+"t": "halte"
+},
+{
+"id": "H00262P",
+"n": "Warung Jati",
+"la": -6.262356,
+"lo": 106.829783,
+"t": "halte"
+},
+{
+"id": "H00137S",
+"n": "Widya Chandra Telkomsel Arah Barat",
+"la": -6.227374,
+"lo": 106.817584,
+"t": "halte"
+},
+{
+"id": "H00120S",
+"n": "Widya Chandra Telkomsel Arah Timur",
+"la": -6.226556,
+"lo": 106.817451,
+"t": "halte"
+},
+{
+"id": "B05908P",
+"n": "Yaspen Islam Al Mamur Ciganjur",
+"la": -6.345678,
+"lo": 106.80344,
+"t": "bus_stop"
+}
+]
+}
