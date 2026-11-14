@@ -10,6 +10,21 @@
 
 ---
 
+## ✦ v2.21.0 — 14 November 2026 / 14 November 2026
+
+- 🇮🇩 **Fasilitas & rute resmi di lembar halte.** Lembar halte kini menampilkan jenis titik (halte BRT / bus_stop), fasilitas beserta ikonnya, akses kursi roda, dan daftar rute resmi dengan warna koridornya — dari `GET /v1/bus-stop` dan `/v1/bus-stop/{id}`. `versionCode` **22100**
+- 🇮🇩 **Jam operasional, headway, dan tarif dari server.** Detail rute memakai `start_time`/`end_time`/`headway_secs`/`price` dari `/v1/route/{id}`; teks bawaan tetap jadi cadangan. `versionCode` **22100**
+- 🇮🇩 **Cuaca di titik halte** (Open-Meteo, tanpa kunci API) dan **hitungan bus putus sinyal** (`POST /v1/bus/offline`) di papan "Bus di sekitarmu". `versionCode` **22100**
+- 🇮🇩 **Bus arah sebaliknya tidak lagi muncul di halte satu arah.** Tiga sebab ditutup: pencarian `stop_id` memakai nama "mengandung" lalu jatuh ke titik terdekat tanpa batas, toleransi pencocokan 250 m (lebih lebar daripada jarak dua peron ±40 m), dan penjaga arah yang hanya jalan bila halte tujuan dikirim. Sekarang nama harus persis, arah wajib sama, toleransi 30 m. `versionCode` **22100**
+- 🇮🇩 **Halte kembar digabung** (nama sama & ≤ 25 m), penanda koordinat untuk kembar ≥ 300 m, dan `x-app-version` naik ke 3.1.1. `versionCode` **22100**
+- 🇬🇧 **Facilities and official routes in the stop sheet.** The stop sheet now shows the point type (BRT stop / bus_stop), facilities with icons, wheelchair access, and the official route list with corridor colours — from `GET /v1/bus-stop` and `/v1/bus-stop/{id}`. `versionCode` **22100**
+- 🇬🇧 **Operating hours, headway and fare from the server.** Route detail uses `start_time`/`end_time`/`headway_secs`/`price` from `/v1/route/{id}`; bundled text stays as the fallback. `versionCode` **22100**
+- 🇬🇧 **Weather at the stop** (Open-Meteo, no API key) and an **offline-bus count** (`POST /v1/bus/offline`) on the "Buses near you" board. `versionCode` **22100**
+- 🇬🇧 **Opposite-direction buses no longer appear at one-way stops.** Three causes closed: `stop_id` lookup used "contains" then fell back to the nearest point with no distance cap, the match tolerance was 250 m (wider than the ±40 m between two platforms), and the direction guard only ran when a destination stop was supplied. Names must now match exactly, direction must match, tolerance is 30 m. `versionCode` **22100**
+- 🇬🇧 **Duplicate stops merged** (same name & ≤ 25 m), coordinate tags for twins ≥ 300 m apart, and `x-app-version` bumped to 3.1.1. `versionCode` **22100**
+
+---
+
 ## ✦ v2.20.1 — 13 November 2026 / 13 November 2026
 
 - 🇮🇩 **GTFS tidak lagi ditanam di APK.** Parsing 4,1 MB di WebView selalu memblokir thread utama — dulu saat boot, lalu sesaat setelah layar tampil setelah dipindah. Bundling-nya dibatalkan: data resmi diunduh di latar belakang seperti semula, dan yang tersimpan dipakai saat aplikasi dibuka. Boot 398 ms, dan tidak ada jeda setelah layar tampil. `versionCode` **22001**

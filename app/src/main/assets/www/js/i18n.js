@@ -23,6 +23,9 @@
     "© OpenStreetMap contributors · Peta © Google": "© OpenStreetMap contributors · Map © Google",
     // header, nav, tab
     "Semua moda Jabodetabek, satu rute": "Every Greater Jakarta mode, one route",
+    // v2.21: judul fasilitas halte yang datang dari server TJ (REST /v1/bus-stop).
+    "aksesibilitas umum": "general accessibility", "aksesibilitas": "accessibility",
+    "eskalator": "escalator", "lift": "lift", "area beribadah": "prayer area", "toilet": "toilet",
     "Dari": "From", "Ke": "To", "Cari rute": "Find route", "Lokasi saya": "My location", "Pakai lokasi saya": "Use my location",
     "Berangkat sekarang": "Leaving now", "Pengaturan": "Settings", "Tukar asal dan tujuan": "Swap origin and destination",
     "Hapus asal": "Clear origin", "Hapus tujuan": "Clear destination",

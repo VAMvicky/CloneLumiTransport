@@ -411,17 +411,26 @@
 
   /* ------------------------------------------------------- tab halte & riwayat */
   var STOP_INDEX = null;
+  /* v2.21: satu nama + satu titik = satu halte. Sebelumnya kunci memakai koordinat 4 desimal,
+     jadi baris yang sama dari dua sumber (GTFS 2021 + GTFS 2024) muncul dua kali kalau titiknya
+     bergeser beberapa meter — mis. "Glodok" tiga baris dalam 11 meter. Sekarang digabung bila
+     namanya sama dan jaraknya ≤ 25 m; yang lebih jauh tetap terpisah karena memang halte lain
+     (sisi seberang jalan, peron bernomor). */
+  var STOP_MERGE_KM = 0.025;
   function stopIndex() {
     if (STOP_INDEX) return STOP_INDEX;
-    var byKey = {}, out = [];
+    var out = [], byName = {};
     var lines = (window.LUMI_DATA && LUMI_DATA.lines) ? LUMI_DATA.lines : [];
     lines.forEach(function (l) {
       (l.dirs || []).forEach(function (d) {
         (d.s || []).forEach(function (st) {
           if (!st || !st.n || !st.p) return;
-          var key = st.n + "@" + (+st.p[0]).toFixed(4) + "," + (+st.p[1]).toFixed(4);
-          if (!byKey[key]) { byKey[key] = { n: st.n, p: st.p, codes: {} }; out.push(byKey[key]); }
-          byKey[key].codes[l.code] = 1;
+          var k = nmKey(st.n), bucket = byName[k] || (byName[k] = []), hit = null;
+          for (var i = 0; i < bucket.length; i++) {
+            if (E.hav(bucket[i].p, st.p) <= STOP_MERGE_KM) { hit = bucket[i]; break; }
+          }
+          if (!hit) { hit = { n: st.n, p: st.p, codes: {} }; bucket.push(hit); out.push(hit); }
+          hit.codes[l.code] = 1;
         });
       });
     });
@@ -443,7 +452,9 @@
     });
     DUP_TAG = {};
     Object.keys(g).forEach(function (k) {
-      if (g[k].n > 1 && E.hav(g[k].lo, g[k].hi) > 1.5) DUP_TAG[k] = true;
+      // v2.21: ambang 1,5 km terlalu longgar — halte kembar 100–400 m (sisi seberang, peron
+      // bernomor) tidak pernah diberi penanda. 300 m cukup untuk membedakan yang memang berjauhan.
+      if (g[k].n > 1 && E.hav(g[k].lo, g[k].hi) > 0.3) DUP_TAG[k] = true;
     });
     return DUP_TAG;
   }
@@ -484,6 +495,16 @@
     var station = exact.length > 0 && exact.every(function (l) { return RAIL[l.mode]; });
     return near.filter(function (l) { return station ? RAIL[l.mode] : !RAIL[l.mode]; });
   }
+  /* v2.21: saklar fitur dari data/remote_config.json (bentuk features{}). Bawaannya menyala;
+     kalau berkas tidak ada atau namanya tidak dikenal, fitur tetap jalan. */
+  function flag(name) {
+    try {
+      var c = JSON.parse(LS.get("lumi:remoteCfg") || "null");
+      if (c && c.features && typeof c.features[name] === "boolean") return c.features[name];
+    } catch (e) { lumiLog(e); }
+    return true;
+  }
+
   /* Lembar aksi halte/stasiun: berangkat dari sini, pergi ke sini, dan (khusus halte bus) posisi bus. */
   function openStopActions(s) {
     var m = $("#sheetStop"); if (!m) return;
@@ -503,7 +524,54 @@
     $("#stopActTo").onclick = function () { use("to"); };
     $("#stopActLive").onclick = function () { m.hidden = true; openLiveAt(s.p, s.n, { stop: s, lines: bus }); };
     $("#stopActAccess") && ($("#stopActAccess").innerHTML = accessLineHTML(s, isStation));
+    enrichStop(s);                       // v2.21: fasilitas resmi, rute resmi, cuaca (malas, tidak memblokir)
     m.hidden = false; raiseSheet(m);   // tampil di atas peta/lembar yang sedang terbuka
+  }
+
+  /*
+   * v2.21: isi tambahan lembar halte dari REST TJ — jenis halte, fasilitas (beserta ikonnya),
+   * daftar rute resmi yang berhenti di sana, dan cuaca di titik itu. Semua opsional: kalau
+   * jaringan gagal, lembar tetap terbuka seperti sebelumnya.
+   */
+  function enrichStop(s) {
+    var box = $("#stopActFac");
+    if (!box) return;
+    box.hidden = true;
+    box.innerHTML = "";
+    if (!window.LumiTJ || !flag("stopFacilities")) return;
+    var p = s.p;
+    function paint(parts, wx) {
+      if (!parts.length && !wx) return;
+      box.innerHTML = tr('<div class="fac-row">' + parts.join("") + (wx || "") + "</div>");
+      box.hidden = false;
+    }
+    var parts = [];
+    var chain = LumiLive.stopIdFor(p[0], p[1], s.n).then(function (id) {
+      if (!id) return null;
+      return LumiTJ.stopDetail(id);
+    }).then(function (d) {
+      if (!d) return [];
+      if (d.type === "halte") parts.push('<span class="fac-badge">' + tl("Halte BRT", "BRT stop") + "</span>");
+      (d.v2 || []).forEach(function (f) {
+        var label = f.title || f.name || "";
+        parts.push('<span class="fac-chip">' +
+          (f.icon_dark || f.icon ? '<img alt="" loading="lazy" src="' + esc(f.icon_dark || f.icon) + '">' : "") +
+          esc(label) + "</span>");
+      });
+      if (d.wheelchair) parts.push('<span class="fac-chip">' + tl("Akses kursi roda", "Wheelchair access") + "</span>");
+      if ((d.routes || []).length) {
+        var chips = d.routes.slice(0, 10).map(function (r) {
+          return '<span class="fac-badge" style="background:' + esc(r.color) + ";color:" + esc(r.text) + '">' + esc(r.code) + "</span>";
+        }).join("");
+        parts.push('<span class="fac-src">' + tl("Rute resmi", "Official routes") + "</span>" + chips);
+      }
+      return parts;
+    }).catch(function () { return parts; });
+    var wxp = (flag("weather") ? LumiTJ.weather(p[0], p[1]) : Promise.resolve(null)).then(function (w) {
+      if (!w) return "";
+      return '<span class="fac-chip live-wx">' + esc(w.text) + " · " + w.temp + "°C</span>";
+    }).catch(function () { return ""; });
+    Promise.all([chain, wxp]).then(function (r) { paint(r[0] || [], r[1] || ""); });
   }
 
   function renderHistoryTab() {
@@ -1132,10 +1200,19 @@
       if (stop) list.forEach(function (x) {
         // Utamakan arah yang singgah di halte BERNAMA SAMA (mis. "Pancoran Arah Barat" hanya ada di satu arah);
         // bila tidak ada, arah dengan titik halte terdekat (selisih ≤ 15 m dari yang paling dekat).
+        var stopTok = LumiLive.dirTok(stop.n);
         var byName = [], byDist = [];
         (x.l.dirs || []).forEach(function (d) {
-          var nk = -1, bk = -1, bd = 0.08;
+          var nk = -1, bk = -1, bd = 0.03;          // v2.21: 80 m terlalu lebar untuk dua peron ±40 m
           (d.s || []).forEach(function (q, k) {
+            /*
+             * v2.21: halte yang namanya membawa arah ("Pancoran Arah Barat") hanya dilayani arah rute
+             * yang peronnya membawa arah yang SAMA. Peron pasangan ("Pancoran Arah Timur") dibuang
+             * sebelum jarak dihitung — dulu peron seberang masuk lewat jalur "terdekat" lalu bus arah
+             * sebaliknya ikut tampil di halte ini.
+             */
+            var tok = LumiLive.dirTok(q.n);
+            if (stopTok && tok && tok !== stopTok) return;
             var dd = E.hav(q.p, stop.p);
             if (nk < 0 && dd < 0.15 && nmKey(q.n) === nmKey(stop.n)) nk = k;
             if (dd < bd) { bd = dd; bk = k; }
@@ -1161,7 +1238,10 @@
           // v2.18.1: bukti terkuat = daftar sisa halte bus itu sendiri. Ada nama halte ini → searah;
           // hanya ada pasangannya (mis. "… Arah Timur" saat memilih "… Arah Barat") → arah sebaliknya.
           var sk = nmKey(stop.n), base = sk.replace(/arah[a-z]+$/, "");
-          var rest = (b.stops || []).filter(function (q) { return isFinite(+q.eta) && +q.eta >= 0; }).map(function (q) { return nmKey(q.name); });
+          // v2.21: dulu hanya halte yang punya `eta` yang dihitung. Feed sering mengirim sisa
+          // perjalanan tanpa eta, jadi daftar ini kosong dan penjaga arah di bawah tidak pernah
+          // jalan. Sekarang semua nama sisa perjalanan dipakai.
+          var rest = (b.stops || []).map(function (q) { return nmKey(q.name); });
           var mine = rest.indexOf(sk) >= 0, other = rest.some(function (k) { return k !== sk && base && k.indexOf(base) === 0 && /arah/.test(k); });
           if (other && !mine) return null;
           if (!mine && !be) return null;
@@ -1183,6 +1263,7 @@
       // Label di peta memakai kode yang sama dengan aplikasi (mis. JAK71, bukan JAK.71 dari feed).
       var labelOf = function (b) { var l = lineOfBus[LumiLive.norm(b.code)]; return l ? l.code : b.code; };
       if (nearBoard) nearBoard.stop();
+      var offlineN = 0;                    // v2.21: bus yang sedang putus sinyal (POST /v1/bus/offline)
       var render = function () {
         var st = LumiLive.state(), all = nearBoard ? Object.keys(nearBoard.buses).map(function (k) { return nearBoard.buses[k]; }) : [];
         var only = nearBoard && nearBoard.filter();
@@ -1201,7 +1282,9 @@
           return a.dist - b.dist;
         });
         var used = LumiLive.bytes();
-        $("#liveNearStatus").textContent = liveStatusText(st, bs.length) + (used > 50000 ? " · " + dec(used / 1048576) + " MB" : "");
+        $("#liveNearStatus").textContent = liveStatusText(st, bs.length) +
+          (offlineN ? " · " + offlineN + tl(" bus offline", " offline") : "") +
+          (used > 50000 ? " · " + dec(used / 1048576) + " MB" : "");
         var chips = list.slice().sort(function (a, b) {
           var ca = cnt[LumiLive.norm(a.l.code)] || 0, cb = cnt[LumiLive.norm(b.l.code)] || 0;
           return (cb > 0) - (ca > 0) || a.d - b.d;
@@ -1245,6 +1328,11 @@
           });
         });
       };
+      // v2.21: sekali per pembukaan, tanya bus yang putus sinyal. Beda dengan "hilang dari peta":
+      // bus ini masih dijadwalkan, cuma posisinya tidak diterima.
+      if (window.LumiTJ && flag("offlineBuses")) {
+        LumiTJ.busesOffline().then(function (a) { offlineN = (a || []).length; render(); }).catch(function () { });
+      }
       // B8: panel digambar ulang paling sering tiap 1,5 dtk, dan tidak saat jari sedang menyentuh panel
       // (ketukan tidak hilang karena tombolnya diganti di tengah sentuhan).
       var rT = null, body = $("#liveBody");
@@ -3252,11 +3340,34 @@
     $("[data-close-line]").addEventListener("click", function () { sheet.hidden = true; });
     if (!lineMap) lineMap = makeMap($("#lineMap"));
     paintLine();
+    augmentLineHours(line);
   }
   var ICO_CLOCK = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   function hoursBox(line) {
     return '<div class="hours">' + ICO_CLOCK + "<div><b>" + tl("Jam operasional", "Operating hours") + "</b>" + esc(T(line.hoursText || "-")) +
-      (line.mode === "TJ" || line.mode === "MIKRO" ? "" : "") + "</div></div>";
+      '<span class="hours-srv" id="lineHoursSrv"></span></div></div>';
+  }
+  /*
+   * v2.21: jam operasional, headway, dan tarif dari server TJ (bukan teks bawaan). Diisi setelah
+   * lembar tampil supaya tidak menahan render; kalau gagal, teks bawaan tetap yang dipakai.
+   */
+  function augmentLineHours(line) {
+    if (!window.LumiTJ || !flag("serverHours") || !line || !line.code) return;
+    LumiTJ.routes().then(function (list) {
+      var hit = null, key = LumiLive.norm(line.code);
+      for (var i = 0; i < list.length; i++) if (LumiLive.norm(list[i].code) === key) { hit = list[i]; break; }
+      if (!hit) return null;
+      return LumiTJ.routeDetail(hit.id).then(function (d) { return { r: hit, d: d }; });
+    }).then(function (x) {
+      if (!x) return;
+      var bits = [], d = x.d;
+      if (d && d.start && d.end) bits.push(d.start.slice(0, 5).replace(":", ".") + "–" + d.end.slice(0, 5).replace(":", "."));
+      if (d && d.headway > 0) bits.push(tl("tiap ", "every ") + Math.round(d.headway / 60) + tl(" mnt", " min"));
+      var price = (d && d.price) || x.r.price;
+      if (price) bits.push(rp(price));
+      var e = $("#lineHoursSrv");
+      if (e && bits.length) e.textContent = " · " + bits.join(" · ");
+    }).catch(function () { });
   }
   function paintLine() {
     var line = S.openLineObj, d = line.dirs[S.lineDir];

@@ -23,9 +23,38 @@ public final class BusEta {
 
     static String key(String s) { return s == null ? "" : s.toLowerCase(java.util.Locale.US).replaceAll("[^a-z0-9]", ""); }
 
+    /**
+     * v2.21: token arah pada nama halte ("Pancoran Arah Barat" → "barat"). Dua halte yang namanya
+     * hanya beda token arah adalah dua peron berbeda, bukan satu halte.
+     */
+    static String dirTok(String s) {
+        if (s == null) return "";
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("arah\\s+(utara|selatan|timur|barat)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(s);
+        if (m.find()) return m.group(1).toLowerCase(java.util.Locale.US);
+        m = java.util.regex.Pattern.compile("(utara|selatan|timur|barat)\\s*$",
+                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(s.trim());
+        return m.find() ? m.group(1).toLowerCase(java.util.Locale.US) : "";
+    }
+
+    /** Peron pasangan: dua-duanya punya token arah, dan tokennya berbeda. */
+    static boolean opposite(String a, String b) {
+        String x = dirTok(a), y = dirTok(b);
+        return !x.isEmpty() && !y.isEmpty() && !x.equals(y);
+    }
+
+    /** Nama halte harus sama PERSIS. Dulu `contains()`: "Pancoran" cocok ke kedua arah sekaligus. */
     static boolean nameMatch(String a, String b) {
         String x = key(a), y = key(b);
-        return !x.isEmpty() && !y.isEmpty() && (x.equals(y) || x.contains(y) || y.contains(x));
+        return !x.isEmpty() && !y.isEmpty() && x.equals(y);
+    }
+
+    /** Untuk headsign: boleh mengandung, tapi hanya bila arahnya tidak bertentangan. */
+    static boolean looseMatch(String a, String b) {
+        String x = key(a), y = key(b);
+        if (x.isEmpty() || y.isEmpty() || opposite(a, b)) return false;
+        return x.equals(y) || x.contains(y) || y.contains(x);
     }
 
     static double km(double la1, double lo1, double la2, double lo2) {
@@ -84,19 +113,28 @@ public final class BusEta {
         return m;
     }
 
+    static String optName(JSONArray st, int i) {
+        JSONObject s = st == null || i < 0 || i >= st.length() ? null : st.optJSONObject(i);
+        return s == null ? null : s.optString("name");
+    }
+
     static double rawMinutes(JSONObject msg, Target t) {
         JSONArray st = msg.optJSONArray("stops");
         if (st == null || st.length() == 0) return -1;
         int fi = byId(st, t.fromId, 0);
-        if (fi < 0) fi = nearest(st, t.fromLat, t.fromLon, 0, 0.25);
+        // v2.21: toleransi 250 m lebih lebar daripada jarak dua peron (mis. Pancoran ±40 m), jadi
+        // peron seberang selalu ikut cocok. 30 m masih cukup untuk galat GPS, tidak untuk menyeberang.
+        if (fi < 0) fi = nearest(st, t.fromLat, t.fromLon, 0, 0.03);
         if (fi < 0) fi = byName(st, t.fromName, 0);
+        if (fi >= 0 && opposite(optName(st, fi), t.fromName)) fi = -1;   // peron arah berlawanan
         if (fi < 0) return -1;                               // halte sudah dilewati / bukan jalur bus ini
         boolean wantDir = t.toId != null || !Double.isNaN(t.toLat) || t.toName != null;
         if (wantDir) {
             int ti = byId(st, t.toId, fi + 1);
-            if (ti < 0) ti = nearest(st, t.toLat, t.toLon, fi + 1, 0.35);
+            if (ti < 0) ti = nearest(st, t.toLat, t.toLon, fi + 1, 0.05);
+            if (ti >= 0 && opposite(optName(st, ti), t.toName)) ti = -1;
             if (ti < 0) ti = byName(st, t.toName, fi + 1);
-            if (ti < 0 && nameMatch(msg.optString("trip_headsign"), t.toName)) ti = fi + 1;
+            if (ti < 0 && looseMatch(msg.optString("trip_headsign"), t.toName)) ti = fi + 1;
             if (ti < 0) return -1;                           // arah berlawanan
         }
         JSONObject map = msg.optJSONObject("eta_by_parent_stop_id");

@@ -333,33 +333,79 @@
     });
   }
 
-  /* Daftar halte terdekat (dengan ID) untuk satu titik. */
+  /* Daftar halte terdekat (dengan ID) untuk satu titik.
+     v2.21: SEMUA field dipertahankan — jenis halte/bus_stop, fasilitas (beserta ikon), gerbang,
+     kampanye. Dulu hanya lima field yang disalin, sisanya terbuang tiap panggilan. */
   var stopCache = {};
   function nmk(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  /* Token arah pada nama halte ("Pancoran Arah Barat" → "barat"). Dipakai sebagai bagian identitas:
+     dua halte yang namanya hanya beda token arah adalah dua peron berbeda, bukan satu halte. */
+  function dirTok(name) {
+    var m = /(?:^|\s)arah\s+(utara|selatan|timur|barat)\b/i.exec(String(name || "")) ||
+            /\b(utara|selatan|timur|barat)\b\s*$/i.exec(String(name || ""));
+    return m ? m[1].toLowerCase() : "";
+  }
+  function nmBase(name) { return nmk(name).replace(/arah(utara|selatan|timur|barat)$/, ""); }
   function nearbyStops(lat, lon) {
     var k = (+lat).toFixed(4) + "," + (+lon).toFixed(4);
     if (stopCache[k]) return Promise.resolve(stopCache[k]);
     return apiGet("/v1/bus-stop?latitude=" + lat + "&longitude=" + lon).then(function (j) {
       var list = (j.data || []).map(function (s) {
-        return { id: s.stop_id, name: s.stop_name, lat: +s.stop_lat, lon: +s.stop_lon, dist: +s.distance };
+        return {
+          id: s.stop_id, name: s.stop_name, lat: +s.stop_lat, lon: +s.stop_lon,
+          dist: s.distance == null ? null : +s.distance,
+          type: s.bus_stop_type || "bus_stop",
+          parent: s.parent_station || "",
+          wheelchair: s.wheelchair_boarding || 0,
+          facilities: s.facilities || [],
+          v2: s.v2_facilities || [],
+          gates: s.stop_gates || {},
+          campaign: s.campaign || null,
+          routes: s.routes || []
+        };
       });
       stopCache[k] = list;
       return list;
     });
   }
 
-  /* ID halte untuk koordinat sebuah halte rute: yang terdekat, diutamakan yang namanya sama. */
+  /*
+   * v2.21: ID halte untuk sebuah halte rute.
+   * Dulu: cocokkan nama dengan `contains` dua arah, kalau gagal ambil yang terdekat tanpa batas jarak.
+   * Dua peron berseberangan (mis. "Pancoran Arah Barat" / "… Arah Timur", ±40 m) jadi saling tertukar,
+   * dan ETA dipasang ke peron yang salah.
+   * Sekarang: nama PERSIS dulu; kalau tidak ada, wajib token arah yang sama dan jarak ≤ 30 m.
+   */
   var idCache = {};
+  var ID_MAX_KM = 0.03;
   function stopIdFor(lat, lon, name) {
-    var k = (+lat).toFixed(5) + "," + (+lon).toFixed(5);
+    var k = (+lat).toFixed(5) + "," + (+lon).toFixed(5) + "|" + nmk(name);
     if (k in idCache) return Promise.resolve(idCache[k]);
     return nearbyStops(lat, lon).then(function (list) {
       if (!list || !list.length) return null;
-      var nk = nmk(name), pick = list[0];
-      for (var i = 0; i < list.length && i < 6; i++) {
-        var sk = nmk(list[i].name);
-        if (nk && sk && (sk === nk || sk.indexOf(nk) >= 0 || nk.indexOf(sk) >= 0)) { pick = list[i]; break; }
+      var nk = nmk(name), tk = dirTok(name), base = nmBase(name), pick = null, i, s, sk;
+      for (i = 0; i < list.length; i++) {                    // 1. nama persis
+        if (nk && nmk(list[i].name) === nk) { pick = list[i]; break; }
       }
+      if (!pick && tk) {                                     // 2. token arah sama, dekat
+        for (i = 0; i < list.length; i++) {
+          s = list[i];
+          if (dirTok(s.name) !== tk) continue;
+          if (base && nmBase(s.name) && nmBase(s.name) !== base) continue;
+          if (s.dist == null || s.dist > ID_MAX_KM) continue;
+          pick = s; break;
+        }
+      }
+      if (!pick) {                                           // 3. tanpa token arah, dekat, tidak bertentangan
+        for (i = 0; i < list.length; i++) {
+          s = list[i];
+          if (tk && dirTok(s.name) && dirTok(s.name) !== tk) continue;
+          if (base && nmBase(s.name) && nmBase(s.name) !== base) continue;
+          if (s.dist == null || s.dist > ID_MAX_KM) continue;
+          pick = s; break;
+        }
+      }
+      if (!pick) return null;                                // jangan menebak: lebih baik tanpa ETA
       idCache[k] = pick.id;
       return pick.id;
     }).catch(function () { return null; });   // gagal (mis. offline): jangan disimpan, coba lagi nanti
@@ -373,14 +419,31 @@
     return -1;
   }
 
-  /* ETA (menit) bus ke halte `fromId`, hanya bila bus masih akan melewati `toId` sesudahnya. */
-  function etaFor(b, fromId, toId) {
+  /* ETA (menit) bus ke halte `fromId`, hanya bila bus masih akan melewati `toId` sesudahnya.
+     v2.21: bila `toId` tidak diketahui tetapi `stopName` membawa token arah, arah tetap dibuktikan
+     dari sisa perjalanan bus: bus yang menyebut peron pasangan (arah berlawanan) tanpa menyebut
+     peron ini ditolak. Dulu tanpa `toId` cek arah dilewati sama sekali. */
+  function siblingOnly(b, stopName) {
+    var tk = dirTok(stopName), base = nmBase(stopName);
+    if (!tk || !base || !b || !b.stops) return false;
+    var mine = false, other = false;
+    for (var i = 0; i < b.stops.length; i++) {
+      var n = b.stops[i] && b.stops[i].name;
+      if (!n || nmBase(n) !== base) continue;
+      var t = dirTok(n);
+      if (!t || t === tk) mine = true; else other = true;
+    }
+    return other && !mine;
+  }
+  function etaFor(b, fromId, toId, stopName) {
     if (!fromId || !b || !b.stops) return null;
     var fi = idxOfStop(b, fromId);
     if (fi < 0) return null;                       // halte sudah dilewati / bukan jalur bus ini
     if (toId) {
       var ti = idxOfStop(b, toId);
       if (ti < 0 || ti <= fi) return null;         // arah salah
+    } else if (stopName && siblingOnly(b, stopName)) {
+      return null;                                 // peron seberang, bukan peron ini
     }
     var m = b.etaMap ? +b.etaMap[fromId] : NaN;
     if (!isFinite(m)) m = +b.stops[fi].eta;
@@ -423,6 +486,10 @@
 
   Live.tjClientVersion = tjClientVersion;
   Live.token = token;
+  Live.apiGet = apiGet;          // dipakai tjapi.js (satu jalur token + jembatan native)
+  Live.dirTok = dirTok;          // token arah pada nama halte: bagian identitas, bukan hiasan
+  Live.nmBase = nmBase;
+  Live.siblingOnly = siblingOnly;
   Live.stops = nearbyStops;
   Live.stopIdFor = stopIdFor;
   Live.etaFor = etaFor;

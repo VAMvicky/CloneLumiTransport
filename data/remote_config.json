@@ -1,7 +1,15 @@
 {
   "v": 1,
-  "updated": "2026-11-11",
-  "_": "Konfigurasi jarak jauh Lumi (v2.16). Aplikasi mengambil berkas ini paling sering tiap 6 jam dan memeriksa isinya (tools/check_remote.py juga dijalankan di CI). Semua kolom opsional.",
-  "tjClientVersion": "2.11.0",
-  "disruptions": "disruptions.json"
+  "updated": "2026-11-14",
+  "_": "Konfigurasi jarak jauh Lumi (v2.21). Aplikasi mengambil berkas ini paling sering tiap 6 jam dan memeriksa isinya (tools/check_remote.py juga dijalankan di CI). Semua kolom opsional. features{} adalah saklar per fitur: false mematikan fitur itu di semua perangkat tanpa rilis baru.",
+  "tjClientVersion": "3.1.1",
+  "disruptions": "disruptions.json",
+  "features": {
+    "liveBus": true,
+    "stopFacilities": true,
+    "serverFares": true,
+    "serverHours": true,
+    "offlineBuses": true,
+    "weather": true
+  }
 }

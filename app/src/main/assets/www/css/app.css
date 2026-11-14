@@ -1115,3 +1115,15 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 
 /* D-02 — penanda lokasi untuk nama halte kembar */
 .stop-where { margin-left: 8px; font-size: 11px; color: #7A93A8; letter-spacing: .2px; }
+
+/* v2.21: fasilitas halte dari REST TJ + jam/headway/tarif dari server.
+   Warna memakai rgba netral supaya ikut tema terang dan gelap tanpa variabel baru. */
+.stop-act-fac { margin: 0 0 10px; }
+.fac-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fac-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px;
+  background: rgba(127, 127, 127, .14); font-size: 12px; line-height: 1.25; }
+.fac-chip img { width: 14px; height: 14px; object-fit: contain; }
+.fac-badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 7px;
+  font-size: 12px; font-weight: 700; background: rgba(127, 127, 127, .2); }
+.fac-src { font-size: 12px; opacity: .6; }
+.hours-srv { opacity: .75; }
