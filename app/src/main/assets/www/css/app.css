@@ -1133,3 +1133,8 @@ html.ob-pending #app > :not(#onboard) { visibility: hidden; }
 .lm-halt.mikro { border-color: #12A594; border-radius: 50%; border-width: 2.5px; }
 :root[data-theme="dark"] .lm-halt.brt { background: #0e1a2e; }
 :root[data-theme="dark"] .lm-halt.mikro { background: #0e1a2e; }
+
+/* v2.24: ikon halte bergambar (bus / angkot / kereta), bukan kotak polos. */
+.lm-halt-i { background: none; border: 0; }
+.lm-halt-i svg { width: 100%; height: 100%; display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }

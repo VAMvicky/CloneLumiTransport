@@ -10,6 +10,17 @@
 
 ---
 
+## ✦ v2.24.0 — 15 November 2026 / 15 November 2026
+
+- 🇮🇩 **Mikrotrans dibangun ulang dari GTFS resmi terbaru** lewat `tools/build_gtfs_snapshot.py` → `data-raw/tj_gtfs_2026_mikro.json` (1,7 MB): 98 rute, 10.041 halte **apa adanya**, dan garis rute untuk **167 arah (0 tanpa shape)**. Dulu 55 rute memakai salinan 2021, jadi pengguna baru melihat halte usang sampai unduhan GTFS pertama selesai. `data.js` 0,62 → 1,69 MB — disengaja. `versionCode` **22400**
+- 🇮🇩 **Nama halte dobel diperbaiki:** "Pancoran Arah Barat Arah Barat" terjadi karena nama resmi sudah memuat arah lalu label menambah sekali lagi. Sekarang dicek sebelum menambah. `versionCode` **22400**
+- 🇮🇩 **Ikon halte bergambar:** bus biru untuk BRT, angkot tosca untuk Mikrotrans, kereta merah untuk stasiun — mengikuti aplikasi resmi. Jenis tetap dari `line.brt`, bukan dari nama. `versionCode` **22400**
+- 🇬🇧 **Mikrotrans rebuilt from the latest official GTFS** via `tools/build_gtfs_snapshot.py` → `data-raw/tj_gtfs_2026_mikro.json` (1.7 MB): 98 routes, 10,041 stops **verbatim**, and route shapes for **167 directions (0 without a shape)**. Previously 55 routes used a 2021 copy, so new installs saw stale stops until the first GTFS download. `data.js` 0.62 → 1.69 MB — deliberate. `versionCode` **22400**
+- 🇬🇧 **Doubled stop names fixed:** "Pancoran Arah Barat Arah Barat" happened because the official name already carries the direction and the label appended it again. It is now checked before appending. `versionCode` **22400**
+- 🇬🇧 **Stops now use drawn icons:** blue bus for BRT, teal angkot for Mikrotrans, red train for rail stations. The type still comes from `line.brt`, not the name. `versionCode` **22400**
+
+---
+
 ## ✦ v2.23.0 — 15 November 2026 / 15 November 2026
 
 - 🇮🇩 **Halte di peta dibedakan:** BRT kotak biru, non-BRT/Mikrotrans titik bulat tosca kecil, kereta bulat merah. Jenis dihitung dari rute yang benar-benar berhenti di titik itu (`line.brt`), bukan dari nama; tooltip menampilkan arah peron. `versionCode` **22300**

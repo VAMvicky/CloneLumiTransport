@@ -531,6 +531,38 @@ if FARES.get("v") != 1 or not all(k in FARES for k in ("tj", "krl", "mrt", "lrt"
     sys.exit("data/fares.json tidak lengkap")
 
 
+# ------------------------------------- Mikrotrans dari GTFS resmi 2026 ----
+# data-raw/tj_gtfs_2021/ adalah salinan 2021: nama halte, urutan halte, dan sebagian rutenya
+# sudah berubah. Supaya pengguna baru melihat data yang benar SEBELUM unduhan GTFS pertama,
+# Mikrotrans diambil dari snapshot resmi terbaru (tools/build_gtfs_snapshot.py) bila tersedia.
+_MIKRO_SNAP = os.path.join(RAW, "tj_gtfs_2026_mikro.json")
+_mikro_used = 0
+_SNAP_DIRS = set()          # arah dari GTFS resmi: urutannya sudah benar, jangan diutak-atik
+if os.path.exists(_MIKRO_SNAP):
+    try:
+        _MS = json.load(open(_MIKRO_SNAP, encoding="utf-8")).get("routes") or {}
+    except Exception as _e:
+        _MS = {}
+        print("snapshot mikro dilewati:", _e)
+    for _l in lines:
+        if _l.get("mode") != "MIKRO":
+            continue
+        _ent = _MS.get(norm_code(_l.get("code")))
+        if not _ent or not _ent.get("dirs"):
+            continue
+        _dirs = []
+        for _d in _ent["dirs"]:
+            _st = [{"n": _x[2], "p": [_x[0], _x[1]]} for _x in (_d.get("s") or [])]
+            if len(_st) < 2:
+                continue
+            _one = {"h": _d.get("h") or "Arah", "s": _st, "shape": _d.get("shape")}
+            _dirs.append(_one)
+            _SNAP_DIRS.add(id(_one))
+        if _dirs:
+            _l["dirs"] = _dirs
+            _mikro_used += 1
+    print("mikro dari GTFS resmi 2026:", _mikro_used, "rute")
+
 # ------------------------------------------------- normalisasi nama halte (v2.22) ----
 # Tiga hal yang dulu tidak disentuh, sekarang dikerjakan saat build:
 #  1. Nama halte disamakan dengan aplikasi resmi 2026 (snapshot data-raw/tj_stops_2026.json).
@@ -677,6 +709,15 @@ for a in range(len(_pts)):
 # --- 3) tulis ulang daftar halte tiap arah ------------------------------------------
 for _l in lines:
     for _d in (_l.get("dirs") or []):
+        if id(_d) in _SNAP_DIRS:
+            # GTFS resmi: urutan halte apa adanya. Hanya token arah yang ditambahkan.
+            for _st in (_d.get("s") or []):
+                _t = _dir_tok(_st["n"])
+                if _t:
+                    _st["d"] = _t
+                if re.match(r"^(sbr\.?|seberang)\s+", _st["n"], re.I):
+                    _st["x"] = 1
+            continue
         out = []
         for _st in (_d.get("s") or []):
             raw = _st["n"]

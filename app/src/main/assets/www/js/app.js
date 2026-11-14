@@ -452,8 +452,12 @@
   function dirLabel(t) { return t ? (EN ? (DIR_EN[t] || t) : t) : ""; }
   function stopLabel(s) {
     if (!s) return "";
-    if (!s.d) return s.n;
-    var t = s.d.charAt(0).toUpperCase() + s.d.slice(1);
+    var tok = s.d || LumiLive.dirTok(s.n) || "";
+    if (!tok) return s.n;
+    // v2.24: nama dari data resmi SUDAH memuat arahnya ("Pancoran Arah Barat"). Menambahkan lagi
+    // menghasilkan "Pancoran Arah Barat Arah Barat". Cek dulu sebelum menambah.
+    if (new RegExp("\\barah\\s+" + tok + "\\b", "i").test(s.n)) return s.n;
+    var t = tok.charAt(0).toUpperCase() + tok.slice(1);
     return s.n + " " + tl("Arah ", "towards ") + t;
   }
   /* D-02: nama halte kembar yang titiknya berjauhan diberi penanda koordinat,
@@ -1167,13 +1171,34 @@
    * v2.23: titik halte di peta dibedakan menurut jenisnya — BRT, non-BRT (Mikrotrans), dan kereta.
    * Dulu semua titik sama, jadi orang nggak bisa lihat mana yang dilayani bus BRT berhenti.
    */
-  var HALT_ICON = {
-    brt: [15, 15], mikro: [11, 11], rail: [15, 15]
+  /*
+   * v2.24: ikon halte bergambar, bukan kotak/titik polos — bus untuk BRT, angkot untuk Mikrotrans,
+   * kereta untuk stasiun. Bentuknya mengikuti aplikasi resmi supaya orang langsung tahu jenisnya.
+   */
+  var HALT_SVG = {
+    brt: '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<rect x="2.5" y="3.5" width="19" height="15" rx="3.5" fill="#1565D8"/>' +
+      '<rect x="5.2" y="6.2" width="13.6" height="6" rx="1.4" fill="#eaf2ff"/>' +
+      '<circle cx="7.6" cy="16.2" r="1.7" fill="#0b2440"/><circle cx="16.4" cy="16.2" r="1.7" fill="#0b2440"/>' +
+      '<rect x="10.6" y="2" width="2.8" height="2.4" rx="1" fill="#1565D8"/></svg>',
+    mikro: '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<rect x="2.5" y="6.5" width="19" height="10.5" rx="3" fill="#12A594"/>' +
+      '<rect x="5.5" y="8.8" width="8" height="4.4" rx="1.2" fill="#e6fffb"/>' +
+      '<rect x="14.8" y="8.8" width="3.4" height="4.4" rx="1" fill="#e6fffb"/>' +
+      '<circle cx="7.8" cy="18" r="1.6" fill="#06332e"/><circle cx="16.2" cy="18" r="1.6" fill="#06332e"/></svg>',
+    rail: '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<circle cx="12" cy="12" r="10.5" fill="#E2231A"/>' +
+      '<rect x="7" y="6" width="10" height="8.4" rx="2.2" fill="#fff"/>' +
+      '<rect x="8.4" y="7.4" width="3.4" height="3.4" rx=".6" fill="#E2231A"/>' +
+      '<rect x="12.2" y="7.4" width="3.4" height="3.4" rx=".6" fill="#E2231A"/>' +
+      '<rect x="9" y="15.2" width="6" height="1.8" rx=".9" fill="#fff"/>' +
+      '<rect x="9.8" y="17.4" width="1.6" height="3" rx=".8" fill="#fff"/>' +
+      '<rect x="12.6" y="17.4" width="1.6" height="3" rx=".8" fill="#fff"/></svg>'
   };
   function haltIcon(kind) {
-    var cls = kind === "rail" ? " rail" : kind === "brt" ? " brt" : " mikro";
-    var sz = HALT_ICON[kind] || HALT_ICON.mikro;
-    return L.divIcon({ className: "", html: '<div class="lm-halt' + cls + '"></div>', iconSize: sz, iconAnchor: [sz[0] / 2, sz[1] / 2] });
+    var k = kind === "rail" ? "rail" : kind === "brt" ? "brt" : "mikro";
+    var sz = k === "mikro" ? 21 : 25;
+    return L.divIcon({ className: "lm-halt-i", html: HALT_SVG[k], iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] });
   }
   function showHaltsOn(map) {
     if (map._halts) { map._halts.remove(); map.off("moveend zoomend", map._haltsFn); }
