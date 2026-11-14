@@ -10,6 +10,15 @@
 
 ---
 
+## ✦ v2.21.1 — 14 November 2026 / 14 November 2026
+
+- 🇮🇩 **Pantau perubahan rute berhenti gagal.** Langkah `javac` di `route-watch.yml` hanya mengompilasi `GtfsImporter.java`, padahal berkas itu memakai `Csv`/`Lang`/`AppInfo` (kelas Android) → `cannot find symbol`, dan `set -e` mematikan job sebelum "Simpan perubahan". `data/route_changes.json` karena itu tidak pernah naik. Langkah mati itu dibuang. `versionCode` **22101**
+- 🇮🇩 **Data rute diperiksa saat aplikasi dibuka.** Halaman memanggil `LumiNative.checkRoutesNow()` ±1,2 dtk setelah layar pertama tampil (dulu hanya lewat JobScheduler latar). Kartu "rute berubah" langsung memuat rincian sebelum → sesudah: halte ditambah, halte tidak lagi dilewati, urutan lama vs baru. Dibatasi sekali per 30 menit. `versionCode` **22101**
+- 🇬🇧 **The route watcher no longer fails.** A `javac` step in `route-watch.yml` compiled only `GtfsImporter.java`, which uses `Csv`/`Lang`/`AppInfo` (Android classes) → `cannot find symbol`, and `set -e` killed the job before "Simpan perubahan". That is why `data/route_changes.json` never advanced. The dead step is removed. `versionCode` **22101**
+- 🇬🇧 **Route data is checked when the app opens.** The page now calls `LumiNative.checkRoutesNow()` about 1.2 s after first paint (previously only via the background JobScheduler). The "route changed" card loads the before → after detail immediately: added stops, stops no longer served, old vs new stop order. Capped at once per 30 minutes. `versionCode` **22101**
+
+---
+
 ## ✦ v2.21.0 — 14 November 2026 / 14 November 2026
 
 - 🇮🇩 **Fasilitas & rute resmi di lembar halte.** Lembar halte kini menampilkan jenis titik (halte BRT / bus_stop), fasilitas beserta ikonnya, akses kursi roda, dan daftar rute resmi dengan warna koridornya — dari `GET /v1/bus-stop` dan `/v1/bus-stop/{id}`. `versionCode` **22100**

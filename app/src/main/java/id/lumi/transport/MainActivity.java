@@ -942,6 +942,23 @@ public class MainActivity extends Activity {
             }});
         }
 
+        /**
+         * v2.21: periksa umpan perubahan rute sekarang juga, tanpa menunggu jadwal JobScheduler.
+         * Dipanggil halaman saat aplikasi dibuka, supaya data rute yang dipakai selalu yang terbaru
+         * dan kartu "rute berubah" (lengkap dengan sebelum → sesudah) langsung terisi.
+         */
+        @JavascriptInterface
+        public void checkRoutesNow() {
+            pool.execute(new Runnable() { @Override public void run() {
+                try {
+                    RouteWatchJob.check(MainActivity.this);
+                } catch (Throwable e) {
+                    android.util.Log.w("lumi", "checkRoutesNow: " + e);
+                }
+                js("window.__lumiRoutesChecked && window.__lumiRoutesChecked()");
+            }});
+        }
+
         /** Data rute hasil GTFS yang tersimpan (atau null). */
         @JavascriptInterface
         public String getRouteData() {

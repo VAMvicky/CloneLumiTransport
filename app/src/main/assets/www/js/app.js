@@ -3916,6 +3916,34 @@
     });
   }
 
+  /*
+   * v2.21: umpan perubahan rute diperiksa SAAT APLIKASI DIBUKA, bukan hanya lewat JobScheduler
+   * latar (yang bisa tertunda berjam-jam oleh mode hemat daya). Pemeriksaan ini juga yang mengisi
+   * kartu "rute berubah" beserta rincian sebelum → sesudah dari RouteUpdater.
+   * Jeda 30 menit supaya membuka aplikasi berulang tidak memanggil server terus.
+   */
+  var ROUTE_CHECK_MS = 30 * 60000;
+  function routeCheckDue() {
+    var at = store("remoteAt") || {};
+    return !at.route || Date.now() - at.route > ROUTE_CHECK_MS;
+  }
+  function checkRoutesNow(force) {
+    if (!NATIVE || !NATIVE.checkRoutesNow) return;
+    if (!force && !routeCheckDue()) return;
+    try { NATIVE.checkRoutesNow(); } catch (e) { lumiLog(e); }
+  }
+  /* Dipanggil native setelah pemeriksaan selesai (berhasil maupun gagal). */
+  window.__lumiRoutesChecked = function () {
+    try {
+      var at = store("remoteAt") || {};
+      at.route = Date.now(); store("remoteAt", at);
+      STOP_INDEX = null;                       // titik halte bisa berubah setelah data baru dipakai
+      if (typeof renderChangesCard === "function") renderChangesCard();
+      if (typeof renderGtfsBanner === "function") renderGtfsBanner();
+      if (typeof renderSettings === "function" && $("#sheetSettings") && !$("#sheetSettings").hidden) renderSettings();
+    } catch (e) { lumiLog(e); }
+  };
+
   /* ---------------------------------------------------------------- 4. info gangguan */
   var SEVS = { info: 1, warn: 1, severe: 1 };
   function validDisruptions(d) {
@@ -4379,6 +4407,8 @@
   }
   setTimeout(function () { refreshService(false); }, 5000);
   setInterval(function () { refreshService(false); }, 10 * 60000);
+  // v2.21: begitu layar pertama tampil, periksa data rute resmi — tanpa menunggu 5 detik atau job latar.
+  setTimeout(function () { checkRoutesNow(false); }, 1200);
 
   /*
    * v2.16: bila koordinat tidak terbaca dari tautan Google Maps, jangan langsung minta pengguna menaruh pin
