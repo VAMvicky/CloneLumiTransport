@@ -1198,7 +1198,8 @@
   function haltIcon(kind) {
     var k = kind === "rail" ? "rail" : kind === "brt" ? "brt" : "mikro";
     var sz = k === "mikro" ? 21 : 25;
-    return L.divIcon({ className: "lm-halt-i", html: HALT_SVG[k], iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] });
+    // "lm-halt" dipertahankan: itu kait yang dipakai uji UI untuk mengetuk halte di peta.
+    return L.divIcon({ className: "lm-halt-i lm-halt", html: HALT_SVG[k], iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] });
   }
   function showHaltsOn(map) {
     if (map._halts) { map._halts.remove(); map.off("moveend zoomend", map._haltsFn); }
